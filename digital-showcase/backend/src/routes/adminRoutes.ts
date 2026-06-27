@@ -1,0 +1,19 @@
+import { Router } from "express";
+import * as controller from "../controllers/adminController.js";
+import { adminOnly, authMiddleware } from "../middleware/authMiddleware.js";
+
+export const adminRoutes = Router();
+adminRoutes.use(authMiddleware, adminOnly);
+adminRoutes.get("/owners", controller.listOwners);
+adminRoutes.post("/owners", controller.createOwner);
+adminRoutes.get("/owners/:id", controller.getOwner);
+adminRoutes.patch("/owners/:id", controller.updateOwner);
+adminRoutes.delete("/owners/:id", controller.deleteOwner);
+adminRoutes.get("/stores", controller.listStores);
+adminRoutes.post("/stores", controller.createStore);
+adminRoutes.get("/stores/:id", controller.getStore);
+adminRoutes.patch("/stores/:id", controller.updateStore);
+adminRoutes.delete("/stores/:id", controller.deleteStore);
+adminRoutes.post("/stores/:id/extend-subscription", controller.extendSubscription);
+adminRoutes.post("/stores/:id/disable", controller.disableStore);
+adminRoutes.post("/stores/:id/enable", controller.enableStore);

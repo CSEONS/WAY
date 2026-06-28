@@ -9,17 +9,29 @@ import type { User } from "./types/models";
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(() => Boolean(localStorage.getItem("token")));
 
   useEffect(() => {
-    if (localStorage.getItem("token")) {
-      api.get("/auth/me").then((res) => setUser(res.data)).catch(() => localStorage.removeItem("token"));
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setIsAuthLoading(false);
+      return;
     }
+
+    api
+      .get("/auth/me")
+      .then((res) => setUser(res.data))
+      .catch(() => {
+        localStorage.removeItem("token");
+        setUser(null);
+      })
+      .finally(() => setIsAuthLoading(false));
   }, []);
 
   return (
     <BrowserRouter>
       <Layout user={user} onLogout={() => setUser(null)} />
-      <AppRoutes user={user} onLogin={setUser} />
+      <AppRoutes user={user} isAuthLoading={isAuthLoading} onLogin={setUser} />
     </BrowserRouter>
   );
 }

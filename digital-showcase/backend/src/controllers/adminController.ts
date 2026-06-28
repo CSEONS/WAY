@@ -21,6 +21,13 @@ export const updateOwner = asyncHandler(async (req, res) => {
   res.json(owner);
 });
 
+export const changeOwnerPassword = asyncHandler(async (req, res) => {
+  requireFields(req.body, ["password"]);
+  const owner = await userService.updateOwner(String(req.params.id), { password: req.body.password });
+  if (!owner) throw new HttpError(404, "Владелец не найден");
+  res.json(owner);
+});
+
 export const deleteOwner = asyncHandler(async (req, res) => {
   await userService.deleteOwner(String(req.params.id));
   res.status(204).send();
@@ -69,3 +76,7 @@ export const enableStore = asyncHandler(async (req, res) => {
   if (!store) throw new HttpError(404, "Магазин не найден");
   res.json(store);
 });
+
+export const archiveStore = disableStore;
+
+export const restoreStore = enableStore;

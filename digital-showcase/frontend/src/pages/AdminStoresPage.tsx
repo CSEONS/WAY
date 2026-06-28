@@ -35,6 +35,11 @@ export function AdminStoresPage() {
     load();
   }
 
+  async function toggleAiForm(store: Store) {
+    await api.post(`/admin/stores/${store.id}/${store.aiFormEnabled ? "disable-ai-form" : "enable-ai-form"}`);
+    load();
+  }
+
   return (
     <section>
       <h1>Управление магазинами</h1>
@@ -84,6 +89,7 @@ export function AdminStoresPage() {
                 </span>
                 <span>{store.ownerName}</span>
                 <button onClick={() => extend(store.id)}>+30 дней</button>
+                <button onClick={() => toggleAiForm(store)}>{store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}</button>
                 <button onClick={() => toggle(store)}>{store.isActive ? "Архивировать" : "Восстановить"}</button>
               </div>
             ))}

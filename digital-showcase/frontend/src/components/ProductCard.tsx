@@ -8,6 +8,10 @@ const statusMap = {
 };
 
 export function ProductCard({ product, slug }: { product: Product; slug: string }) {
+  const variantPrices = product.variants.map((variant) => variant.price).filter((price): price is number => price != null);
+  const minPrice = variantPrices.length ? Math.min(...variantPrices) : null;
+  const displayPrice = product.price ?? minPrice;
+
   return (
     <Link className="product-card" to={`/m/${slug}/p/${product.id}`}>
       <div className="product-image">
@@ -15,7 +19,7 @@ export function ProductCard({ product, slug }: { product: Product; slug: string 
       </div>
       <div className="product-body">
         <h3>{product.title}</h3>
-        <p>{product.priceText || (product.price ? `${product.price.toLocaleString("ru-RU")} ₽` : "Цена в магазине")}</p>
+        <p>{product.priceText || (displayPrice != null ? `${displayPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине")}</p>
         <small>{product.category || "Без категории"}</small>
         <div className="chips">
           {product.sizes.map((size) => (

@@ -32,8 +32,8 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   await db.run(
-    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, coverUrl, isActive, subscriptionEndsAt, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, coverUrl, isActive, aiFormEnabled, subscriptionEndsAt, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.ownerId,
     input.name,
@@ -46,6 +46,7 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
     input.logoUrl ?? null,
     input.coverUrl ?? null,
     input.isActive ?? 1,
+    input.aiFormEnabled ?? 0,
     input.subscriptionEndsAt ?? null,
     now,
     now
@@ -59,7 +60,7 @@ export async function updateStore(id: string, input: Partial<Store>) {
   const db = await getDb();
   await db.run(
     `UPDATE stores SET ownerId = ?, name = ?, slug = ?, description = ?, address = ?, phone = ?, whatsapp = ?, telegram = ?,
-     logoUrl = ?, coverUrl = ?, isActive = ?, subscriptionEndsAt = ?, updatedAt = ? WHERE id = ?`,
+     logoUrl = ?, coverUrl = ?, isActive = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, updatedAt = ? WHERE id = ?`,
     input.ownerId ?? current.ownerId,
     input.name ?? current.name,
     input.slug ?? current.slug,
@@ -71,6 +72,7 @@ export async function updateStore(id: string, input: Partial<Store>) {
     input.logoUrl ?? current.logoUrl,
     input.coverUrl ?? current.coverUrl,
     input.isActive ?? current.isActive,
+    input.aiFormEnabled ?? current.aiFormEnabled,
     input.subscriptionEndsAt ?? current.subscriptionEndsAt,
     new Date().toISOString(),
     id

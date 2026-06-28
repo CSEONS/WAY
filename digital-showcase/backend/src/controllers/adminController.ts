@@ -80,3 +80,15 @@ export const enableStore = asyncHandler(async (req, res) => {
 export const archiveStore = disableStore;
 
 export const restoreStore = enableStore;
+
+export const enableAiForm = asyncHandler(async (req, res) => {
+  const store = await storeService.updateStore(String(req.params.id), { aiFormEnabled: 1 });
+  if (!store) throw new HttpError(404, "Магазин не найден");
+  res.json(store);
+});
+
+export const disableAiForm = asyncHandler(async (req, res) => {
+  const store = await storeService.updateStore(String(req.params.id), { aiFormEnabled: 0 });
+  if (!store) throw new HttpError(404, "Магазин не найден");
+  res.json(store);
+});

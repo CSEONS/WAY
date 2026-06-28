@@ -1,6 +1,7 @@
 import { asyncHandler, HttpError, requireFields } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
+import { createProductAiDraft } from "../services/aiDraftService.js";
 
 async function currentStore(ownerId: string) {
   const store = await storeService.getOwnerStore(ownerId);
@@ -33,6 +34,13 @@ export const createProduct = asyncHandler(async (req, res) => {
   requireFields(req.body, ["title"]);
   const store = await currentStore(req.user!.userId);
   res.status(201).json(await productService.createProduct({ ...req.body, storeId: store.id }));
+});
+
+export const createProductDraft = asyncHandler(async (req, res) => {
+  requireFields(req.body, ["prompt"]);
+  const store = await currentStore(req.user!.userId);
+  if (!store.aiFormEnabled) throw new HttpError(403, "ИИ-заполнение формы не подключено");
+  res.json(createProductAiDraft(String(req.body.prompt)));
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {

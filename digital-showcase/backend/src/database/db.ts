@@ -90,6 +90,7 @@ export async function initDatabase() {
       logoUrl TEXT,
       coverUrl TEXT,
       isActive INTEGER NOT NULL DEFAULT 1,
+      aiFormEnabled INTEGER NOT NULL DEFAULT 0,
       subscriptionEndsAt TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
@@ -125,7 +126,20 @@ export async function initDatabase() {
       name TEXT NOT NULL,
       hex TEXT
     );
+    CREATE TABLE IF NOT EXISTS product_variants (
+      id TEXT PRIMARY KEY,
+      productId TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      colorName TEXT NOT NULL,
+      colorHex TEXT,
+      size TEXT NOT NULL,
+      price REAL
+    );
   `);
+
+  const storeColumns = await database.all<{ name: string }>("PRAGMA table_info(stores)");
+  if (!storeColumns.some((column) => column.name === "aiFormEnabled")) {
+    await database.exec("ALTER TABLE stores ADD COLUMN aiFormEnabled INTEGER NOT NULL DEFAULT 0");
+  }
 
   const existing = await database.get<{ count: number }>("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");
   if (!existing?.count) {

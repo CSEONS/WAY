@@ -20,3 +20,5 @@ adminRoutes.post("/stores/:id/disable", controller.disableStore);
 adminRoutes.post("/stores/:id/enable", controller.enableStore);
 adminRoutes.post("/stores/:id/archive", controller.archiveStore);
 adminRoutes.post("/stores/:id/restore", controller.restoreStore);
+adminRoutes.post("/stores/:id/enable-ai-form", controller.enableAiForm);
+adminRoutes.post("/stores/:id/disable-ai-form", controller.disableAiForm);

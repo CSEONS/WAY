@@ -23,6 +23,7 @@ export interface Store {
   logoUrl: string | null;
   coverUrl: string | null;
   isActive: number;
+  aiFormEnabled: number;
   subscriptionEndsAt: string | null;
 }
 
@@ -43,6 +44,14 @@ export interface ProductColor {
   hex: string | null;
 }
 
+export interface ProductVariant {
+  id: string;
+  colorName: string;
+  colorHex: string | null;
+  size: string;
+  price: number | null;
+}
+
 export interface Product {
   id: string;
   storeId: string;
@@ -56,4 +65,5 @@ export interface Product {
   images: ProductImage[];
   sizes: ProductSize[];
   colors: ProductColor[];
+  variants: ProductVariant[];
 }

@@ -8,8 +8,10 @@ export function ProductEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product>();
+  const [aiFormEnabled, setAiFormEnabled] = useState(false);
 
   useEffect(() => {
+    api.get("/owner/store").then((res) => setAiFormEnabled(Boolean(res.data.aiFormEnabled)));
     if (id) api.get(`/owner/products/${id}`).then((res) => setProduct(res.data));
   }, [id]);
 
@@ -27,7 +29,7 @@ export function ProductEditorPage() {
   return (
     <section className="narrow">
       <h1>{id ? "Редактировать товар" : "Новый товар"}</h1>
-      <ProductForm initial={product} onSubmit={save} />
+      <ProductForm initial={product} aiFormEnabled={aiFormEnabled} onSubmit={save} />
     </section>
   );
 }

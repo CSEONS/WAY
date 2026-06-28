@@ -1,12 +1,20 @@
 import { getDb } from "../database/db.js";
-import type { Product, ProductColor, ProductFull, ProductImage, ProductSize } from "../types/models.js";
+import type { Product, ProductColor, ProductFull, ProductImage, ProductSize, ProductVariant } from "../types/models.js";
+
+type ProductVariantInput = {
+  colorName?: string;
+  colorHex?: string | null;
+  size?: string;
+  price?: number | string | null;
+};
 
 async function enrich(product: Product): Promise<ProductFull> {
   const db = await getDb();
   const images = await db.all<ProductImage>("SELECT * FROM product_images WHERE productId = ? ORDER BY sortOrder, createdAt", product.id);
   const sizes = await db.all<ProductSize>("SELECT * FROM product_sizes WHERE productId = ? ORDER BY value", product.id);
   const colors = await db.all<ProductColor>("SELECT * FROM product_colors WHERE productId = ? ORDER BY name", product.id);
-  return { ...product, images, sizes, colors };
+  const variants = await db.all<ProductVariant>("SELECT * FROM product_variants WHERE productId = ? ORDER BY colorName, size", product.id);
+  return { ...product, images, sizes, colors, variants };
 }
 
 export async function listProducts(storeId: string, publicOnly = false, filters: { q?: string; category?: string; size?: string; color?: string } = {}) {
@@ -23,12 +31,12 @@ export async function listProducts(storeId: string, publicOnly = false, filters:
     params.push(filters.category);
   }
   if (filters.size) {
-    where.push("EXISTS (SELECT 1 FROM product_sizes s WHERE s.productId = p.id AND s.value = ?)");
-    params.push(filters.size);
+    where.push("(EXISTS (SELECT 1 FROM product_sizes s WHERE s.productId = p.id AND s.value = ?) OR EXISTS (SELECT 1 FROM product_variants v WHERE v.productId = p.id AND v.size = ?))");
+    params.push(filters.size, filters.size);
   }
   if (filters.color) {
-    where.push("EXISTS (SELECT 1 FROM product_colors c WHERE c.productId = p.id AND c.name = ?)");
-    params.push(filters.color);
+    where.push("(EXISTS (SELECT 1 FROM product_colors c WHERE c.productId = p.id AND c.name = ?) OR EXISTS (SELECT 1 FROM product_variants v WHERE v.productId = p.id AND v.colorName = ?))");
+    params.push(filters.color, filters.color);
   }
   const products = await db.all<Product>(`SELECT p.* FROM products p WHERE ${where.join(" AND ")} ORDER BY p.createdAt DESC`, params);
   return Promise.all(products.map(enrich));
@@ -59,7 +67,55 @@ async function replaceDetails(productId: string, sizes?: string[], colors?: { na
   }
 }
 
-export async function createProduct(input: Partial<Product> & { storeId: string; title: string; sizes?: string[]; colors?: { name: string; hex?: string | null }[] }) {
+function normalizeVariants(variants?: ProductVariantInput[]) {
+  return variants
+    ?.map((variant) => ({
+      colorName: variant.colorName?.trim() ?? "",
+      colorHex: variant.colorHex?.trim() || null,
+      size: variant.size?.trim() ?? "",
+      price: variant.price === "" || variant.price == null ? null : Number(variant.price)
+    }))
+    .filter((variant) => variant.colorName && variant.size && (variant.price === null || Number.isFinite(variant.price)));
+}
+
+function detailsFromVariants(variants: ReturnType<typeof normalizeVariants>) {
+  const sizeValues = [...new Set((variants ?? []).map((variant) => variant.size))];
+  const colorsByName = new Map<string, { name: string; hex: string | null }>();
+  for (const variant of variants ?? []) {
+    if (!colorsByName.has(variant.colorName)) colorsByName.set(variant.colorName, { name: variant.colorName, hex: variant.colorHex });
+  }
+  return { sizes: sizeValues, colors: [...colorsByName.values()] };
+}
+
+async function replaceVariants(productId: string, variants?: ProductVariantInput[]) {
+  if (!variants) return;
+  const db = await getDb();
+  const normalized = normalizeVariants(variants);
+  await db.run("DELETE FROM product_variants WHERE productId = ?", productId);
+  for (const variant of normalized ?? []) {
+    await db.run(
+      "INSERT INTO product_variants (id, productId, colorName, colorHex, size, price) VALUES (?, ?, ?, ?, ?, ?)",
+      crypto.randomUUID(),
+      productId,
+      variant.colorName,
+      variant.colorHex,
+      variant.size,
+      variant.price
+    );
+  }
+  const details = detailsFromVariants(normalized);
+  await replaceDetails(productId, details.sizes, details.colors);
+}
+
+export async function createProduct(
+  input: Partial<Product> & {
+    storeId: string;
+    title: string;
+    sizes?: string[];
+    colors?: { name: string; hex?: string | null }[];
+    variants?: ProductVariantInput[];
+  }
+) {
   const db = await getDb();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -78,11 +134,16 @@ export async function createProduct(input: Partial<Product> & { storeId: string;
     now,
     now
   );
-  await replaceDetails(id, input.sizes, input.colors);
+  if (input.variants) await replaceVariants(id, input.variants);
+  else await replaceDetails(id, input.sizes, input.colors);
   return getProduct(id);
 }
 
-export async function updateProduct(id: string, storeId: string, input: Partial<Product> & { sizes?: string[]; colors?: { name: string; hex?: string | null }[] }) {
+export async function updateProduct(
+  id: string,
+  storeId: string,
+  input: Partial<Product> & { sizes?: string[]; colors?: { name: string; hex?: string | null }[]; variants?: ProductVariantInput[] }
+) {
   const current = await getProduct(id, storeId);
   if (!current) return null;
   const db = await getDb();
@@ -99,7 +160,8 @@ export async function updateProduct(id: string, storeId: string, input: Partial<
     id,
     storeId
   );
-  await replaceDetails(id, input.sizes, input.colors);
+  if (input.variants) await replaceVariants(id, input.variants);
+  else await replaceDetails(id, input.sizes, input.colors);
   return getProduct(id, storeId);
 }
 

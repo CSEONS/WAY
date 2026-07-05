@@ -25,6 +25,8 @@ export interface Store {
   isActive: number;
   aiFormEnabled: number;
   subscriptionEndsAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProductImage {
@@ -62,6 +64,8 @@ export interface Product {
   category: string | null;
   status: ProductStatus;
   isVisible: number;
+  createdAt: string;
+  updatedAt: string;
   images: ProductImage[];
   sizes: ProductSize[];
   colors: ProductColor[];

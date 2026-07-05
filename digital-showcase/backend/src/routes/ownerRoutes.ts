@@ -1,17 +1,31 @@
 import { Router } from "express";
 import * as controller from "../controllers/ownerController.js";
 import { authMiddleware, ownerOnly } from "../middleware/authMiddleware.js";
-import { upload } from "../middleware/upload.js";
+import { audioUpload, upload } from "../middleware/upload.js";
 
 export const ownerRoutes = Router();
 ownerRoutes.use(authMiddleware, ownerOnly);
+ownerRoutes.get("/stores", controller.listStores);
+ownerRoutes.get("/stores/:storeId", controller.getStore);
+ownerRoutes.patch("/stores/:storeId", controller.updateStore);
+ownerRoutes.get("/stores/:storeId/products", controller.listProducts);
+ownerRoutes.post("/stores/:storeId/products/ai-draft", audioUpload.single("voice"), controller.createProductDraft);
+ownerRoutes.post("/stores/:storeId/products", controller.createProduct);
+ownerRoutes.get("/stores/:storeId/products/:id", controller.getProduct);
+ownerRoutes.patch("/stores/:storeId/products/:id", controller.updateProduct);
+ownerRoutes.delete("/stores/:storeId/products/:id", controller.deleteProduct);
+ownerRoutes.post("/stores/:storeId/products/:id/images", upload.single("image"), controller.addImage);
+ownerRoutes.patch("/stores/:storeId/products/:id/images/order", controller.reorderImages);
+ownerRoutes.delete("/stores/:storeId/products/:id/images/:imageId", controller.deleteImage);
+
 ownerRoutes.get("/store", controller.getStore);
 ownerRoutes.patch("/store", controller.updateStore);
 ownerRoutes.get("/products", controller.listProducts);
-ownerRoutes.post("/products/ai-draft", controller.createProductDraft);
+ownerRoutes.post("/products/ai-draft", audioUpload.single("voice"), controller.createProductDraft);
 ownerRoutes.post("/products", controller.createProduct);
 ownerRoutes.get("/products/:id", controller.getProduct);
 ownerRoutes.patch("/products/:id", controller.updateProduct);
 ownerRoutes.delete("/products/:id", controller.deleteProduct);
 ownerRoutes.post("/products/:id/images", upload.single("image"), controller.addImage);
+ownerRoutes.patch("/products/:id/images/order", controller.reorderImages);
 ownerRoutes.delete("/products/:id/images/:imageId", controller.deleteImage);

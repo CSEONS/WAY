@@ -194,3 +194,13 @@ export async function deleteProductImage(productId: string, storeId: string, ima
   await db.run("DELETE FROM product_images WHERE id = ? AND productId = ?", imageId, productId);
   return getProduct(productId, storeId);
 }
+
+export async function reorderProductImages(productId: string, storeId: string, imageIds: string[]) {
+  const product = await getProduct(productId, storeId);
+  if (!product) return null;
+  const db = await getDb();
+  for (const [index, imageId] of imageIds.entries()) {
+    await db.run("UPDATE product_images SET sortOrder = ? WHERE id = ? AND productId = ?", index, imageId, productId);
+  }
+  return getProduct(productId, storeId);
+}

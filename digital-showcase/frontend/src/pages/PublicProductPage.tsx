@@ -10,12 +10,14 @@ export function PublicProductPage() {
   const [firstChoice, setFirstChoice] = useState<"color" | "size" | null>(null);
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
+  const [selectedImageId, setSelectedImageId] = useState("");
 
   useEffect(() => {
     api
       .get(`/public/stores/${storeSlug}/products/${productId}`)
       .then((res) => {
         setData(res.data);
+        setSelectedImageId(res.data.product.images[0]?.id ?? "");
         resetVariantSelection();
       })
       .catch((err) => setError(err.response?.data?.message ?? "Товар недоступен"));
@@ -32,6 +34,7 @@ export function PublicProductPage() {
   if (error) return <section className="empty">{error}</section>;
   if (!data) return <section className="empty">Загрузка...</section>;
   const { store, product } = data;
+  const selectedImage = product.images.find((image) => image.id === selectedImageId) ?? product.images[0];
   const variants = product.variants ?? [];
   const selectedVariant = variants.find((variant) => variant.colorName === selectedColor && variant.size === selectedSize);
   const displayedPrice = selectedVariant?.price ?? product.price;
@@ -66,12 +69,27 @@ export function PublicProductPage() {
 
   return (
     <section className="product-page">
-      <div className="gallery">
-        {product.images.length ? product.images.map((image) => <img key={image.id} src={image.url} alt={product.title} />) : <div className="placeholder">Фото скоро</div>}
+      <div className="product-slider">
+        {selectedImage ? (
+          <>
+            <div className="product-slider-main">
+              <img src={selectedImage.url} alt={product.title} />
+            </div>
+            <div className="product-slider-thumbs">
+              {product.images.map((image) => (
+                <button className={selectedImage.id === image.id ? "active" : ""} type="button" key={image.id} onClick={() => setSelectedImageId(image.id)}>
+                  <img src={image.url} alt={product.title} />
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="placeholder">Фото скоро</div>
+        )}
       </div>
       <article>
         <h1>{product.title}</h1>
-        <p className="price">{displayedPriceText}</p>
+        <p className="price">{product.priceText ? `Цена: ${displayedPriceText}` : displayedPriceText}</p>
         <p>{product.description}</p>
         {variants.length ? (
           <div className="product-options">
@@ -102,11 +120,11 @@ export function PublicProductPage() {
                 ))}
               </div>
             </div>
-            {firstChoice && (
-              <button className="button-link" type="button" onClick={resetVariantSelection}>
+            <div className="reset-choice-slot">
+              <button className={firstChoice ? "button-link danger" : "button-link danger hidden"} type="button" onClick={resetVariantSelection} disabled={!firstChoice}>
                 Сбросить выбор
               </button>
-            )}
+            </div>
           </div>
         ) : (
           <div className="chips">

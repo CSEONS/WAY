@@ -17,9 +17,19 @@ export async function getStore(id: string) {
   return db.get<Store>("SELECT * FROM stores WHERE id = ?", id);
 }
 
+export async function listOwnerStores(ownerId: string) {
+  const db = await getDb();
+  return db.all<Store>("SELECT * FROM stores WHERE ownerId = ? ORDER BY createdAt DESC", ownerId);
+}
+
 export async function getOwnerStore(ownerId: string) {
   const db = await getDb();
   return db.get<Store>("SELECT * FROM stores WHERE ownerId = ? ORDER BY createdAt LIMIT 1", ownerId);
+}
+
+export async function getOwnerStoreById(ownerId: string, storeId: string) {
+  const db = await getDb();
+  return db.get<Store>("SELECT * FROM stores WHERE id = ? AND ownerId = ?", storeId, ownerId);
 }
 
 export async function getStoreBySlug(slug: string) {

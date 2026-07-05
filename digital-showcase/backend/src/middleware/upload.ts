@@ -25,3 +25,15 @@ export const upload = multer({
     cb(null, true);
   }
 });
+
+export const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith("audio/") && file.mimetype !== "video/webm") {
+      cb(new HttpError(400, "Можно загружать только аудиозапись"));
+      return;
+    }
+    cb(null, true);
+  }
+});

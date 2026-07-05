@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { Product, ProductStatus } from "../types/models";
 
@@ -24,6 +24,27 @@ export interface ProductPayload {
 }
 
 type ProductDraft = ProductPayload;
+
+export interface ProductFormImage {
+  id: string;
+  existingId: string | null;
+  file: File | null;
+  name: string;
+  url: string;
+}
+
+export interface ProductImageSelection {
+  images: ProductFormImage[];
+  previewImageId: string | null;
+}
+
+const voiceQuestions = [
+  "Что это за товар и как он называется?",
+  "Какие цвета доступны?",
+  "Какие размеры есть у каждого цвета?",
+  "Сколько стоит товар или отдельные комбинации?",
+  "К какой категории его отнести?"
+];
 
 function createEmptyVariant(): VariantFormRow {
   return { id: crypto.randomUUID(), colorName: "", colorHex: "#2779a7", size: "", price: "" };
@@ -57,7 +78,29 @@ function initialVariants(initial?: Product): VariantFormRow[] {
   return [createEmptyVariant()];
 }
 
-export function ProductForm({ initial, aiFormEnabled, onSubmit }: { initial?: Product; aiFormEnabled: boolean; onSubmit: (payload: ProductPayload, file?: File) => Promise<void> }) {
+function initialImages(initial?: Product): ProductFormImage[] {
+  return (
+    initial?.images.map((image) => ({
+      id: image.id,
+      existingId: image.id,
+      file: null,
+      name: "Картинка товара",
+      url: image.url
+    })) ?? []
+  );
+}
+
+export function ProductForm({
+  initial,
+  aiDraftPath,
+  aiFormEnabled,
+  onSubmit
+}: {
+  initial?: Product;
+  aiDraftPath?: string;
+  aiFormEnabled: boolean;
+  onSubmit: (payload: ProductPayload, imageSelection: ProductImageSelection) => Promise<void>;
+}) {
   const initialPriceMode = initial?.priceText === "Уточнить у продавца" ? "ask" : "number";
   const [form, setForm] = useState({
     title: initial?.title ?? "",
@@ -73,8 +116,23 @@ export function ProductForm({ initial, aiFormEnabled, onSubmit }: { initial?: Pr
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [voiceRecorder, setVoiceRecorder] = useState<MediaRecorder | null>(null);
+  const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [voiceDurationSeconds, setVoiceDurationSeconds] = useState(0);
+  const [aiInputMode, setAiInputMode] = useState<"text" | "voice">("text");
+  const [aiDraftApplied, setAiDraftApplied] = useState(false);
   const [variants, setVariants] = useState<VariantFormRow[]>(() => initialVariants(initial));
-  const [file, setFile] = useState<File>();
+  const [images, setImages] = useState<ProductFormImage[]>(() => initialImages(initial));
+  const [previewImageId, setPreviewImageId] = useState<string | null>(() => initial?.images[0]?.id ?? null);
+  const previewImage = images.find((image) => image.id === previewImageId) ?? images[0];
+
+  useEffect(() => {
+    if (!recordingStartedAt) return;
+    const timer = window.setInterval(() => setRecordingSeconds(Math.floor((Date.now() - recordingStartedAt) / 1000)), 250);
+    return () => window.clearInterval(timer);
+  }, [recordingStartedAt]);
 
   function updateVariant(id: string, patch: Partial<VariantFormRow>) {
     setVariants((current) => current.map((variant) => (variant.id === id ? { ...variant, ...patch } : variant)));
@@ -82,6 +140,23 @@ export function ProductForm({ initial, aiFormEnabled, onSubmit }: { initial?: Pr
 
   function removeVariant(id: string) {
     setVariants((current) => (current.length > 1 ? current.filter((variant) => variant.id !== id) : [createEmptyVariant()]));
+  }
+
+  function addImages(files: FileList | null) {
+    if (!files?.length) return;
+    const nextImages = [...files].map((file) => ({ id: crypto.randomUUID(), existingId: null, file, name: file.name, url: URL.createObjectURL(file) }));
+    setImages((current) => [...current, ...nextImages]);
+    setPreviewImageId((current) => current ?? nextImages[0]?.id ?? null);
+  }
+
+  function removeImage(id: string) {
+    setImages((current) => {
+      const image = current.find((item) => item.id === id);
+      if (image?.file) URL.revokeObjectURL(image.url);
+      const nextImages = current.filter((item) => item.id !== id);
+      setPreviewImageId((currentPreview) => (currentPreview === id ? nextImages[0]?.id ?? null : currentPreview));
+      return nextImages;
+    });
   }
 
   function applyDraft(draft: ProductDraft) {
@@ -112,37 +187,71 @@ export function ProductForm({ initial, aiFormEnabled, onSubmit }: { initial?: Pr
     setAiError("");
     setAiLoading(true);
     try {
-      const { data } = await api.post<ProductDraft>("/owner/products/ai-draft", { prompt: aiPrompt });
+      const request =
+        aiInputMode === "voice"
+          ? (() => {
+              if (!voiceBlob) throw new Error("Сначала запишите голосовое сообщение");
+              const formData = new FormData();
+              formData.append("voice", voiceBlob, "product-voice.webm");
+              return api.post<ProductDraft>(aiDraftPath ?? "/owner/products/ai-draft", formData);
+            })()
+          : api.post<ProductDraft>(aiDraftPath ?? "/owner/products/ai-draft", { prompt: aiPrompt });
+      const { data } = await request;
       applyDraft(data);
-      setAiMode(false);
+      setAiDraftApplied(true);
     } catch (err: any) {
-      setAiError(err.response?.data?.message ?? "Не удалось заполнить форму");
+      setAiError(err.response?.data?.message ?? err.message ?? "Не удалось заполнить форму");
     } finally {
       setAiLoading(false);
     }
   }
 
-  function recordVoice() {
-    const SpeechRecognition = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setAiError("Браузер не поддерживает голосовой ввод");
+  async function recordVoice() {
+    if (voiceRecorder && voiceRecorder.state === "recording") {
+      voiceRecorder.stop();
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "ru-RU";
-    recognition.interimResults = false;
-    recognition.onstart = () => setIsListening(true);
-    recognition.onerror = () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setAiError("Браузер не поддерживает запись аудио");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+      const startedAt = Date.now();
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        setVoiceBlob(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }));
+        setVoiceDurationSeconds(Math.max(1, Math.round((Date.now() - startedAt) / 1000)));
+        setRecordingStartedAt(null);
+        stream.getTracks().forEach((track) => track.stop());
+        setIsListening(false);
+        setVoiceRecorder(null);
+      };
+      recorder.onerror = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setIsListening(false);
+        setVoiceRecorder(null);
+        setRecordingStartedAt(null);
+        setAiError("Не удалось записать голос");
+      };
+      setVoiceBlob(null);
+      setVoiceDurationSeconds(0);
+      setRecordingSeconds(0);
+      setRecordingStartedAt(startedAt);
+      setVoiceRecorder(recorder);
+      setIsListening(true);
+      recorder.start();
+    } catch {
       setIsListening(false);
-      setAiError("Не удалось распознать голос");
-    };
-    recognition.onend = () => setIsListening(false);
-    recognition.onresult = (event: any) => {
-      const transcript = event.results?.[0]?.[0]?.transcript;
-      if (transcript) setAiPrompt((current) => [current, transcript].filter(Boolean).join(" "));
-    };
-    recognition.start();
+      setRecordingStartedAt(null);
+      setAiError("Не удалось получить доступ к микрофону");
+    }
   }
 
   function selectFieldText(event: KeyboardEvent<HTMLFormElement>) {
@@ -184,7 +293,7 @@ export function ProductForm({ initial, aiFormEnabled, onSubmit }: { initial?: Pr
         colors: [...colorsByName.values()],
         variants: normalizedVariants
       },
-      file
+      { images, previewImageId }
     );
   }
 
@@ -192,78 +301,153 @@ export function ProductForm({ initial, aiFormEnabled, onSubmit }: { initial?: Pr
     <form className="form" onSubmit={submit} onKeyDownCapture={selectFieldText}>
       <div className="mode-switch">
         <span>Обычный ввод</span>
-        <button className={aiMode ? "switch active" : "switch"} type="button" disabled={!aiFormEnabled} aria-pressed={aiMode} onClick={() => setAiMode(!aiMode)}>
+        <button
+          className={aiMode ? "switch active" : "switch"}
+          type="button"
+          disabled={!aiFormEnabled}
+          aria-pressed={aiMode}
+          onClick={() => {
+            setAiMode(!aiMode);
+            setAiDraftApplied(false);
+          }}
+        >
           <span />
         </button>
         <span>ИИ ввод {!aiFormEnabled && <LockIcon />}</span>
       </div>
       {aiMode && (
         <div className="ai-draft-box">
-          <label>
-            Голосовое описание товара
-            <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Например: синее платье, размеры S и M, цена 4500 рублей, есть еще белый цвет..." />
-          </label>
+          <div className="segmented">
+            <button className={aiInputMode === "text" ? "active" : ""} type="button" onClick={() => setAiInputMode("text")}>Текст</button>
+            <button className={aiInputMode === "voice" ? "active" : ""} type="button" onClick={() => setAiInputMode("voice")}>Голос</button>
+          </div>
+          {aiInputMode === "text" && (
+            <label>
+              Описание товара для ИИ
+              <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Например: синее платье, размеры S и M, цена 4500 рублей, есть еще белый цвет..." />
+            </label>
+          )}
+          {aiInputMode === "voice" && (
+            <div className="voice-panel">
+              <div className={isListening ? "recording-status active" : "recording-status"}>
+                <MicrophoneIcon />
+                {isListening ? `Идет запись... ${formatDuration(recordingSeconds)}` : voiceBlob ? `Голосовое сообщение записано: ${formatDuration(voiceDurationSeconds)}` : "Запись не запущена"}
+                {isListening && (
+                  <span className="recording-visual" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                )}
+              </div>
+              <ol>
+                {voiceQuestions.map((question) => (
+                  <li key={question}>{question}</li>
+                ))}
+              </ol>
+            </div>
+          )}
           {aiError && <p className="error">{aiError}</p>}
           <div className="section-head">
-            <button type="button" onClick={recordVoice}>{isListening ? "Слушаю..." : "Надиктовать"}</button>
-            <button className="primary" type="button" disabled={!aiPrompt.trim() || aiLoading} onClick={fillWithAi}>
+            {aiInputMode === "voice" && (
+              <button type="button" onClick={recordVoice}>
+                <MicrophoneIcon />
+                {isListening ? "Остановить запись" : voiceBlob ? "Перезаписать" : "Надиктовать"}
+              </button>
+            )}
+            <button className="primary" type="button" disabled={(aiInputMode === "text" ? !aiPrompt.trim() : !voiceBlob || isListening) || aiLoading} onClick={fillWithAi}>
               {aiLoading ? "Заполняю..." : "Заполнить форму"}
             </button>
           </div>
         </div>
       )}
-      <label>Название<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></label>
-      <label>Описание<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-      <div className="price-mode">
-        <div className="segmented">
-          <button className={priceMode === "number" ? "active" : ""} type="button" onClick={() => setPriceMode("number")}>Цена</button>
-          <button className={priceMode === "ask" ? "active" : ""} type="button" onClick={() => setPriceMode("ask")}>Уточнить у продавца</button>
+      <div className="image-uploader">
+        <div className="section-head">
+          <h2>Картинки товара</h2>
+          <div className="image-tools">
+            <label className="button-link">
+              Добавить картинки
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(e) => addImages(e.target.files)} />
+            </label>
+          </div>
         </div>
-        {priceMode === "number" ? (
-          <label>Цена<input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
+        {images.length ? (
+          <div className="image-gallery-picker">
+            <div className="image-preview-main">
+              <img src={previewImage.url} alt={previewImage.name} />
+            </div>
+            <div className="image-thumb-strip">
+              {images.map((image) => (
+                <div className={previewImageId === image.id ? "image-thumb active" : "image-thumb"} key={image.id}>
+                  <button type="button" onClick={() => setPreviewImageId(image.id)} aria-label={`Выбрать ${image.name} как превью`}>
+                    <img src={image.url} alt={image.name} />
+                  </button>
+                  <button className="image-remove" type="button" onClick={() => removeImage(image.id)} aria-label={`Удалить ${image.name}`}>
+                    x
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : (
-          <label>Цена<input value="Уточнить у продавца" disabled /></label>
+          <div className="empty-upload">Картинки еще не выбраны</div>
         )}
       </div>
-      <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
-      <div className="variant-editor">
-        <div className="section-head">
-          <h2>Комбинации товара</h2>
-          <button type="button" onClick={() => setVariants([...variants, createEmptyVariant()])}>
-            Добавить комбинацию
-          </button>
-        </div>
-        <div className="variant-list">
-          <div className="variant-header" aria-hidden="true">
-            <span>Цвет</span>
-            <span>HEX</span>
-            <span>Размер</span>
-            <span>Цена</span>
-            <span />
+      {(!aiMode || aiDraftApplied) && (
+        <>
+          <label>Название<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></label>
+          <label>Описание<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+          <div className="price-mode">
+            <div className="segmented">
+              <button className={priceMode === "number" ? "active" : ""} type="button" onClick={() => setPriceMode("number")}>Цена</button>
+              <button className={priceMode === "ask" ? "active" : ""} type="button" onClick={() => setPriceMode("ask")}>Уточнить у продавца</button>
+            </div>
+            {priceMode === "number" ? (
+              <label>Цена<input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
+            ) : (
+              <label>Цена<input value="Уточнить у продавца" disabled /></label>
+            )}
           </div>
-          {variants.map((variant) => (
-            <div className="variant-row" key={variant.id}>
-              <input aria-label="Цвет" value={variant.colorName} onChange={(e) => updateVariant(variant.id, { colorName: e.target.value })} placeholder="Синий" />
-              <input
-                aria-label="HEX"
-                className="color-picker"
-                type="color"
-                value={variant.colorHex || "#2779a7"}
-                onChange={(e) => updateVariant(variant.id, { colorHex: e.target.value })}
-              />
-              <input aria-label="Размер" value={variant.size} onChange={(e) => updateVariant(variant.id, { size: e.target.value })} placeholder="M" />
-              <input aria-label="Цена" type="number" value={variant.price} onChange={(e) => updateVariant(variant.id, { price: e.target.value })} placeholder={form.price || "0"} />
-              <button type="button" onClick={() => removeVariant(variant.id)}>
-                Удалить
+          <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
+          <div className="variant-editor">
+            <div className="section-head">
+              <h2>Комбинации товара</h2>
+            </div>
+            <div className="variant-list">
+              <div className="variant-header" aria-hidden="true">
+                <span>Цвет</span>
+                <span>HEX</span>
+                <span>Размер</span>
+                <span>Цена</span>
+                <span />
+              </div>
+              {variants.map((variant) => (
+                <div className="variant-row" key={variant.id}>
+                  <input aria-label="Цвет" value={variant.colorName} onChange={(e) => updateVariant(variant.id, { colorName: e.target.value })} placeholder="Синий" />
+                  <input
+                    aria-label="HEX"
+                    className="color-picker"
+                    type="color"
+                    value={variant.colorHex || "#2779a7"}
+                    onChange={(e) => updateVariant(variant.id, { colorHex: e.target.value })}
+                  />
+                  <input aria-label="Размер" value={variant.size} onChange={(e) => updateVariant(variant.id, { size: e.target.value })} placeholder="M" />
+                  <input aria-label="Цена" type="number" value={variant.price} onChange={(e) => updateVariant(variant.id, { price: e.target.value })} placeholder={form.price || "0"} />
+                  <button type="button" onClick={() => removeVariant(variant.id)}>
+                    Удалить
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="variant-actions">
+              <button type="button" onClick={() => setVariants([...variants, createEmptyVariant()])}>
+                Добавить комбинацию
               </button>
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="form-grid">
-        <label>Изображение<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0])} /></label>
-      </div>
-      <button className="primary">Сохранить</button>
+          </div>
+          <button className="primary">Сохранить</button>
+        </>
+      )}
     </form>
   );
 }
@@ -274,4 +458,18 @@ function LockIcon() {
       <path d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1Zm2 0h6V8a3 3 0 0 0-6 0v2Z" />
     </svg>
   );
+}
+
+function MicrophoneIcon() {
+  return (
+    <svg className="inline-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21a1 1 0 1 1-2 0v-3.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
+    </svg>
+  );
+}
+
+function formatDuration(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }

@@ -10,6 +10,8 @@ export function PublicStorePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({ q: "", category: "", size: "", color: "" });
+  const [draftFilters, setDraftFilters] = useState({ q: "", category: "", size: "", color: "" });
+  const [sort, setSort] = useState("new");
 
   useEffect(() => {
     api.get(`/public/stores/${storeSlug}`).then((res) => setStore(res.data)).catch((err) => setError(err.response?.data?.message ?? "Магазин недоступен"));
@@ -19,36 +21,81 @@ export function PublicStorePage() {
     api.get(`/public/stores/${storeSlug}/products`, { params: filters }).then((res) => setProducts(res.data));
   }, [storeSlug, filters]);
 
-  const options = useMemo(() => ({
-    categories: [...new Set(products.map((p) => p.category).filter(Boolean))],
-    sizes: [...new Set(products.flatMap((p) => p.sizes.map((s) => s.value)))],
-    colors: [...new Set(products.flatMap((p) => p.colors.map((c) => c.name)))]
-  }), [products]);
+  const options = useMemo(
+    () => ({
+      categories: [...new Set(products.map((p) => p.category).filter(Boolean))],
+      sizes: [...new Set(products.flatMap((p) => p.sizes.map((s) => s.value)))],
+      colors: [...new Set(products.flatMap((p) => p.colors.map((c) => c.name)))]
+    }),
+    [products]
+  );
+  const visibleProducts = useMemo(() => {
+    if (sort === "price-asc") return [...products].sort((a, b) => (a.price ?? Number.MAX_SAFE_INTEGER) - (b.price ?? Number.MAX_SAFE_INTEGER));
+    if (sort === "price-desc") return [...products].sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+    return products;
+  }, [products, sort]);
+
+  function resetFilters() {
+    const emptyFilters = { q: "", category: "", size: "", color: "" };
+    setDraftFilters(emptyFilters);
+    setFilters(emptyFilters);
+  }
 
   if (error) return <section className="empty">{error}</section>;
   if (!store) return <section className="empty">Загрузка...</section>;
 
   return (
-    <section>
-      <div className="store-head">
-        {store.coverUrl && <img className="cover" src={store.coverUrl} alt="" />}
-        <div className="store-title">
-          {store.logoUrl && <img className="logo" src={store.logoUrl} alt="" />}
+    <section className="storefront-page">
+      <aside className="storefront-filters">
+        <div className="filter-head">
+          <strong>Фильтры</strong>
+          <button type="button" onClick={resetFilters}>Сбросить все</button>
+        </div>
+        <label>
+          <span className="visually-hidden">Поиск</span>
+          <input placeholder="Поиск по названию" value={draftFilters.q} onChange={(e) => setDraftFilters({ ...draftFilters, q: e.target.value })} />
+        </label>
+        <label>
+          Категория
+          <select value={draftFilters.category} onChange={(e) => setDraftFilters({ ...draftFilters, category: e.target.value })}>
+            <option value="">Все категории</option>
+            {options.categories.map((v) => <option key={v!}>{v}</option>)}
+          </select>
+        </label>
+        <label>
+          Размер
+          <select value={draftFilters.size} onChange={(e) => setDraftFilters({ ...draftFilters, size: e.target.value })}>
+            <option value="">Все размеры</option>
+            {options.sizes.map((v) => <option key={v}>{v}</option>)}
+          </select>
+        </label>
+        <label>
+          Цвет
+          <select value={draftFilters.color} onChange={(e) => setDraftFilters({ ...draftFilters, color: e.target.value })}>
+            <option value="">Все цвета</option>
+            {options.colors.map((v) => <option key={v}>{v}</option>)}
+          </select>
+        </label>
+        <button className="primary" type="button" onClick={() => setFilters(draftFilters)}>Применить</button>
+      </aside>
+      <div className="storefront-content">
+        <div className="storefront-top">
           <div>
             <h1>{store.name}</h1>
-            <p>{store.description}</p>
-            <p>{[store.address, store.phone, store.whatsapp, store.telegram].filter(Boolean).join(" · ")}</p>
+            {store.description && <p>{store.description}</p>}
           </div>
+          <label>
+            <span className="visually-hidden">Сортировка</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="new">Сортировка: Новые</option>
+              <option value="price-asc">Цена: сначала ниже</option>
+              <option value="price-desc">Цена: сначала выше</option>
+            </select>
+          </label>
         </div>
-      </div>
-      <div className="filters">
-        <input placeholder="Поиск по названию" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
-        <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}><option value="">Категория</option>{options.categories.map((v) => <option key={v!}>{v}</option>)}</select>
-        <select value={filters.size} onChange={(e) => setFilters({ ...filters, size: e.target.value })}><option value="">Размер</option>{options.sizes.map((v) => <option key={v}>{v}</option>)}</select>
-        <select value={filters.color} onChange={(e) => setFilters({ ...filters, color: e.target.value })}><option value="">Цвет</option>{options.colors.map((v) => <option key={v}>{v}</option>)}</select>
-      </div>
-      <div className="product-grid">
-        {products.map((product) => <ProductCard key={product.id} product={product} slug={storeSlug} />)}
+        <div className="product-grid">
+          {visibleProducts.map((product) => <ProductCard key={product.id} product={product} slug={storeSlug} />)}
+        </div>
       </div>
     </section>
   );

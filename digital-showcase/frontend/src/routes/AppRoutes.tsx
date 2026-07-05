@@ -21,10 +21,11 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
       <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
       <Route element={<ProtectedRoute user={user} role="OWNER" isLoading={isAuthLoading} />}>
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/dashboard/products" element={<DashboardPage />} />
-        <Route path="/dashboard/products/new" element={<ProductEditorPage />} />
-        <Route path="/dashboard/products/:id/edit" element={<ProductEditorPage />} />
-        <Route path="/dashboard/settings" element={<SettingsPage />} />
+        <Route path="/dashboard/stores/:storeId" element={<DashboardPage />} />
+        <Route path="/dashboard/stores/:storeId/products" element={<DashboardPage />} />
+        <Route path="/dashboard/stores/:storeId/products/new" element={<ProductEditorPage />} />
+        <Route path="/dashboard/stores/:storeId/products/:id/edit" element={<ProductEditorPage />} />
+        <Route path="/dashboard/stores/:storeId/settings" element={<SettingsPage />} />
       </Route>
       <Route element={<ProtectedRoute user={user} role="ADMIN" isLoading={isAuthLoading} />}>
         <Route path="/admin" element={<AdminPage />} />

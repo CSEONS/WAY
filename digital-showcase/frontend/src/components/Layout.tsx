@@ -1,4 +1,4 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { User } from "../types/models";
 
 interface Props {
@@ -8,6 +8,8 @@ interface Props {
 
 export function Layout({ user, onLogout }: Props) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const hidePublicStoreNav = !user && location.pathname.startsWith("/m/");
   function logout() {
     localStorage.removeItem("token");
     onLogout();
@@ -20,11 +22,13 @@ export function Layout({ user, onLogout }: Props) {
         <Link className="brand" to="/">
           Витрины
         </Link>
-        <nav>
-          {user?.role === "ADMIN" && <NavLink to="/admin">Админка</NavLink>}
-          {user?.role === "OWNER" && <NavLink to="/dashboard">Кабинет</NavLink>}
-          {user ? <button onClick={logout}>Выйти</button> : <NavLink to="/login">Войти</NavLink>}
-        </nav>
+        {!hidePublicStoreNav && (
+          <nav>
+            {user?.role === "ADMIN" && <NavLink to="/admin">Админка</NavLink>}
+            {user?.role === "OWNER" && <NavLink to="/dashboard">Кабинет</NavLink>}
+            {user ? <button onClick={logout}>Выйти</button> : <NavLink to="/login">Войти</NavLink>}
+          </nav>
+        )}
       </header>
     </>
   );

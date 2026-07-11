@@ -50,8 +50,8 @@ export async function updateOwner(id: string, input: { name?: string; email?: st
   await db.run(
     `UPDATE users SET name = ?, email = ?, phone = ?, passwordHash = COALESCE(?, passwordHash), updatedAt = ? WHERE id = ? AND role = 'OWNER'`,
     input.name ?? current.name,
-    input.email ?? current.email,
-    input.phone ?? current.phone,
+    Object.prototype.hasOwnProperty.call(input, "email") ? input.email : current.email,
+    Object.prototype.hasOwnProperty.call(input, "phone") ? input.phone : current.phone,
     passwordHash ?? null,
     new Date().toISOString(),
     id

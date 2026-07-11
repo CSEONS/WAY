@@ -37,3 +37,19 @@ export const audioUpload = multer({
     cb(null, true);
   }
 });
+
+export const aiDraftUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 9 },
+  fileFilter: (_req, file, cb) => {
+    const isVoice = file.fieldname === "voice" && (file.mimetype.startsWith("audio/") || file.mimetype === "video/webm");
+    const isImage = file.fieldname === "images" && ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
+
+    if (!isVoice && !isImage) {
+      cb(new HttpError(400, "AI-черновик принимает только изображения товара и голосовую запись"));
+      return;
+    }
+
+    cb(null, true);
+  }
+});

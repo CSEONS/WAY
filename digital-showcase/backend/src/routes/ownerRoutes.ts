@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as controller from "../controllers/ownerController.js";
 import { authMiddleware, ownerOnly } from "../middleware/authMiddleware.js";
-import { audioUpload, upload } from "../middleware/upload.js";
+import { aiDraftUpload, upload } from "../middleware/upload.js";
 
 export const ownerRoutes = Router();
 ownerRoutes.use(authMiddleware, ownerOnly);
@@ -10,7 +10,7 @@ ownerRoutes.get("/stores/:storeId", controller.getStore);
 ownerRoutes.patch("/stores/:storeId", controller.updateStore);
 ownerRoutes.get("/stores/:storeId/analytics", controller.getAnalytics);
 ownerRoutes.get("/stores/:storeId/products", controller.listProducts);
-ownerRoutes.post("/stores/:storeId/products/ai-draft", audioUpload.single("voice"), controller.createProductDraft);
+ownerRoutes.post("/stores/:storeId/products/ai-draft", aiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 8 }]), controller.createProductDraft);
 ownerRoutes.post("/stores/:storeId/products", controller.createProduct);
 ownerRoutes.get("/stores/:storeId/products/:id", controller.getProduct);
 ownerRoutes.patch("/stores/:storeId/products/:id", controller.updateProduct);
@@ -22,7 +22,7 @@ ownerRoutes.delete("/stores/:storeId/products/:id/images/:imageId", controller.d
 ownerRoutes.get("/store", controller.getStore);
 ownerRoutes.patch("/store", controller.updateStore);
 ownerRoutes.get("/products", controller.listProducts);
-ownerRoutes.post("/products/ai-draft", audioUpload.single("voice"), controller.createProductDraft);
+ownerRoutes.post("/products/ai-draft", aiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 8 }]), controller.createProductDraft);
 ownerRoutes.post("/products", controller.createProduct);
 ownerRoutes.get("/products/:id", controller.getProduct);
 ownerRoutes.patch("/products/:id", controller.updateProduct);

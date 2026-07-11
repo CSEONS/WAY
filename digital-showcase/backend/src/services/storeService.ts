@@ -74,20 +74,24 @@ export async function updateStore(id: string, input: Partial<Store>) {
     input.ownerId ?? current.ownerId,
     input.name ?? current.name,
     input.slug ?? current.slug,
-    input.description ?? current.description,
-    input.address ?? current.address,
-    input.phone ?? current.phone,
-    input.whatsapp ?? current.whatsapp,
-    input.telegram ?? current.telegram,
-    input.logoUrl ?? current.logoUrl,
-    input.coverUrl ?? current.coverUrl,
+    field(input, "description", current.description),
+    field(input, "address", current.address),
+    field(input, "phone", current.phone),
+    field(input, "whatsapp", current.whatsapp),
+    field(input, "telegram", current.telegram),
+    field(input, "logoUrl", current.logoUrl),
+    field(input, "coverUrl", current.coverUrl),
     input.isActive ?? current.isActive,
     input.aiFormEnabled ?? current.aiFormEnabled,
-    input.subscriptionEndsAt ?? current.subscriptionEndsAt,
+    field(input, "subscriptionEndsAt", current.subscriptionEndsAt),
     new Date().toISOString(),
     id
   );
   return getStore(id);
+}
+
+function field<K extends keyof Store>(input: Partial<Store>, key: K, fallback: Store[K]) {
+  return Object.prototype.hasOwnProperty.call(input, key) ? input[key] : fallback;
 }
 
 export async function deleteStore(id: string) {

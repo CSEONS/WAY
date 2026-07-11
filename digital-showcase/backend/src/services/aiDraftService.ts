@@ -1,10 +1,27 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { ProductStatus } from "../types/models.js";
+import { HttpError } from "../utils/http.js";
 
 interface DraftVariant {
   colorName: string;
   colorHex: string | null;
   size: string;
   price: number | null;
+}
+
+interface AiDraftFile {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
+}
+
+export interface ProductAiDraftInput {
+  prompt?: string;
+  voice?: AiDraftFile;
+  images?: AiDraftFile[];
+  imageUrls?: string[];
 }
 
 export interface ProductAiDraft {
@@ -56,10 +73,288 @@ const colorAliases: Record<string, string> = {
   серая: "серый"
 };
 
-export function createProductAiDraft(prompt: string): ProductAiDraft {
-  const jsonDraft = parseJsonDraft(prompt);
-  if (jsonDraft) return jsonDraft;
+const productDraftInstructions = `
+Ты помогаешь владельцу небольшого магазина одежды заполнить форму товара.
+Верни только JSON без markdown и пояснений.
+Схема:
+{
+  "title": "короткое название товара",
+  "description": "описание для покупателя или null",
+  "price": 4500 или null,
+  "priceText": "Уточнить у продавца" или null,
+  "category": "Платья" или null,
+  "status": "AVAILABLE" | "NOT_AVAILABLE" | "CHECK_IN_STORE",
+  "isVisible": 1 или 0,
+  "sizes": ["S", "M"],
+  "colors": [{"name":"синий","hex":"#2779a7"}],
+  "variants": [{"colorName":"синий","colorHex":"#2779a7","size":"M","price":4500}]
+}
+Не выдумывай точную цену, если ее нет в тексте или голосе. Используй null и priceText "Уточнить у продавца".
+AI не принимает финальных решений: возвращай только редактируемое предложение.
+`;
 
+export async function createProductAiDraft(input: string | ProductAiDraftInput): Promise<ProductAiDraft> {
+  const draftInput = typeof input === "string" ? { prompt: input } : input;
+  const prompt = draftInput.prompt?.trim() ?? "";
+  const hasRichInput = Boolean(draftInput.voice || draftInput.images?.length || draftInput.imageUrls?.length);
+
+  if (openAiApiKey()) {
+    try {
+      return await createExternalProductAiDraft(draftInput);
+    } catch (error) {
+      if (hasRichInput) {
+        throw error instanceof HttpError ? error : new HttpError(502, "AI-провайдер не смог создать черновик товара");
+      }
+    }
+  }
+
+  if (hasRichInput) {
+    throw new HttpError(503, "Для AI-черновика по изображениям или голосу настройте OPENAI_API_KEY на сервере");
+  }
+
+  return createLocalProductAiDraft(prompt);
+}
+
+async function createExternalProductAiDraft(input: ProductAiDraftInput) {
+  const transcript = input.voice ? await transcribeVoice(input.voice) : "";
+  const imageUrls = await collectImageInputs(input.images ?? [], input.imageUrls ?? []);
+  const descriptionParts = [input.prompt?.trim(), transcript ? `Голосовое описание: ${transcript}` : ""].filter(Boolean);
+  const text = descriptionParts.length ? descriptionParts.join("\n\n") : "Описание товара не задано. Используй изображения, если они приложены.";
+
+  const content = [
+    { type: "input_text", text: `Создай черновик карточки товара одежды.\n\n${text}` },
+    ...imageUrls.map((imageUrl) => ({ type: "input_image", image_url: imageUrl, detail: "low" }))
+  ];
+
+  const response = await fetch(`${openAiBaseUrl()}/responses`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openAiApiKey()}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL ?? "gpt-5.6",
+      instructions: productDraftInstructions,
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_object" } },
+      store: false
+    }),
+    signal: AbortSignal.timeout(openAiTimeoutMs())
+  });
+
+  const payload = await readOpenAiPayload(response);
+  return normalizeAiDraft(extractResponseText(payload), [input.prompt, transcript].filter(Boolean).join("\n"));
+}
+
+async function transcribeVoice(file: AiDraftFile) {
+  const formData = new FormData();
+  const filename = audioFilename(file);
+  formData.append("file", new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || "audio/webm" }), filename);
+  formData.append("model", process.env.OPENAI_TRANSCRIBE_MODEL ?? "gpt-4o-mini-transcribe");
+  formData.append("response_format", "text");
+  formData.append("prompt", "Описание товара одежды для цифровой витрины. Сохрани размеры, цвета, цены и категории.");
+
+  const response = await fetch(`${openAiBaseUrl()}/audio/transcriptions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${openAiApiKey()}` },
+    body: formData,
+    signal: AbortSignal.timeout(openAiTimeoutMs())
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const body = contentType.includes("application/json") ? await response.json() : await response.text();
+  if (!response.ok) throw new HttpError(502, openAiErrorMessage(body));
+  return typeof body === "string" ? body : String(body.text ?? "");
+}
+
+async function collectImageInputs(files: AiDraftFile[], imageUrls: string[]) {
+  const inputs = files.map((file) => dataUrl(file.buffer, file.mimetype));
+  for (const url of imageUrls) {
+    const imageInput = await imageUrlInput(url);
+    if (imageInput) inputs.push(imageInput);
+  }
+  return inputs.slice(0, 8);
+}
+
+async function imageUrlInput(url: string) {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!url.startsWith("/uploads/")) return null;
+
+  const uploadDir = path.resolve(process.env.UPLOAD_DIR ?? "uploads");
+  const filename = path.basename(decodeURIComponent(url));
+  const filePath = path.resolve(uploadDir, filename);
+  if (!filePath.startsWith(`${uploadDir}${path.sep}`)) return null;
+  if (!fs.existsSync(filePath)) return null;
+
+  const buffer = await fs.promises.readFile(filePath);
+  return dataUrl(buffer, mimeFromFilename(filename));
+}
+
+function dataUrl(buffer: Buffer | Uint8Array, mimetype: string) {
+  return `data:${mimetype};base64,${Buffer.from(buffer).toString("base64")}`;
+}
+
+function audioFilename(file: AiDraftFile) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if ([".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm"].includes(ext)) return file.originalname;
+  if (file.mimetype.includes("wav")) return "voice.wav";
+  if (file.mimetype.includes("mpeg") || file.mimetype.includes("mp3")) return "voice.mp3";
+  if (file.mimetype.includes("mp4")) return "voice.mp4";
+  return "voice.webm";
+}
+
+function mimeFromFilename(filename: string) {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === ".png") return "image/png";
+  if (ext === ".webp") return "image/webp";
+  return "image/jpeg";
+}
+
+async function readOpenAiPayload(response: Response) {
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new HttpError(502, openAiErrorMessage(payload));
+  return payload;
+}
+
+function openAiErrorMessage(payload: unknown) {
+  if (payload && typeof payload === "object" && "error" in payload) {
+    const error = (payload as { error?: { message?: string } }).error;
+    if (error?.message) return `AI-провайдер вернул ошибку: ${error.message}`;
+  }
+  if (typeof payload === "string" && payload.trim()) return `AI-провайдер вернул ошибку: ${payload.trim()}`;
+  return "AI-провайдер временно недоступен";
+}
+
+function extractResponseText(payload: unknown) {
+  if (payload && typeof payload === "object" && "output_text" in payload && typeof (payload as { output_text?: unknown }).output_text === "string") {
+    return (payload as { output_text: string }).output_text;
+  }
+
+  const parts: string[] = [];
+  const output = payload && typeof payload === "object" && "output" in payload ? (payload as { output?: unknown[] }).output : [];
+  for (const item of output ?? []) {
+    const content = item && typeof item === "object" && "content" in item ? (item as { content?: unknown[] }).content : [];
+    for (const block of content ?? []) {
+      if (block && typeof block === "object" && "text" in block && typeof (block as { text?: unknown }).text === "string") {
+        parts.push((block as { text: string }).text);
+      }
+    }
+  }
+  return parts.join("\n");
+}
+
+function normalizeAiDraft(rawText: string, fallbackPrompt: string): ProductAiDraft {
+  const parsed = parseJsonObject(rawText);
+  if (!parsed) return createLocalProductAiDraft(fallbackPrompt);
+
+  const price = numberOrNull(parsed.price);
+  const colors = normalizeColors(parsed.colors);
+  const sizes = normalizeStrings(parsed.sizes);
+  let variants = normalizeDraftVariants(parsed.variants);
+  if (!variants.length && (colors.length || sizes.length)) {
+    variants = buildVariants("", colors.map((color) => color.name), sizes, price);
+  }
+
+  return {
+    title: stringOrNull(parsed.title) ?? inferTitle(fallbackPrompt),
+    description: stringOrNull(parsed.description) ?? (fallbackPrompt || null),
+    price,
+    priceText: stringOrNull(parsed.priceText) ?? (price == null ? "Уточнить у продавца" : null),
+    category: stringOrNull(parsed.category),
+    status: normalizeStatus(parsed.status),
+    isVisible: Number(parsed.isVisible) === 0 ? 0 : 1,
+    sizes,
+    colors,
+    variants
+  };
+}
+
+function parseJsonObject(value: string) {
+  const trimmed = value.trim();
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+
+  try {
+    return JSON.parse(match[0]) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStrings(value: unknown) {
+  return Array.isArray(value) ? [...new Set(value.map((item) => String(item).trim()).filter(Boolean))] : [];
+}
+
+function normalizeColors(value: unknown): { name: string; hex: string | null }[] {
+  if (!Array.isArray(value)) return [];
+  const colors: { name: string; hex: string | null }[] = [];
+
+  for (const item of value) {
+    if (typeof item === "string") {
+      const name = item.trim();
+      if (name) colors.push({ name, hex: colorHexByName[name.toLowerCase()] ?? null });
+      continue;
+    }
+
+    if (item && typeof item === "object") {
+      const color = item as { name?: unknown; hex?: unknown };
+      const name = String(color.name ?? "").trim();
+      if (name) colors.push({ name, hex: typeof color.hex === "string" && color.hex.trim() ? color.hex.trim() : colorHexByName[name.toLowerCase()] ?? null });
+    }
+  }
+
+  return colors;
+}
+
+function normalizeDraftVariants(value: unknown): DraftVariant[] {
+  if (!Array.isArray(value)) return [];
+  const variants: DraftVariant[] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const variant = item as Record<string, unknown>;
+    const colorName = String(variant.colorName ?? "").trim();
+    const size = String(variant.size ?? "").trim();
+    if (!colorName || !size) continue;
+    variants.push({
+      colorName,
+      colorHex: stringOrNull(variant.colorHex) ?? colorHexByName[colorName.toLowerCase()] ?? null,
+      size,
+      price: numberOrNull(variant.price)
+    });
+  }
+
+  return variants;
+}
+
+function stringOrNull(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function numberOrNull(value: unknown) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeStatus(value: unknown): ProductStatus {
+  return value === "NOT_AVAILABLE" || value === "CHECK_IN_STORE" || value === "AVAILABLE" ? value : "AVAILABLE";
+}
+
+function openAiApiKey() {
+  return process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "";
+}
+
+function openAiBaseUrl() {
+  return (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
+}
+
+function openAiTimeoutMs() {
+  const value = Number(process.env.OPENAI_TIMEOUT_MS ?? 45000);
+  return Number.isFinite(value) && value > 0 ? value : 45000;
+}
+
+function createLocalProductAiDraft(prompt: string): ProductAiDraft {
   const normalized = prompt.replace(/\s+/g, " ").trim();
   const lower = normalized.toLowerCase();
   const price = findFirstPrice(lower);
@@ -79,29 +374,6 @@ export function createProductAiDraft(prompt: string): ProductAiDraft {
     colors: colors.map((name) => ({ name, hex: colorHexByName[name] ?? null })),
     variants
   };
-}
-
-function parseJsonDraft(prompt: string) {
-  const match = prompt.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-
-  try {
-    const parsed = JSON.parse(match[0]) as Partial<ProductAiDraft>;
-    return {
-      title: parsed.title ?? "",
-      description: parsed.description ?? null,
-      price: parsed.price ?? null,
-      priceText: parsed.priceText ?? null,
-      category: parsed.category ?? null,
-      status: parsed.status ?? "AVAILABLE",
-      isVisible: parsed.isVisible ?? 1,
-      sizes: parsed.sizes ?? [],
-      colors: parsed.colors ?? [],
-      variants: parsed.variants ?? []
-    };
-  } catch {
-    return null;
-  }
 }
 
 function inferTitle(prompt: string) {

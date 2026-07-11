@@ -7,6 +7,8 @@ import type { User } from "../types/models";
 export function AdminOwnersPage() {
   const [owners, setOwners] = useState<User[]>([]);
   const [ownerForm, setOwnerForm] = useState({ name: "", email: "", phone: "", password: "" });
+  const [ownerToEdit, setOwnerToEdit] = useState<User | null>(null);
+  const [ownerEditForm, setOwnerEditForm] = useState({ name: "", email: "", phone: "" });
   const [passwords, setPasswords] = useState<Record<string, string>>({});
   const [openOwnerActions, setOpenOwnerActions] = useState<string | null>(null);
   const [passwordModalOwnerId, setPasswordModalOwnerId] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export function AdminOwnersPage() {
   useEffect(() => {
     function closeModal(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      setOwnerToEdit(null);
       setPasswordModalOwnerId(null);
       setOwnerToDelete(null);
       setOpenOwnerActions(null);
@@ -59,6 +62,24 @@ export function AdminOwnersPage() {
     setPasswords((current) => ({ ...current, [ownerId]: "" }));
     setPasswordModalOwnerId(null);
     setOpenOwnerActions(null);
+    load();
+  }
+
+  function openEditModal(owner: User) {
+    setOwnerToEdit(owner);
+    setOwnerEditForm({ name: owner.name, email: owner.email ?? "", phone: owner.phone ?? "" });
+    setOpenOwnerActions(null);
+  }
+
+  async function updateOwner(event: FormEvent) {
+    event.preventDefault();
+    if (!ownerToEdit) return;
+    await api.patch(`/admin/owners/${ownerToEdit.id}`, {
+      name: ownerEditForm.name,
+      email: ownerEditForm.email || null,
+      phone: ownerEditForm.phone || null
+    });
+    setOwnerToEdit(null);
     load();
   }
 
@@ -125,6 +146,9 @@ export function AdminOwnersPage() {
                   </button>
                   {openOwnerActions === owner.id && (
                     <div className="action-menu-content" role="menu">
+                      <button className="menu-action" type="button" role="menuitem" onClick={() => openEditModal(owner)}>
+                        Редактировать
+                      </button>
                       <button className="menu-action" type="button" role="menuitem" onClick={() => openPasswordModal(owner.id)}>
                         Сменить пароль
                       </button>
@@ -139,6 +163,41 @@ export function AdminOwnersPage() {
           </div>
         </div>
       </div>
+      {ownerToEdit && (
+        <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setOwnerToEdit(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="edit-owner-title">
+            <div className="modal-head">
+              <div>
+                <h2 id="edit-owner-title">Редактировать владельца</h2>
+                <p>{ownerToEdit.name}</p>
+              </div>
+              <button className="icon-button" type="button" aria-label="Закрыть" onClick={() => setOwnerToEdit(null)}>
+                <CloseIcon />
+              </button>
+            </div>
+            <form className="form" onSubmit={updateOwner}>
+              <label>
+                Имя
+                <input value={ownerEditForm.name} onChange={(e) => setOwnerEditForm({ ...ownerEditForm, name: e.target.value })} required autoFocus />
+              </label>
+              <label>
+                Email
+                <input value={ownerEditForm.email} onChange={(e) => setOwnerEditForm({ ...ownerEditForm, email: e.target.value })} />
+              </label>
+              <label>
+                Телефон
+                <input value={ownerEditForm.phone} onChange={(e) => setOwnerEditForm({ ...ownerEditForm, phone: e.target.value })} />
+              </label>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setOwnerToEdit(null)}>
+                  Отмена
+                </button>
+                <button className="primary">Сохранить</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {passwordModalOwner && (
         <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setPasswordModalOwnerId(null)}>
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="change-password-title">

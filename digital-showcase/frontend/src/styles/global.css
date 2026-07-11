@@ -319,6 +319,7 @@ textarea {
 
 .mode-switch,
 .price-mode,
+.publish-controls,
 .ai-draft-box,
 .image-uploader {
   display: grid;
@@ -408,6 +409,28 @@ textarea {
   background: var(--color-surface);
   color: var(--color-primary);
   box-shadow: var(--shadow-sm);
+}
+
+.publish-controls {
+  grid-template-columns: 1fr;
+  align-items: end;
+}
+
+.inline-check {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.inline-check input {
+  width: auto;
+  margin: 0;
 }
 
 .voice-panel {
@@ -1968,6 +1991,12 @@ textarea {
   box-shadow: var(--shadow-md);
 }
 
+.modal.wide-modal {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
 .modal-head,
 .modal-actions {
   display: flex;
@@ -2004,6 +2033,12 @@ textarea {
 .danger-button:hover {
   border-color: #8f1d14;
   background: #8f1d14;
+}
+
+button.danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
 }
 
 .qr-modal {
@@ -2098,6 +2133,10 @@ textarea {
   .admin-grid,
   .product-page {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .publish-controls {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .variant-header {

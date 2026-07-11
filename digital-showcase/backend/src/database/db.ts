@@ -150,13 +150,21 @@ export async function initDatabase() {
 
   const existing = await database.get<{ count: number }>("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");
   if (!existing?.count) {
+    const email = process.env.ADMIN_EMAIL?.trim();
+    const password = process.env.ADMIN_PASSWORD;
+    if (!email || !password) {
+      throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required to create the first administrator");
+    }
+    if (password.length < 12) {
+      throw new Error("ADMIN_PASSWORD must contain at least 12 characters");
+    }
     const now = new Date().toISOString();
-    const passwordHash = await bcrypt.hash("admin123", 10);
+    const passwordHash = await bcrypt.hash(password, 12);
     await database.run(
       "INSERT INTO users (id, name, email, phone, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 'ADMIN', ?, ?)",
       crypto.randomUUID(),
       "Admin",
-      "admin@example.com",
+      email,
       null,
       passwordHash,
       now,

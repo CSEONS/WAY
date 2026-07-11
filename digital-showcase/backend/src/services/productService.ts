@@ -150,10 +150,10 @@ export async function updateProduct(
   await db.run(
     `UPDATE products SET title = ?, description = ?, price = ?, priceText = ?, category = ?, status = ?, isVisible = ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
     input.title ?? current.title,
-    input.description ?? current.description,
-    input.price ?? current.price,
-    input.priceText ?? current.priceText,
-    input.category ?? current.category,
+    productField(input, "description", current.description),
+    productField(input, "price", current.price),
+    productField(input, "priceText", current.priceText),
+    productField(input, "category", current.category),
     input.status ?? current.status,
     input.isVisible ?? current.isVisible,
     new Date().toISOString(),
@@ -163,6 +163,10 @@ export async function updateProduct(
   if (input.variants) await replaceVariants(id, input.variants);
   else await replaceDetails(id, input.sizes, input.colors);
   return getProduct(id, storeId);
+}
+
+function productField<K extends keyof Product>(input: Partial<Product>, key: K, fallback: Product[K]) {
+  return Object.prototype.hasOwnProperty.call(input, key) ? input[key] : fallback;
 }
 
 export async function deleteProduct(id: string, storeId: string) {

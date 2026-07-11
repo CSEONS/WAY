@@ -245,16 +245,18 @@ export function ProductForm({
     setAiError("");
     setAiLoading(true);
     try {
-      const request =
-        aiInputMode === "voice"
-          ? (() => {
-              if (!voiceBlob) throw new Error("Сначала запишите голосовое сообщение");
-              const formData = new FormData();
-              formData.append("voice", voiceBlob, "product-voice.webm");
-              return api.post<ProductDraft>(aiDraftPath ?? "/owner/products/ai-draft", formData);
-            })()
-          : api.post<ProductDraft>(aiDraftPath ?? "/owner/products/ai-draft", { prompt: aiPrompt });
-      const { data } = await request;
+      const formData = new FormData();
+      if (aiPrompt.trim()) formData.append("prompt", aiPrompt.trim());
+      for (const image of images) {
+        if (image.file) formData.append("images", image.file);
+        else if (image.url) formData.append("imageUrls", image.url);
+      }
+      if (aiInputMode === "voice") {
+        if (!voiceBlob) throw new Error("Сначала запишите голосовое сообщение");
+        formData.append("voice", voiceBlob, "product-voice.webm");
+      }
+
+      const { data } = await api.post<ProductDraft>(aiDraftPath ?? "/owner/products/ai-draft", formData);
       applyDraft(data);
       setAiDraftApplied(true);
     } catch (err: any) {
@@ -482,6 +484,24 @@ export function ProductForm({
             )}
           </div>
           <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
+          <div className="publish-controls">
+            <label>
+              Статус наличия
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProductStatus })}>
+                <option value="AVAILABLE">В наличии</option>
+                <option value="CHECK_IN_STORE">Уточнить в магазине</option>
+                <option value="NOT_AVAILABLE">Нет в наличии</option>
+              </select>
+            </label>
+            <label className="inline-check">
+              <input
+                type="checkbox"
+                checked={Boolean(form.isVisible)}
+                onChange={(e) => setForm({ ...form, isVisible: e.target.checked ? 1 : 0 })}
+              />
+              Показывать в витрине
+            </label>
+          </div>
           <div className="variant-editor">
             <div className="section-head">
               <h2>Комбинации товара</h2>

@@ -21,6 +21,19 @@ async function scopedStore(req: Request) {
   return req.params.storeId ? ownerStore(req.user!.userId, String(req.params.storeId)) : firstOwnerStore(req.user!.userId);
 }
 
+function uploadedAiDraftFiles(req: Request) {
+  const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+  return {
+    voice: files?.voice?.[0] ?? undefined,
+    images: files?.images ?? []
+  };
+}
+
+function stringList(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  return value ? [String(value)] : [];
+}
+
 export const listStores = asyncHandler(async (req, res) => {
   res.json(await storeService.listOwnerStores(req.user!.userId));
 });
@@ -63,17 +76,11 @@ export const createProductDraft = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
   if (!store.aiFormEnabled) throw new HttpError(403, "ИИ-заполнение формы не подключено");
 
-  if (req.file) {
-    res.json(
-      createProductAiDraft(
-        `Голосовая запись получена сервером: ${req.file.originalname || "voice.webm"}, ${req.file.size} байт. Подключите серверное распознавание речи, чтобы извлекать параметры товара из аудио.`
-      )
-    );
-    return;
-  }
+  const { voice, images } = uploadedAiDraftFiles(req);
+  const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
+  if (!prompt.trim() && !voice) throw new HttpError(400, "Добавьте текстовое или голосовое описание товара");
 
-  requireFields(req.body, ["prompt"]);
-  res.json(createProductAiDraft(String(req.body.prompt)));
+  res.json(await createProductAiDraft({ prompt, voice, images, imageUrls: stringList(req.body.imageUrls) }));
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {

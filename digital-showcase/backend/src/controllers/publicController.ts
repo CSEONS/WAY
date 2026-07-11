@@ -1,6 +1,7 @@
 import { asyncHandler, HttpError } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
+import * as analyticsService from "../services/analyticsService.js";
 
 async function publicStore(slug: string) {
   const store = await storeService.getStoreBySlug(slug);
@@ -11,6 +12,7 @@ async function publicStore(slug: string) {
 
 export const getStore = asyncHandler(async (req, res) => {
   const store = await publicStore(String(req.params.slug));
+  await analyticsService.recordStoreView(store.id);
   res.json(store);
 });
 
@@ -30,5 +32,6 @@ export const getProduct = asyncHandler(async (req, res) => {
   const store = await publicStore(String(req.params.slug));
   const product = await productService.getProduct(String(req.params.productId), store.id, true);
   if (!product) throw new HttpError(404, "Товар не найден");
+  await analyticsService.recordProductView(store.id, product.id);
   res.json({ store, product });
 });

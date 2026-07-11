@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Product, ProductStatus } from "../types/models";
 
@@ -8,6 +8,22 @@ interface VariantFormRow {
   colorHex: string;
   size: string;
   price: string;
+}
+
+interface ProductFormState {
+  title: string;
+  description: string;
+  price: string;
+  category: string;
+  status: ProductStatus;
+  isVisible: number;
+}
+
+interface SavedProductFormDraft {
+  form: ProductFormState;
+  priceMode: "number" | "ask";
+  aiPrompt: string;
+  variants: VariantFormRow[];
 }
 
 export interface ProductPayload {
@@ -90,29 +106,55 @@ function initialImages(initial?: Product): ProductFormImage[] {
   );
 }
 
+function readSavedDraft(draftKey?: string): SavedProductFormDraft | null {
+  if (!draftKey) return null;
+  try {
+    const value = localStorage.getItem(draftKey);
+    return value ? (JSON.parse(value) as SavedProductFormDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasDraftContent(draft: SavedProductFormDraft) {
+  return (
+    draft.form.title.trim() ||
+    draft.form.description.trim() ||
+    draft.form.price.trim() ||
+    draft.form.category.trim() ||
+    draft.aiPrompt.trim() ||
+    draft.variants.some((variant) => variant.colorName.trim() || variant.size.trim() || variant.price.trim())
+  );
+}
+
 export function ProductForm({
   initial,
   aiDraftPath,
   aiFormEnabled,
+  draftKey,
   onSubmit
 }: {
   initial?: Product;
   aiDraftPath?: string;
   aiFormEnabled: boolean;
+  draftKey?: string;
   onSubmit: (payload: ProductPayload, imageSelection: ProductImageSelection) => Promise<void>;
 }) {
+  const savedDraft = useMemo(() => readSavedDraft(draftKey), [draftKey]);
   const initialPriceMode = initial?.priceText === "Уточнить у продавца" ? "ask" : "number";
-  const [form, setForm] = useState({
-    title: initial?.title ?? "",
-    description: initial?.description ?? "",
-    price: initial?.price?.toString() ?? "",
-    category: initial?.category ?? "",
-    status: initial?.status ?? "AVAILABLE",
-    isVisible: initial?.isVisible ?? 1
-  });
-  const [priceMode, setPriceMode] = useState<"number" | "ask">(initialPriceMode);
+  const [form, setForm] = useState<ProductFormState>(
+    savedDraft?.form ?? {
+      title: initial?.title ?? "",
+      description: initial?.description ?? "",
+      price: initial?.price?.toString() ?? "",
+      category: initial?.category ?? "",
+      status: initial?.status ?? "AVAILABLE",
+      isVisible: initial?.isVisible ?? 1
+    }
+  );
+  const [priceMode, setPriceMode] = useState<"number" | "ask">(savedDraft?.priceMode ?? initialPriceMode);
   const [aiMode, setAiMode] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -123,9 +165,10 @@ export function ProductForm({
   const [voiceDurationSeconds, setVoiceDurationSeconds] = useState(0);
   const [aiInputMode, setAiInputMode] = useState<"text" | "voice">("text");
   const [aiDraftApplied, setAiDraftApplied] = useState(false);
-  const [variants, setVariants] = useState<VariantFormRow[]>(() => initialVariants(initial));
+  const [variants, setVariants] = useState<VariantFormRow[]>(() => savedDraft?.variants?.length ? savedDraft.variants : initialVariants(initial));
   const [images, setImages] = useState<ProductFormImage[]>(() => initialImages(initial));
   const [previewImageId, setPreviewImageId] = useState<string | null>(() => initial?.images[0]?.id ?? null);
+  const [isDraftNoticeVisible, setIsDraftNoticeVisible] = useState(Boolean(savedDraft));
   const previewImage = images.find((image) => image.id === previewImageId) ?? images[0];
 
   useEffect(() => {
@@ -133,6 +176,21 @@ export function ProductForm({
     const timer = window.setInterval(() => setRecordingSeconds(Math.floor((Date.now() - recordingStartedAt) / 1000)), 250);
     return () => window.clearInterval(timer);
   }, [recordingStartedAt]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const draft: SavedProductFormDraft = { form, priceMode, aiPrompt, variants };
+    if (!hasDraftContent(draft)) {
+      localStorage.removeItem(draftKey);
+      return;
+    }
+    localStorage.setItem(draftKey, JSON.stringify(draft));
+  }, [aiPrompt, draftKey, form, priceMode, variants]);
+
+  function clearSavedDraft() {
+    if (draftKey) localStorage.removeItem(draftKey);
+    setIsDraftNoticeVisible(false);
+  }
 
   function updateVariant(id: string, patch: Partial<VariantFormRow>) {
     setVariants((current) => current.map((variant) => (variant.id === id ? { ...variant, ...patch } : variant)));
@@ -295,10 +353,19 @@ export function ProductForm({
       },
       { images, previewImageId }
     );
+    clearSavedDraft();
   }
 
   return (
     <form className="form" onSubmit={submit} onKeyDownCapture={selectFieldText}>
+      {isDraftNoticeVisible && (
+        <div className="autosave-note">
+          <span>Восстановлен локальный черновик</span>
+          <button type="button" onClick={clearSavedDraft}>
+            Очистить
+          </button>
+        </div>
+      )}
       <div className="mode-switch">
         <span>Обычный ввод</span>
         <button
@@ -315,6 +382,12 @@ export function ProductForm({
         </button>
         <span>ИИ ввод {!aiFormEnabled && <LockIcon />}</span>
       </div>
+      {!aiFormEnabled && (
+        <div className="ai-unavailable-note">
+          <strong>AI недоступен</strong>
+          <span>Администратор еще не подключил AI-заполнение для этого магазина.</span>
+        </div>
+      )}
       {aiMode && (
         <div className="ai-draft-box">
           <div className="segmented">

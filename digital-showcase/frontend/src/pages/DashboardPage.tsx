@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { EmptyState } from "../components/EmptyState";
+import { QrShareButton } from "../components/QrShareButton";
 import type { Product, Store } from "../types/models";
 
 type OwnerProductStatus = "published" | "draft" | "archive";
+type StoreAnalytics = { productCount: number; storeViews: number; productViews: number };
 
 function formatStoreDate(value?: string | null) {
   if (!value) return "Дата создания не указана";
@@ -84,7 +88,7 @@ function StoreCardIcon({ type }: { type: "link" | "globe" | "copy" | "bag" | "ed
   );
 }
 
-function OwnerIcon({ type }: { type: "home" | "swap" | "plus" | "cube" | "eye" | "clock" | "archive" | "search" | "filter" | "edit" | "menu" | "copy" }) {
+function OwnerIcon({ type }: { type: "home" | "swap" | "plus" | "cube" | "eye" | "clock" | "archive" | "search" | "filter" | "edit" | "menu" | "copy" | "trash" }) {
   const paths = {
     home: (
       <>
@@ -162,6 +166,15 @@ function OwnerIcon({ type }: { type: "home" | "swap" | "plus" | "cube" | "eye" |
       <>
         <rect x="8" y="8" width="11" height="11" rx="2" />
         <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+      </>
+    ),
+    trash: (
+      <>
+        <path d="M4 7h16" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+        <path d="M6 7l1 13h10l1-13" />
+        <path d="M9 7V4h6v3" />
       </>
     )
   };
@@ -249,9 +262,13 @@ function StoreChoiceCard({ store }: { store: Store }) {
             <StoreCardIcon type="globe" />
           </span>
           <a href={`/m/${store.slug}`}>{publicUrl}</a>
-          <button type="button" onClick={copyPublicUrl} aria-label="Скопировать публичную ссылку">
-            <StoreCardIcon type="copy" />
-          </button>
+          <div className="public-link-actions">
+            <button type="button" onClick={copyPublicUrl}>
+              <StoreCardIcon type="copy" />
+              Копировать
+            </button>
+            <QrShareButton url={publicUrl} label="QR" />
+          </div>
         </div>
         <p className="store-link-note">{isCopied ? "Ссылка скопирована" : "Эта ссылка доступна для всех пользователей"}</p>
         <div className="store-choice-actions">
@@ -278,13 +295,20 @@ export function DashboardPage() {
   const { storeId } = useParams();
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [analytics, setAnalytics] = useState<StoreAnalytics>({ productCount: 0, storeViews: 0, productViews: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | OwnerProductStatus>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState("new");
+  const [copiedPublicUrl, setCopiedPublicUrl] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const selectedStore = stores.find((store) => store.id === storeId);
   const publicStoreUrl = selectedStore ? `${location.origin}/m/${selectedStore.slug}` : "";
+  const isStoreProfileIncomplete = Boolean(
+    selectedStore && (!selectedStore.description || !selectedStore.logoUrl || !selectedStore.phone || (!selectedStore.whatsapp && !selectedStore.telegram))
+  );
+  const isSubscriptionExpired = Boolean(selectedStore?.subscriptionEndsAt && new Date(selectedStore.subscriptionEndsAt).getTime() < Date.now());
 
   const categories = useMemo(
     () => [...new Set(products.map((product) => product.category).filter((category): category is string => Boolean(category)))],
@@ -332,17 +356,37 @@ export function DashboardPage() {
   useEffect(() => {
     if (!storeId) {
       setProducts([]);
+      setAnalytics({ productCount: 0, storeViews: 0, productViews: 0 });
       return;
     }
 
     let ignore = false;
-    api.get<Product[]>(`/owner/stores/${storeId}/products`).then((res) => {
-      if (!ignore) setProducts(res.data);
+    Promise.all([
+      api.get<Product[]>(`/owner/stores/${storeId}/products`),
+      api.get<StoreAnalytics>(`/owner/stores/${storeId}/analytics`)
+    ]).then(([productsRes, analyticsRes]) => {
+      if (ignore) return;
+      setProducts(productsRes.data);
+      setAnalytics(analyticsRes.data);
     });
     return () => {
       ignore = true;
     };
   }, [storeId]);
+
+  async function copySelectedStoreUrl() {
+    if (!publicStoreUrl) return;
+    await navigator.clipboard?.writeText(publicStoreUrl);
+    setCopiedPublicUrl(true);
+    window.setTimeout(() => setCopiedPublicUrl(false), 1600);
+  }
+
+  async function deleteProduct() {
+    if (!storeId || !productToDelete) return;
+    await api.delete(`/owner/stores/${storeId}/products/${productToDelete.id}`);
+    setProducts((current) => current.filter((product) => product.id !== productToDelete.id));
+    setProductToDelete(null);
+  }
 
   if (isLoading) return <section className="empty">Загрузка...</section>;
 
@@ -363,7 +407,10 @@ export function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="empty">Для вашего аккаунта еще не создан магазин.</div>
+          <EmptyState
+            title="Магазин еще не создан"
+            description="Администратор должен создать магазин и привязать его к вашему аккаунту."
+          />
         )}
       </section>
     );
@@ -372,12 +419,15 @@ export function DashboardPage() {
   if (!selectedStore) {
     return (
       <section className="empty">
-        <div>
-          <p>Магазин не найден или недоступен.</p>
-          <Link className="button-link" to="/dashboard">
-            Вернуться к выбору магазина
-          </Link>
-        </div>
+        <EmptyState
+          title="Магазин недоступен"
+          description="Магазин не найден или больше не привязан к вашему аккаунту."
+          action={
+            <Link className="button-link" to="/dashboard">
+              Вернуться к выбору магазина
+            </Link>
+          }
+        />
       </section>
     );
   }
@@ -410,12 +460,16 @@ export function DashboardPage() {
                 <OwnerIcon type="edit" />
               </Link>
             </div>
-            <p>
-              Публичная ссылка: <a href={`/m/${selectedStore.slug}`}>{publicStoreUrl}</a>
-              <button type="button" onClick={() => navigator.clipboard?.writeText(publicStoreUrl)} aria-label="Скопировать публичную ссылку">
+            <div className="owner-public-link">
+              <span>Публичная ссылка:</span>
+              <a href={`/m/${selectedStore.slug}`}>{publicStoreUrl}</a>
+              <button type="button" onClick={copySelectedStoreUrl}>
                 <OwnerIcon type="copy" />
+                Копировать
               </button>
-            </p>
+              <QrShareButton url={publicStoreUrl} label="QR" />
+            </div>
+            <p className={copiedPublicUrl ? "copy-note visible" : "copy-note"}>Ссылка скопирована</p>
           </div>
         </div>
         <div className="owner-store-actions">
@@ -434,12 +488,67 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {!selectedStore.isActive && (
+        <EmptyState
+          title="Магазин архивирован"
+          description="Публичная витрина сейчас недоступна. Обратитесь к администратору, чтобы восстановить магазин."
+        />
+      )}
+
+      {selectedStore.isActive && isSubscriptionExpired && (
+        <EmptyState
+          title="Подписка истекла"
+          description="Клиенты не смогут открыть витрину, пока администратор не продлит подписку."
+        />
+      )}
+
+      {selectedStore.isActive && !isSubscriptionExpired && isStoreProfileIncomplete && (
+        <div className="onboarding-panel">
+          <div>
+            <h2>Запустите магазин</h2>
+            <p>Закройте базовые шаги, чтобы витрина выглядела готовой для клиентов.</p>
+          </div>
+          <ol>
+            <li className={selectedStore.description || selectedStore.phone || selectedStore.whatsapp || selectedStore.telegram ? "done" : ""}>
+              <span>1</span>
+              Заполните информацию о магазине
+            </li>
+            <li className={selectedStore.logoUrl ? "done" : ""}>
+              <span>2</span>
+              Загрузите логотип
+            </li>
+            <li className={products.length ? "done" : ""}>
+              <span>3</span>
+              Добавьте первый товар
+            </li>
+            <li className={copiedPublicUrl ? "done" : ""}>
+              <span>4</span>
+              Скопируйте ссылку
+            </li>
+          </ol>
+        </div>
+      )}
+
       <div className="tabs">
         <Link to={`/dashboard/stores/${selectedStore.id}/products`}>Товары</Link>
         <Link to={`/dashboard/stores/${selectedStore.id}/settings`}>Настройки магазина</Link>
       </div>
 
       <div className="owner-products-panel">
+        <div className="owner-analytics-grid">
+          <div className="owner-analytics-card">
+            <small>Количество товаров</small>
+            <strong>{analytics.productCount || stats.total}</strong>
+          </div>
+          <div className="owner-analytics-card">
+            <small>Просмотры магазина</small>
+            <strong>{analytics.storeViews}</strong>
+          </div>
+          <div className="owner-analytics-card">
+            <small>Просмотры товаров</small>
+            <strong>{analytics.productViews}</strong>
+          </div>
+        </div>
         <div className="owner-stat-grid">
           <div className="owner-stat-card total">
             <span><OwnerIcon type="cube" /></span>
@@ -523,14 +632,27 @@ export function DashboardPage() {
                   <Link to={`/dashboard/stores/${selectedStore.id}/products/${product.id}/edit`} aria-label="Редактировать товар">
                     <OwnerIcon type="edit" />
                   </Link>
-                  <button type="button" aria-label="Еще действия">
-                    <OwnerIcon type="menu" />
+                  <button type="button" aria-label="Удалить товар" onClick={() => setProductToDelete(product)}>
+                    <OwnerIcon type="trash" />
                   </button>
                 </div>
               </div>
             );
           })}
-          {!filteredProducts.length && <div className="empty">Товары не найдены.</div>}
+          {!filteredProducts.length && (
+            <EmptyState
+              title={products.length ? "Товары не найдены" : "Нет товаров"}
+              description={products.length ? "Попробуйте изменить поиск, фильтры или сортировку." : "Добавьте первый товар, чтобы витрина начала наполняться."}
+              action={
+                !products.length && (
+                  <Link className="primary button-link" to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+                    <OwnerIcon type="plus" />
+                    Добавить товар
+                  </Link>
+                )
+              }
+            />
+          )}
         </div>
 
         <div className="owner-product-footer">
@@ -548,6 +670,16 @@ export function DashboardPage() {
           </select>
         </div>
       </div>
+      {productToDelete && (
+        <ConfirmModal
+          title="Удалить товар?"
+          description={`Товар "${productToDelete.title}" исчезнет из кабинета и публичной витрины. Это действие нельзя отменить.`}
+          confirmLabel="Удалить"
+          danger
+          onCancel={() => setProductToDelete(null)}
+          onConfirm={deleteProduct}
+        />
+      )}
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { createProductAiDraft } from "../services/aiDraftService.js";
+import * as analyticsService from "../services/analyticsService.js";
 import * as productService from "../services/productService.js";
 import * as storeService from "../services/storeService.js";
 import { asyncHandler, HttpError, requireFields } from "../utils/http.js";
@@ -36,6 +37,13 @@ export const updateStore = asyncHandler(async (req, res) => {
 export const listProducts = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
   res.json(await productService.listProducts(store.id));
+});
+
+export const getAnalytics = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  const products = await productService.listProducts(store.id);
+  const analytics = await analyticsService.getStoreAnalytics(store.id);
+  res.json({ productCount: products.length, ...analytics });
 });
 
 export const getProduct = asyncHandler(async (req, res) => {

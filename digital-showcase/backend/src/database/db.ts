@@ -134,6 +134,13 @@ export async function initDatabase() {
       size TEXT NOT NULL,
       price REAL
     );
+    CREATE TABLE IF NOT EXISTS analytics_events (
+      id TEXT PRIMARY KEY,
+      storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+      productId TEXT REFERENCES products(id) ON DELETE CASCADE,
+      type TEXT NOT NULL CHECK(type IN ('STORE_VIEW', 'PRODUCT_VIEW')),
+      createdAt TEXT NOT NULL
+    );
   `);
 
   const storeColumns = await database.all<{ name: string }>("PRAGMA table_info(stores)");

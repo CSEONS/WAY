@@ -8,6 +8,7 @@ ownerRoutes.use(authMiddleware, ownerOnly);
 ownerRoutes.get("/stores", controller.listStores);
 ownerRoutes.get("/stores/:storeId", controller.getStore);
 ownerRoutes.patch("/stores/:storeId", controller.updateStore);
+ownerRoutes.get("/stores/:storeId/analytics", controller.getAnalytics);
 ownerRoutes.get("/stores/:storeId/products", controller.listProducts);
 ownerRoutes.post("/stores/:storeId/products/ai-draft", audioUpload.single("voice"), controller.createProductDraft);
 ownerRoutes.post("/stores/:storeId/products", controller.createProduct);

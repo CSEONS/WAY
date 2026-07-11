@@ -1,12 +1,14 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { ConfirmModal } from "../components/ConfirmModal";
 import type { Store, User } from "../types/models";
 
 export function AdminStoresPage() {
   const [owners, setOwners] = useState<User[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [storeForm, setStoreForm] = useState({ ownerId: "", name: "", slug: "", subscriptionEndsAt: "" });
+  const [storeToArchive, setStoreToArchive] = useState<Store | null>(null);
 
   async function load() {
     const [ownersRes, storesRes] = await Promise.all([api.get("/admin/owners"), api.get("/admin/stores")]);
@@ -32,6 +34,7 @@ export function AdminStoresPage() {
 
   async function toggle(store: Store) {
     await api.post(`/admin/stores/${store.id}/${store.isActive ? "archive" : "restore"}`);
+    setStoreToArchive(null);
     load();
   }
 
@@ -90,12 +93,22 @@ export function AdminStoresPage() {
                 <span>{store.ownerName}</span>
                 <button onClick={() => extend(store.id)}>+30 дней</button>
                 <button onClick={() => toggleAiForm(store)}>{store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}</button>
-                <button onClick={() => toggle(store)}>{store.isActive ? "Архивировать" : "Восстановить"}</button>
+                <button onClick={() => (store.isActive ? setStoreToArchive(store) : toggle(store))}>{store.isActive ? "Архивировать" : "Восстановить"}</button>
               </div>
             ))}
           </div>
         </div>
       </div>
+      {storeToArchive && (
+        <ConfirmModal
+          title="Архивировать магазин?"
+          description={`Публичная витрина "${storeToArchive.name}" станет недоступна клиентам.`}
+          confirmLabel="Архивировать"
+          danger
+          onCancel={() => setStoreToArchive(null)}
+          onConfirm={() => toggle(storeToArchive)}
+        />
+      )}
       <p>
         <Link to="/admin">← Назад в админку</Link>
       </p>

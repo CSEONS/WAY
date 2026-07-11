@@ -101,6 +101,7 @@ export function ProductEditorPage() {
         initial={product}
         aiDraftPath={`/owner/stores/${storeId}/products/ai-draft`}
         aiFormEnabled={Boolean(store?.aiFormEnabled)}
+        draftKey={`product-form-draft:${storeId}:${id ?? "new"}`}
         onSubmit={save}
       />
     </section>

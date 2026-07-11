@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { ConfirmModal } from "../components/ConfirmModal";
 import type { User } from "../types/models";
 
 export function AdminOwnersPage() {
@@ -9,6 +10,7 @@ export function AdminOwnersPage() {
   const [passwords, setPasswords] = useState<Record<string, string>>({});
   const [openOwnerActions, setOpenOwnerActions] = useState<string | null>(null);
   const [passwordModalOwnerId, setPasswordModalOwnerId] = useState<string | null>(null);
+  const [ownerToDelete, setOwnerToDelete] = useState<User | null>(null);
   const passwordModalOwner = owners.find((owner) => owner.id === passwordModalOwnerId);
 
   async function load() {
@@ -34,6 +36,7 @@ export function AdminOwnersPage() {
     function closeModal(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       setPasswordModalOwnerId(null);
+      setOwnerToDelete(null);
       setOpenOwnerActions(null);
     }
 
@@ -62,6 +65,18 @@ export function AdminOwnersPage() {
   function openPasswordModal(ownerId: string) {
     setPasswordModalOwnerId(ownerId);
     setOpenOwnerActions(null);
+  }
+
+  function openDeleteModal(owner: User) {
+    setOwnerToDelete(owner);
+    setOpenOwnerActions(null);
+  }
+
+  async function deleteOwner() {
+    if (!ownerToDelete) return;
+    await api.delete(`/admin/owners/${ownerToDelete.id}`);
+    setOwnerToDelete(null);
+    load();
   }
 
   return (
@@ -113,6 +128,9 @@ export function AdminOwnersPage() {
                       <button className="menu-action" type="button" role="menuitem" onClick={() => openPasswordModal(owner.id)}>
                         Сменить пароль
                       </button>
+                      <button className="menu-action danger-menu-action" type="button" role="menuitem" onClick={() => openDeleteModal(owner)}>
+                        Удалить владельца
+                      </button>
                     </div>
                   )}
                 </div>
@@ -154,6 +172,16 @@ export function AdminOwnersPage() {
             </form>
           </div>
         </div>
+      )}
+      {ownerToDelete && (
+        <ConfirmModal
+          title="Удалить владельца?"
+          description={`Владелец "${ownerToDelete.name}" и связанные с ним магазины будут удалены. Это действие нельзя отменить.`}
+          confirmLabel="Удалить"
+          danger
+          onCancel={() => setOwnerToDelete(null)}
+          onConfirm={deleteOwner}
+        />
       )}
       <p>
         <Link to="/admin">← Назад в админку</Link>

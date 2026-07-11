@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { EmptyState } from "../components/EmptyState";
 import { ProductCard } from "../components/ProductCard";
 import type { Product, Store } from "../types/models";
 
@@ -41,7 +42,16 @@ export function PublicStorePage() {
     setFilters(emptyFilters);
   }
 
-  if (error) return <section className="empty">{error}</section>;
+  if (error) {
+    return (
+      <section className="empty">
+        <EmptyState
+          title={error.includes("временно") || error.includes("подпис") ? "Магазин недоступен" : "Магазин не найден"}
+          description={error.includes("временно") || error.includes("подпис") ? "Подписка могла истечь или магазин был архивирован." : error}
+        />
+      </section>
+    );
+  }
   if (!store) return <section className="empty">Загрузка...</section>;
 
   return (
@@ -96,6 +106,12 @@ export function PublicStorePage() {
         <div className="product-grid">
           {visibleProducts.map((product) => <ProductCard key={product.id} product={product} slug={storeSlug} />)}
         </div>
+        {!visibleProducts.length && (
+          <EmptyState
+            title="Нет товаров"
+            description="В этом магазине пока нет опубликованных товаров или они скрыты текущими фильтрами."
+          />
+        )}
       </div>
     </section>
   );

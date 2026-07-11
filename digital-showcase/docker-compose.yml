@@ -1,6 +1,8 @@
 services:
   backend:
     build: ./backend
+    user: root
+    command: sh -c "chown -R node:node /app/data /app/uploads && npm start"
     environment:
       PORT: 4000
       NODE_ENV: production

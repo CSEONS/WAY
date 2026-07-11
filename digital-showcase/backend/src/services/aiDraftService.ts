@@ -75,7 +75,7 @@ const colorAliases: Record<string, string> = {
 
 const productDraftInstructions = `
 Ты помогаешь владельцу небольшого магазина одежды заполнить форму товара.
-Верни только JSON без markdown и пояснений.
+Верни только JSON без markdown и пояснений. В ответе обязательно должен быть JSON.
 Схема:
 {
   "title": "короткое название товара",
@@ -122,7 +122,7 @@ async function createExternalProductAiDraft(input: ProductAiDraftInput) {
   const text = descriptionParts.length ? descriptionParts.join("\n\n") : "Описание товара не задано. Используй изображения, если они приложены.";
 
   const content = [
-    { type: "input_text", text: `Создай черновик карточки товара одежды.\n\n${text}` },
+    { type: "input_text", text: `Создай черновик карточки товара одежды в формате JSON.\n\n${text}` },
     ...imageUrls.map((imageUrl) => ({ type: "input_image", image_url: imageUrl, detail: "low" }))
   ];
 

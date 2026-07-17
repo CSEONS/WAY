@@ -23,7 +23,6 @@ export interface Store {
   whatsapp: string | null;
   telegram: string | null;
   logoUrl: string | null;
-  coverUrl: string | null;
   isActive: number;
   aiFormEnabled: number;
   subscriptionEndsAt: string | null;

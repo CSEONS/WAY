@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Product, Store } from "../types/models";
@@ -11,6 +11,7 @@ export function PublicProductPage() {
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedImageId, setSelectedImageId] = useState("");
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -22,14 +23,6 @@ export function PublicProductPage() {
       })
       .catch((err) => setError(err.response?.data?.message ?? "Товар недоступен"));
   }, [storeSlug, productId]);
-
-  const contactHref = useMemo(() => {
-    const store = data?.store;
-    if (!store) return "#";
-    if (store.whatsapp) return `https://wa.me/${store.whatsapp.replace(/\D/g, "")}`;
-    if (store.telegram) return store.telegram.startsWith("http") ? store.telegram : `https://t.me/${store.telegram.replace("@", "")}`;
-    return store.phone ? `tel:${store.phone}` : "#";
-  }, [data]);
 
   if (error) return <section className="empty">{error}</section>;
   if (!data) return <section className="empty">Загрузка...</section>;
@@ -136,15 +129,35 @@ export function PublicProductPage() {
             ))}
           </div>
         )}
-        <p>Статус: {product.status === "AVAILABLE" ? "в наличии" : product.status === "NOT_AVAILABLE" ? "нет в наличии" : "уточнить в магазине"}</p>
+        <p className="availability-label"><strong>Наличие:</strong> {product.status === "AVAILABLE" ? "в наличии" : product.status === "NOT_AVAILABLE" ? "нет в наличии" : "уточнить в магазине"}</p>
         <div className="contact-box">
           <h2>{store.name}</h2>
           <p>{[store.address, store.phone, store.whatsapp, store.telegram].filter(Boolean).join(" · ")}</p>
-          <a className="primary button-link" href={contactHref}>Связаться с магазином</a>
+          <button className="primary" type="button" onClick={() => setContactModalOpen(true)}>Связаться с магазином</button>
         </div>
       </article>
+      {contactModalOpen && (
+        <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setContactModalOpen(false)}>
+          <div className="modal contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+            <div className="modal-head">
+              <div><h2 id="contact-title">Выберите способ связи</h2><p>{store.name}</p></div>
+              <button type="button" aria-label="Закрыть" onClick={() => setContactModalOpen(false)}>×</button>
+            </div>
+            <div className="contact-options">
+              <ContactOption label="Позвонить" value={store.phone} href={store.phone ? `tel:${store.phone}` : undefined} />
+              <ContactOption label="WhatsApp" value={store.whatsapp} href={store.whatsapp ? `https://wa.me/${store.whatsapp.replace(/\D/g, "")}` : undefined} />
+              <ContactOption label="Telegram" value={store.telegram} href={store.telegram ? (store.telegram.startsWith("http") ? store.telegram : `https://t.me/${store.telegram.replace("@", "")}`) : undefined} />
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
+}
+
+function ContactOption({ label, value, href }: { label: string; value?: string | null; href?: string }) {
+  if (!href) return <span className="contact-option disabled" aria-disabled="true"><strong>{label}</strong><small>Не указан владельцем</small></span>;
+  return <a className="contact-option" href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer"><strong>{label}</strong><small>{value}</small></a>;
 }
 
 function uniqueBy<T>(items: T[], getKey: (item: T) => string) {

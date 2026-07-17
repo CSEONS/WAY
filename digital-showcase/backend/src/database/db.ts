@@ -88,7 +88,6 @@ export async function initDatabase() {
       whatsapp TEXT,
       telegram TEXT,
       logoUrl TEXT,
-      coverUrl TEXT,
       isActive INTEGER NOT NULL DEFAULT 1,
       aiFormEnabled INTEGER NOT NULL DEFAULT 0,
       subscriptionEndsAt TEXT,
@@ -146,6 +145,9 @@ export async function initDatabase() {
   const storeColumns = await database.all<{ name: string }>("PRAGMA table_info(stores)");
   if (!storeColumns.some((column) => column.name === "aiFormEnabled")) {
     await database.exec("ALTER TABLE stores ADD COLUMN aiFormEnabled INTEGER NOT NULL DEFAULT 0");
+  }
+  if (storeColumns.some((column) => column.name === "coverUrl")) {
+    await database.exec("ALTER TABLE stores DROP COLUMN coverUrl");
   }
 
   const existing = await database.get<{ count: number }>("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");

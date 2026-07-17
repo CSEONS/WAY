@@ -165,6 +165,7 @@ export function ProductForm({
   const [voiceDurationSeconds, setVoiceDurationSeconds] = useState(0);
   const [aiInputMode, setAiInputMode] = useState<"text" | "voice">("text");
   const [aiDraftApplied, setAiDraftApplied] = useState(false);
+  const [aiSuccessVisible, setAiSuccessVisible] = useState(false);
   const [variants, setVariants] = useState<VariantFormRow[]>(() => savedDraft?.variants?.length ? savedDraft.variants : initialVariants(initial));
   const [images, setImages] = useState<ProductFormImage[]>(() => initialImages(initial));
   const [previewImageId, setPreviewImageId] = useState<string | null>(() => initial?.images[0]?.id ?? null);
@@ -186,6 +187,12 @@ export function ProductForm({
     }
     localStorage.setItem(draftKey, JSON.stringify(draft));
   }, [aiPrompt, draftKey, form, priceMode, variants]);
+
+  useEffect(() => {
+    if (!aiSuccessVisible) return;
+    const timer = window.setTimeout(() => setAiSuccessVisible(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [aiSuccessVisible]);
 
   function clearSavedDraft() {
     if (draftKey) localStorage.removeItem(draftKey);
@@ -259,6 +266,7 @@ export function ProductForm({
       const { data } = await api.post<ProductDraft>(aiDraftPath ?? "/owner/products/ai-draft", formData);
       applyDraft(data);
       setAiDraftApplied(true);
+      setAiSuccessVisible(true);
     } catch (err: any) {
       setAiError(err.response?.data?.message ?? err.message ?? "Не удалось заполнить форму");
     } finally {
@@ -390,8 +398,14 @@ export function ProductForm({
           <span>Администратор еще не подключил AI-заполнение для этого магазина.</span>
         </div>
       )}
-      {aiMode && (
-        <div className="ai-draft-box">
+      {aiMode && aiDraftApplied && (
+        <div className="ai-result-summary">
+          <span>ИИ заполнил форму — проверьте результат ниже.</span>
+          <button type="button" onClick={() => setAiDraftApplied(false)}>Изменить запрос</button>
+        </div>
+      )}
+      {aiMode && !aiDraftApplied && (
+        <div className={aiLoading ? "ai-draft-box loading" : "ai-draft-box"} aria-busy={aiLoading}>
           <div className="segmented">
             <button className={aiInputMode === "text" ? "active" : ""} type="button" onClick={() => setAiInputMode("text")}>Текст</button>
             <button className={aiInputMode === "voice" ? "active" : ""} type="button" onClick={() => setAiInputMode("voice")}>Голос</button>
@@ -431,7 +445,8 @@ export function ProductForm({
               </button>
             )}
             <button className="primary" type="button" disabled={(aiInputMode === "text" ? !aiPrompt.trim() : !voiceBlob || isListening) || aiLoading} onClick={fillWithAi}>
-              {aiLoading ? "Заполняю..." : "Заполнить форму"}
+              {aiLoading && <span className="spinner" aria-hidden="true" />}
+              {aiLoading ? "ИИ обрабатывает данные..." : "Заполнить форму"}
             </button>
           </div>
         </div>
@@ -486,7 +501,7 @@ export function ProductForm({
           <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
           <div className="publish-controls">
             <label>
-              Статус наличия
+              Наличие
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProductStatus })}>
                 <option value="AVAILABLE">В наличии</option>
                 <option value="CHECK_IN_STORE">Уточнить в магазине</option>
@@ -541,6 +556,7 @@ export function ProductForm({
           <button className="primary">Сохранить</button>
         </>
       )}
+      {aiSuccessVisible && <div className="toast success" role="status">ИИ закончил обработку. Проверьте заполненные поля.</div>}
     </form>
   );
 }

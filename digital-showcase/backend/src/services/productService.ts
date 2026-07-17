@@ -1,5 +1,6 @@
 import { getDb } from "../database/db.js";
 import type { Product, ProductColor, ProductFull, ProductImage, ProductSize, ProductVariant } from "../types/models.js";
+import { deleteStoredImage, storeProductImage, type UploadedImage } from "./imageService.js";
 
 type ProductVariantInput = {
   colorName?: string;
@@ -87,7 +88,7 @@ function detailsFromVariants(variants: ReturnType<typeof normalizeVariants>) {
   return { sizes: sizeValues, colors: [...colorsByName.values()] };
 }
 
-async function replaceVariants(productId: string, variants?: ProductVariantInput[]) {
+async function replaceVariants(productId: string, variants?: ProductVariantInput[], fallbackSizes?: string[], fallbackColors?: { name: string; hex?: string | null }[]) {
   if (!variants) return;
   const db = await getDb();
   const normalized = normalizeVariants(variants);
@@ -104,7 +105,7 @@ async function replaceVariants(productId: string, variants?: ProductVariantInput
     );
   }
   const details = detailsFromVariants(normalized);
-  await replaceDetails(productId, details.sizes, details.colors);
+  await replaceDetails(productId, normalized?.length ? details.sizes : fallbackSizes ?? [], normalized?.length ? details.colors : fallbackColors ?? []);
 }
 
 export async function createProduct(
@@ -134,7 +135,7 @@ export async function createProduct(
     now,
     now
   );
-  if (input.variants) await replaceVariants(id, input.variants);
+  if (input.variants) await replaceVariants(id, input.variants, input.sizes, input.colors);
   else await replaceDetails(id, input.sizes, input.colors);
   return getProduct(id);
 }
@@ -160,7 +161,7 @@ export async function updateProduct(
     id,
     storeId
   );
-  if (input.variants) await replaceVariants(id, input.variants);
+  if (input.variants) await replaceVariants(id, input.variants, input.sizes, input.colors);
   else await replaceDetails(id, input.sizes, input.colors);
   return getProduct(id, storeId);
 }
@@ -170,13 +171,16 @@ function productField<K extends keyof Product>(input: Partial<Product>, key: K, 
 }
 
 export async function deleteProduct(id: string, storeId: string) {
+  const product = await getProduct(id, storeId);
   const db = await getDb();
   await db.run("DELETE FROM products WHERE id = ? AND storeId = ?", id, storeId);
+  await Promise.all((product?.images ?? []).map((image) => deleteStoredImage(image.url)));
 }
 
-export async function addProductImage(productId: string, storeId: string, url: string) {
+export async function addProductImage(productId: string, storeId: string, file: UploadedImage) {
   const product = await getProduct(productId, storeId);
   if (!product) return null;
+  const url = await storeProductImage(file);
   const db = await getDb();
   const count = await db.get<{ count: number }>("SELECT COUNT(*) as count FROM product_images WHERE productId = ?", productId);
   const id = crypto.randomUUID();
@@ -195,7 +199,9 @@ export async function deleteProductImage(productId: string, storeId: string, ima
   const product = await getProduct(productId, storeId);
   if (!product) return null;
   const db = await getDb();
+  const image = await db.get<ProductImage>("SELECT * FROM product_images WHERE id = ? AND productId = ?", imageId, productId);
   await db.run("DELETE FROM product_images WHERE id = ? AND productId = ?", imageId, productId);
+  await deleteStoredImage(image?.url);
   return getProduct(productId, storeId);
 }
 

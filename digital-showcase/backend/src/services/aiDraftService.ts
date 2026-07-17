@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ProductStatus } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
+import { optimizeImageForAi } from "./imageService.js";
 
 interface DraftVariant {
   colorName: string;
@@ -35,6 +36,10 @@ export interface ProductAiDraft {
   sizes: string[];
   colors: { name: string; hex: string | null }[];
   variants: DraftVariant[];
+}
+
+export interface BulkProductAiDraft extends ProductAiDraft {
+  imageIndexes: number[];
 }
 
 const colorHexByName: Record<string, string> = {
@@ -93,6 +98,16 @@ const productDraftInstructions = `
 AI не принимает финальных решений: возвращай только редактируемое предложение.
 `;
 
+const bulkDraftInstructions = `
+Ты группируешь фотографии одежды по отдельным товарам и предлагаешь карточки для цифровой витрины.
+Верни только JSON вида {"products":[...]}. Каждый элемент products соответствует одному типу товара и содержит поля обычного черновика:
+title, description, price, priceText, category, status, isVisible, sizes, colors, variants, а также imageIndexes — массив индексов приложенных изображений, начиная с 0.
+Каждое изображение должно относиться ровно к одному товару. Группируй по типу товара, а не только по цвету или ракурсу.
+Цвет, явно названный пользователем для товара, имеет приоритет над цветом на фотографии.
+Цена, явно названная для товара, относится именно к этому товару. Если цены нет, установи price=null, priceText="Уточнить у продавца" и status="CHECK_IN_STORE".
+Не выдумывай цены, размеры и цвета. Результат является редактируемым предложением и применяется только после подтверждения владельца.
+`;
+
 export async function createProductAiDraft(input: string | ProductAiDraftInput): Promise<ProductAiDraft> {
   const draftInput = typeof input === "string" ? { prompt: input } : input;
   const prompt = draftInput.prompt?.trim() ?? "";
@@ -113,6 +128,50 @@ export async function createProductAiDraft(input: string | ProductAiDraftInput):
   }
 
   return createLocalProductAiDraft(prompt);
+}
+
+export async function createBulkProductAiDraft(input: ProductAiDraftInput): Promise<BulkProductAiDraft[]> {
+  if (!input.images?.length) throw new HttpError(400, "Добавьте изображения товаров");
+  if (!openAiApiKey()) throw new HttpError(503, "Для массовой группировки товаров настройте OPENAI_API_KEY на сервере");
+
+  const transcript = input.voice ? await transcribeVoice(input.voice) : "";
+  const imageUrls = await collectImageInputs(input.images, []);
+  const description = [input.prompt?.trim(), transcript ? `Голосовое описание: ${transcript}` : ""].filter(Boolean).join("\n\n");
+  const content = [
+    { type: "input_text", text: `Сгруппируй ${input.images.length} изображений по товарам. ${description || "Дополнительное описание отсутствует."}` },
+    ...imageUrls.map((imageUrl) => ({ type: "input_image", image_url: imageUrl, detail: "low" }))
+  ];
+  const response = await fetch(`${openAiBaseUrl()}/responses`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${openAiApiKey()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL ?? "gpt-5.6",
+      instructions: `${productDraftInstructions}\n${bulkDraftInstructions}`,
+      input: [{ role: "user", content }],
+      text: { format: { type: "json_object" } },
+      store: false
+    }),
+    signal: AbortSignal.timeout(openAiTimeoutMs())
+  });
+
+  const payload = await readOpenAiPayload(response);
+  const parsed = parseJsonObject(extractResponseText(payload));
+  const products = Array.isArray(parsed?.products) ? parsed.products : [];
+  const claimed = new Set<number>();
+  const drafts = products.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as Record<string, unknown>;
+    const normalized = normalizeAiDraft(JSON.stringify(raw), description);
+    const draft = normalized.price == null ? { ...normalized, priceText: "Уточнить у продавца", status: "CHECK_IN_STORE" as ProductStatus } : normalized;
+    const imageIndexes = normalizeImageIndexes(raw.imageIndexes, input.images!.length).filter((index) => !claimed.has(index));
+    imageIndexes.forEach((index) => claimed.add(index));
+    return imageIndexes.length ? [{ ...draft, imageIndexes }] : [];
+  });
+
+  const unclaimed = input.images.map((_, index) => index).filter((index) => !claimed.has(index));
+  if (unclaimed.length && drafts[0]) drafts[0].imageIndexes.push(...unclaimed);
+  if (!drafts.length) throw new HttpError(502, "AI не смог сгруппировать изображения по товарам");
+  return drafts;
 }
 
 async function createExternalProductAiDraft(input: ProductAiDraftInput) {
@@ -168,12 +227,18 @@ async function transcribeVoice(file: AiDraftFile) {
 }
 
 async function collectImageInputs(files: AiDraftFile[], imageUrls: string[]) {
-  const inputs = files.map((file) => dataUrl(file.buffer, file.mimetype));
+  const optimized = await Promise.all(files.map((file) => optimizeImageForAi(file)));
+  const inputs = optimized.map((buffer) => dataUrl(buffer, "image/webp"));
   for (const url of imageUrls) {
     const imageInput = await imageUrlInput(url);
     if (imageInput) inputs.push(imageInput);
   }
-  return inputs.slice(0, 8);
+  return inputs.slice(0, 40);
+}
+
+function normalizeImageIndexes(value: unknown, imageCount: number) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(Number).filter((index) => Number.isInteger(index) && index >= 0 && index < imageCount))];
 }
 
 async function imageUrlInput(url: string) {
@@ -187,7 +252,8 @@ async function imageUrlInput(url: string) {
   if (!fs.existsSync(filePath)) return null;
 
   const buffer = await fs.promises.readFile(filePath);
-  return dataUrl(buffer, mimeFromFilename(filename));
+  const optimized = await optimizeImageForAi({ buffer, mimetype: mimeFromFilename(filename), originalname: filename, size: buffer.length });
+  return dataUrl(optimized, "image/webp");
 }
 
 function dataUrl(buffer: Buffer | Uint8Array, mimetype: string) {

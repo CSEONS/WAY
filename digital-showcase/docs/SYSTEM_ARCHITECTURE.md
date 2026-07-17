@@ -37,9 +37,11 @@ Backend реализован на Express. Сервер принимает HTTP-
 - `POST /api/admin/stores/:id/disable`, `POST /api/admin/stores/:id/enable`, `POST /api/admin/stores/:id/archive`, `POST /api/admin/stores/:id/restore` — переключение активности магазина.
 - `POST /api/admin/stores/:id/enable-ai-form`, `POST /api/admin/stores/:id/disable-ai-form` — управление AI-формой магазина.
 - `GET /api/owner/stores`, `GET /api/owner/stores/:storeId`, `PATCH /api/owner/stores/:storeId` — получение и редактирование магазина владельца.
+- `POST /api/owner/stores/:storeId/logo` — загрузка и оптимизация логотипа магазина.
 - `GET /api/owner/stores/:storeId/analytics` — получение аналитики магазина.
 - `GET /api/owner/stores/:storeId/products`, `POST /api/owner/stores/:storeId/products`, `GET /api/owner/stores/:storeId/products/:id`, `PATCH /api/owner/stores/:storeId/products/:id`, `DELETE /api/owner/stores/:storeId/products/:id` — управление товарами владельца.
 - `POST /api/owner/stores/:storeId/products/ai-draft` — создание AI-черновика товара.
+- `POST /api/owner/stores/:storeId/products/bulk-ai-draft` — группировка до 40 изображений и создание списка AI-предложений товаров.
 - `POST /api/owner/stores/:storeId/products/:id/images`, `PATCH /api/owner/stores/:storeId/products/:id/images/order`, `DELETE /api/owner/stores/:storeId/products/:id/images/:imageId` — управление изображениями товара.
 - `GET /api/owner/store`, `PATCH /api/owner/store`, `GET /api/owner/products`, `POST /api/owner/products/ai-draft`, `POST /api/owner/products`, `GET /api/owner/products/:id`, `PATCH /api/owner/products/:id`, `DELETE /api/owner/products/:id` — альтернативные маршруты с автоматическим выбором магазина владельца.
 - `GET /api/public/stores/:slug` — получение публичного магазина.
@@ -50,7 +52,7 @@ Backend реализован на Express. Сервер принимает HTTP-
 
 - `authController.ts` — логин, получение информации о текущем пользователе, выход.
 - `adminController.ts` — управление владельцами и магазинами, продление подписки, переключение активности и AI-формы.
-- `ownerController.ts` — операции владельца: получение магазина, списка товаров, аналитики, создание/редактирование/удаление товара, загрузка изображений, AI-черновик.
+- `ownerController.ts` — операции владельца: получение магазина, списка товаров, аналитики, создание/редактирование/удаление товара, загрузка изображений и логотипа, одиночный и массовый AI-черновик.
 - `publicController.ts` — публичный доступ к магазину и товарам, проверка доступности подписки и запись просмотров.
 
 ### Сервисы
@@ -60,7 +62,8 @@ Backend реализован на Express. Сервер принимает HTTP-
 - `storeService.ts` — CRUD магазинов, получение магазинов владельца, проверка подписки, продление подписки, получение магазина по slug.
 - `productService.ts` — CRUD товаров, чтение связанных изображений/размеров/цветов/вариантов, управление изображениями и их порядком.
 - `analyticsService.ts` — запись просмотров магазина и товара, вычисление количества просмотров.
-- `aiDraftService.ts` — генерация предложенных данных товара на основе текста или голосовой записи.
+- `aiDraftService.ts` — генерация одиночных и массовых предложений товара на основе текста, голосовой записи и оптимизированных изображений через AI API.
+- `imageService.ts` — серверная оптимизация, сохранение и удаление изображений товаров и логотипов.
 
 ### Middleware
 
@@ -82,6 +85,7 @@ Backend реализован на Express. Сервер принимает HTTP-
   - `product_variants` — варианты сочетаний цвета/размера/цены.
   - `analytics_events` — просмотры магазина и товаров.
 - Таблица `stores` поддерживает добавление колонки `aiFormEnabled` при миграции.
+- Устаревшая колонка `coverUrl` удаляется при инициализации существующей базы.
 - В базе создаётся начальный администратор при первом запуске.
 
 ## Frontend
@@ -111,6 +115,7 @@ Backend реализован на Express. Сервер принимает HTTP-
 ### Компоненты
 
 - `ProductForm.tsx` — форма товара с поддержкой AI-режима, голосового ввода, загрузки картинок, редактирования вариантов, цен и категорий.
+- `BulkProductCreator.tsx` — массовая загрузка изображений, AI-группировка, проверка предложений и подтверждённое создание товаров.
 - `ProductCard.tsx` — отображение товара на публичной витрине.
 - `ConfirmModal.tsx` — подтверждение опасных действий.
 - `EmptyState.tsx` — отображение пустых состояний.
@@ -192,6 +197,10 @@ Backend реализован на Express. Сервер принимает HTTP-
 ↓
 Ответ с предложенными данными товара
 
+### Массовый AI Draft
+
+Владелец → `BulkProductCreator.tsx` → `api/client.ts` → `POST /api/owner/stores/:storeId/products/bulk-ai-draft` → `ownerController.ts` → `aiDraftService.ts` / `imageService.ts` → список редактируемых предложений → подтверждение владельца → существующие маршруты создания товаров и загрузки изображений.
+
 ### Загрузка изображения товара
 
 Владелец
@@ -204,7 +213,7 @@ Backend реализован на Express. Сервер принимает HTTP-
 ↓
 `ownerController.ts`
 ↓
-`productService.ts` → `database/db.ts`
+`productService.ts` → `imageService.ts` → `database/db.ts`
 ↓
 Ответ с обновлённым товаром
 
@@ -223,7 +232,8 @@ Backend реализован на Express. Сервер принимает HTTP-
 - Реализация CRUD операций с данными.
 - Бизнес-логика проверки подписки и активности магазина.
 - Управление товарами, изображениями, размерами, цветами, вариантами.
-- Генерация AI-черновика товара.
+- Генерация одиночного и массового AI-черновика товара.
+- Оптимизация и файловый lifecycle изображений.
 - Расчёт аналитики просмотров.
 - Аутентификация и генерация JWT.
 
@@ -251,14 +261,12 @@ Backend реализован на Express. Сервер принимает HTTP-
 - React SPA: frontend как одностраничное приложение.
 - Централизованная бизнес-логика на backend, frontend отвечает за представление.
 - Файловая база данных: `sql.js` хранит SQLite в файле.
-- Локальные AI-предложения: генерация данных товара реализована на backend без внешнего AI.
+- AI-интеграция: backend обращается к совместимому Responses API и API транскрибации; текстовый одиночный черновик имеет локальный fallback.
 
 ## Несоответствия
 
-- В MOTIVATION.md указано заполнение карточки товара по фотографиям, но в коде это не реализовано.
 - В MOTIVATION.md указано добавление товаров в избранное, но в коде нет поддержки избранного.
 - В MOTIVATION.md и REQUIREMENTS.md упоминается тарифная модель, но в коде отсутствует отдельная модель тарифов.
-- В REQUIREMENTS.md AI-режим должен обрабатывать голосовое описание, но в коде голосовой файл принимается как заглушка, без реального распознавания речи.
 - В REQUIREMENTS.md указана подписка как часть системы, но в коде подписка представлена полями магазина, а не отдельной сущностью.
 - В проекте `Category` реализована не как отдельная сущность, а как строковый атрибут продукта.
 - `AiDraft` не хранится в базе, а создаётся динамически сервисом.

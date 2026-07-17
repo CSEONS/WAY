@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { BulkProductCreator } from "../components/BulkProductCreator";
 import { EmptyState } from "../components/EmptyState";
 import { QrShareButton } from "../components/QrShareButton";
 import type { Product, Store } from "../types/models";
@@ -303,6 +304,7 @@ export function DashboardPage() {
   const [sort, setSort] = useState("new");
   const [copiedPublicUrl, setCopiedPublicUrl] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [bulkCreatorOpen, setBulkCreatorOpen] = useState(false);
   const selectedStore = stores.find((store) => store.id === storeId);
   const publicStoreUrl = selectedStore ? `${location.origin}/m/${selectedStore.slug}` : "";
   const isStoreProfileIncomplete = Boolean(
@@ -386,6 +388,16 @@ export function DashboardPage() {
     await api.delete(`/owner/stores/${storeId}/products/${productToDelete.id}`);
     setProducts((current) => current.filter((product) => product.id !== productToDelete.id));
     setProductToDelete(null);
+  }
+
+  async function reloadProducts() {
+    if (!storeId) return;
+    const [productsRes, analyticsRes] = await Promise.all([
+      api.get<Product[]>(`/owner/stores/${storeId}/products`),
+      api.get<StoreAnalytics>(`/owner/stores/${storeId}/analytics`)
+    ]);
+    setProducts(productsRes.data);
+    setAnalytics(analyticsRes.data);
   }
 
   if (isLoading) return <section className="empty">Загрузка...</section>;
@@ -485,6 +497,7 @@ export function DashboardPage() {
             <OwnerIcon type="plus" />
             Добавить товар
           </Link>
+          {Boolean(selectedStore.aiFormEnabled) && <button type="button" onClick={() => setBulkCreatorOpen(true)}><OwnerIcon type="plus" />Добавить много товаров</button>}
         </div>
       </div>
 
@@ -680,6 +693,7 @@ export function DashboardPage() {
           onConfirm={deleteProduct}
         />
       )}
+      {bulkCreatorOpen && <BulkProductCreator storeId={selectedStore.id} onClose={() => setBulkCreatorOpen(false)} onComplete={reloadProducts} />}
     </section>
   );
 }

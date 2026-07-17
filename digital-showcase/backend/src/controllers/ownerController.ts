@@ -1,5 +1,5 @@
 import type { Request } from "express";
-import { createProductAiDraft } from "../services/aiDraftService.js";
+import { createBulkProductAiDraft, createProductAiDraft } from "../services/aiDraftService.js";
 import * as analyticsService from "../services/analyticsService.js";
 import * as productService from "../services/productService.js";
 import * as storeService from "../services/storeService.js";
@@ -44,7 +44,14 @@ export const getStore = asyncHandler(async (req, res) => {
 
 export const updateStore = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
-  res.json(await storeService.updateStore(store.id, { ...req.body, ownerId: store.ownerId }));
+  const { name, description, address, phone, whatsapp, telegram } = req.body;
+  res.json(await storeService.updateStore(store.id, { name, description, address, phone, whatsapp, telegram, ownerId: store.ownerId }));
+});
+
+export const updateStoreLogo = asyncHandler(async (req, res) => {
+  if (!req.file) throw new HttpError(400, "Выберите изображение логотипа");
+  const store = await scopedStore(req);
+  res.json(await storeService.updateStoreLogo(store.id, req.file));
 });
 
 export const listProducts = asyncHandler(async (req, res) => {
@@ -83,6 +90,15 @@ export const createProductDraft = asyncHandler(async (req, res) => {
   res.json(await createProductAiDraft({ prompt, voice, images, imageUrls: stringList(req.body.imageUrls) }));
 });
 
+export const createBulkProductDraft = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  if (!store.aiFormEnabled) throw new HttpError(403, "ИИ-заполнение формы не подключено");
+  const { voice, images } = uploadedAiDraftFiles(req);
+  if (images.length < 2) throw new HttpError(400, "Для массовой группировки добавьте минимум два изображения");
+  const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
+  res.json(await createBulkProductAiDraft({ prompt, voice, images }));
+});
+
 export const updateProduct = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
   const product = await productService.updateProduct(String(req.params.id), store.id, req.body);
@@ -99,7 +115,7 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 export const addImage = asyncHandler(async (req, res) => {
   if (!req.file) throw new HttpError(400, "Файл не загружен");
   const store = await scopedStore(req);
-  const product = await productService.addProductImage(String(req.params.id), store.id, `/uploads/${req.file.filename}`);
+  const product = await productService.addProductImage(String(req.params.id), store.id, req.file);
   if (!product) throw new HttpError(404, "Товар не найден");
   res.status(201).json(product);
 });

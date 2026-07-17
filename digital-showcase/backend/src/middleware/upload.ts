@@ -1,22 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
 import multer from "multer";
 import { HttpError } from "../utils/http.js";
 
-const uploadDir = process.env.UPLOAD_DIR ?? path.resolve("uploads");
-fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${crypto.randomUUID()}${ext}`);
-  }
-});
+const configuredMaxBytes = Number(process.env.IMAGE_UPLOAD_MAX_BYTES ?? 15 * 1024 * 1024);
+const imageUploadMaxBytes = Number.isFinite(configuredMaxBytes) && configuredMaxBytes > 0 ? configuredMaxBytes : 15 * 1024 * 1024;
 
 export const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: imageUploadMaxBytes },
   fileFilter: (_req, file, cb) => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
       cb(new HttpError(400, "Можно загружать только jpg, jpeg, png или webp"));
@@ -40,7 +30,7 @@ export const audioUpload = multer({
 
 export const aiDraftUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024, files: 9 },
+  limits: { fileSize: imageUploadMaxBytes, files: 9 },
   fileFilter: (_req, file, cb) => {
     const isVoice = file.fieldname === "voice" && (file.mimetype.startsWith("audio/") || file.mimetype === "video/webm");
     const isImage = file.fieldname === "images" && ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
@@ -50,6 +40,17 @@ export const aiDraftUpload = multer({
       return;
     }
 
+    cb(null, true);
+  }
+});
+
+export const bulkAiDraftUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: imageUploadMaxBytes, files: 41 },
+  fileFilter: (_req, file, cb) => {
+    const isVoice = file.fieldname === "voice" && (file.mimetype.startsWith("audio/") || file.mimetype === "video/webm");
+    const isImage = file.fieldname === "images" && ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
+    if (!isVoice && !isImage) return cb(new HttpError(400, "Массовый AI-черновик принимает изображения и одну голосовую запись"));
     cb(null, true);
   }
 });

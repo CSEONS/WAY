@@ -13,8 +13,6 @@ interface StoreFormState {
   phone: string;
   whatsapp: string;
   telegram: string;
-  logoUrl: string;
-  coverUrl: string;
   subscriptionEndsAt: string;
 }
 
@@ -27,8 +25,6 @@ const emptyStoreForm: StoreFormState = {
   phone: "",
   whatsapp: "",
   telegram: "",
-  logoUrl: "",
-  coverUrl: "",
   subscriptionEndsAt: ""
 };
 
@@ -56,8 +52,6 @@ function storePayload(form: StoreFormState) {
     phone: form.phone || null,
     whatsapp: form.whatsapp || null,
     telegram: form.telegram || null,
-    logoUrl: form.logoUrl || null,
-    coverUrl: form.coverUrl || null,
     subscriptionEndsAt: toIsoDate(form.subscriptionEndsAt)
   };
 }
@@ -111,8 +105,6 @@ export function AdminStoresPage() {
       phone: store.phone ?? "",
       whatsapp: store.whatsapp ?? "",
       telegram: store.telegram ?? "",
-      logoUrl: store.logoUrl ?? "",
-      coverUrl: store.coverUrl ?? "",
       subscriptionEndsAt: toDateTimeLocal(store.subscriptionEndsAt)
     });
   }
@@ -237,8 +229,6 @@ export function AdminStoresPage() {
               <label>Телефон<input value={storeEditForm.phone} onChange={(e) => setStoreEditForm({ ...storeEditForm, phone: e.target.value })} /></label>
               <label>WhatsApp<input value={storeEditForm.whatsapp} onChange={(e) => setStoreEditForm({ ...storeEditForm, whatsapp: e.target.value })} /></label>
               <label>Telegram<input value={storeEditForm.telegram} onChange={(e) => setStoreEditForm({ ...storeEditForm, telegram: e.target.value })} /></label>
-              <label>Логотип URL<input value={storeEditForm.logoUrl} onChange={(e) => setStoreEditForm({ ...storeEditForm, logoUrl: e.target.value })} /></label>
-              <label>Обложка URL<input value={storeEditForm.coverUrl} onChange={(e) => setStoreEditForm({ ...storeEditForm, coverUrl: e.target.value })} /></label>
               <label>Подписка до<input type="datetime-local" value={storeEditForm.subscriptionEndsAt} onChange={(e) => setStoreEditForm({ ...storeEditForm, subscriptionEndsAt: e.target.value })} /></label>
               <div className="modal-actions">
                 <button type="button" onClick={() => setStoreToEdit(null)}>Отмена</button>

@@ -138,7 +138,10 @@ export async function createBulkProductAiDraft(input: ProductAiDraftInput): Prom
   const imageUrls = await collectImageInputs(input.images, []);
   const description = [input.prompt?.trim(), transcript ? `Голосовое описание: ${transcript}` : ""].filter(Boolean).join("\n\n");
   const content = [
-    { type: "input_text", text: `Сгруппируй ${input.images.length} изображений по товарам. ${description || "Дополнительное описание отсутствует."}` },
+    {
+      type: "input_text",
+      text: `Сгруппируй ${input.images.length} изображений по товарам и верни результат в формате JSON. ${description || "Дополнительное описание отсутствует."}`
+    },
     ...imageUrls.map((imageUrl) => ({ type: "input_image", image_url: imageUrl, detail: "low" }))
   ];
   const response = await fetch(`${openAiBaseUrl()}/responses`, {

@@ -101,13 +101,13 @@ export function AdminOwnersPage() {
   }
 
   return (
-    <section>
+    <section className="page page-admin-owners">
       <h1>Управление владельцами</h1>
       <p>Создавайте и просматривайте владельцев отдельно от магазинов.</p>
       <div>
         <div>
           <h2>Создать владельца</h2>
-          <form onSubmit={createOwner}>
+          <form className="app-form" onSubmit={createOwner}>
             <label>
               Имя
               <input value={ownerForm.name} onChange={(e) => setOwnerForm({ ...ownerForm, name: e.target.value })} required />
@@ -175,7 +175,7 @@ export function AdminOwnersPage() {
                 <CloseIcon />
               </button>
             </div>
-            <form onSubmit={updateOwner}>
+            <form className="app-form" onSubmit={updateOwner}>
               <label>
                 Имя
                 <input value={ownerEditForm.name} onChange={(e) => setOwnerEditForm({ ...ownerEditForm, name: e.target.value })} required autoFocus />
@@ -210,7 +210,7 @@ export function AdminOwnersPage() {
                 <CloseIcon />
               </button>
             </div>
-            <form onSubmit={(event) => changePassword(event, passwordModalOwner.id)}>
+            <form className="app-form" onSubmit={(event) => changePassword(event, passwordModalOwner.id)}>
               <label>
                 Новый пароль
                 <input

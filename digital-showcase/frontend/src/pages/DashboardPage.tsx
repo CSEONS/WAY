@@ -400,11 +400,11 @@ export function DashboardPage() {
     setAnalytics(analyticsRes.data);
   }
 
-  if (isLoading) return <section>Загрузка...</section>;
+  if (isLoading) return <section className="page page-dashboard">Загрузка...</section>;
 
   if (!storeId) {
     return (
-      <section>
+      <section className="page page-dashboard">
         <div>
           <div>
             <h1>Кабинет владельца</h1>
@@ -430,7 +430,7 @@ export function DashboardPage() {
 
   if (!selectedStore) {
     return (
-      <section>
+      <section className="page page-dashboard">
         <EmptyState
           title="Магазин недоступен"
           description="Магазин не найден или больше не привязан к вашему аккаунту."
@@ -445,7 +445,7 @@ export function DashboardPage() {
   }
 
   return (
-    <section>
+    <section className="page page-dashboard">
       <div>
         <Link to="/dashboard" aria-label="К выбору магазина">
           <OwnerIcon type="home" />

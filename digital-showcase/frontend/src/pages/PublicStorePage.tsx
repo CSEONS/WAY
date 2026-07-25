@@ -44,7 +44,7 @@ export function PublicStorePage() {
 
   if (error) {
     return (
-      <section>
+      <section className="page page-storefront">
         <EmptyState
           title={error.includes("временно") || error.includes("подпис") ? "Магазин недоступен" : "Магазин не найден"}
           description={error.includes("временно") || error.includes("подпис") ? "Подписка могла истечь или магазин был архивирован." : error}
@@ -52,10 +52,10 @@ export function PublicStorePage() {
       </section>
     );
   }
-  if (!store) return <section>Загрузка...</section>;
+  if (!store) return <section className="page page-storefront">Загрузка...</section>;
 
   return (
-    <section>
+    <section className="page page-storefront">
       <aside>
         <div>
           <strong>Фильтры</strong>

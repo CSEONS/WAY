@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 export function AdminPage() {
   return (
-    <section>
+    <section className="page page-admin">
       <h1>Админ-панель</h1>
       <div>
         <div>

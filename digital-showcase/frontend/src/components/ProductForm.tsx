@@ -367,7 +367,7 @@ export function ProductForm({
   }
 
   return (
-    <form onSubmit={submit} onKeyDownCapture={selectFieldText}>
+    <form className="app-form product-form" onSubmit={submit} onKeyDownCapture={selectFieldText}>
       {isDraftNoticeVisible && (
         <div>
           <span>Восстановлен локальный черновик</span>

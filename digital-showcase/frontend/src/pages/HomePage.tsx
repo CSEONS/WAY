@@ -1,6 +1,6 @@
 export function HomePage() {
   return (
-    <section>
+    <section className="page page-home">
       <div>
         <p>Цифровые витрины для локальных магазинов одежды</p>
         <h1>Показывайте ассортимент без интернет-магазина</h1>

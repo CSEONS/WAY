@@ -54,7 +54,7 @@ export function SettingsPage() {
 
   if (!storeId) {
     return (
-      <section>
+      <section className="page page-narrow page-settings">
         <div>
           <p>Сначала выберите магазин.</p>
           <Link to="/dashboard">
@@ -65,13 +65,13 @@ export function SettingsPage() {
     );
   }
 
-  if (!store) return <section>Загрузка...</section>;
+  if (!store) return <section className="page page-narrow page-settings">Загрузка...</section>;
 
   return (
-    <section>
+    <section className="page page-narrow page-settings">
       <p>{store.name}</p>
       <h1>Реквизиты магазина</h1>
-      <form onSubmit={submit}>
+      <form className="app-form settings-form" onSubmit={submit}>
         <label>Название<input value={store.name} onChange={(e) => setStore({ ...store, name: e.target.value })} /></label>
         <label>Описание<textarea value={store.description ?? ""} onChange={(e) => setStore({ ...store, description: e.target.value })} /></label>
         <label>Адрес<input value={store.address ?? ""} onChange={(e) => setStore({ ...store, address: e.target.value })} /></label>

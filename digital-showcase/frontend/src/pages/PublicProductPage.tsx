@@ -24,8 +24,8 @@ export function PublicProductPage() {
       .catch((err) => setError(err.response?.data?.message ?? "Товар недоступен"));
   }, [storeSlug, productId]);
 
-  if (error) return <section>{error}</section>;
-  if (!data) return <section>Загрузка...</section>;
+  if (error) return <section className="page page-product-detail">{error}</section>;
+  if (!data) return <section className="page page-product-detail">Загрузка...</section>;
   const { store, product } = data;
   const selectedImage = product.images.find((image) => image.id === selectedImageId) ?? product.images[0];
   const variants = product.variants ?? [];
@@ -61,7 +61,7 @@ export function PublicProductPage() {
   }
 
   return (
-    <section>
+    <section className="page page-product-detail">
       <div>
         {selectedImage ? (
           <>

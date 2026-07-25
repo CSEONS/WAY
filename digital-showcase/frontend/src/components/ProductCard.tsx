@@ -15,7 +15,7 @@ export function ProductCard({ product, slug }: { product: Product; slug: string 
   const priceText = product.priceText ? `Цена: ${product.priceText}` : displayPrice != null ? `${displayPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине";
 
   return (
-    <Link to={`/m/${slug}/p/${product.id}`}>
+    <Link className="product-card" to={`/m/${slug}/p/${product.id}`}>
       {isUnavailable && <span>Нет в наличии</span>}
       <span>Новинка</span>
       <div>

@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { api } from "./api/client";
 import { Layout } from "./components/Layout";
 import { AppRoutes } from "./routes/AppRoutes";
+import "./styles/global.css";
 import type { User } from "./types/models";
 
 function App() {

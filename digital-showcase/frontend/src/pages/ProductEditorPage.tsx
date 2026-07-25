@@ -80,7 +80,7 @@ export function ProductEditorPage() {
 
   if (!storeId) {
     return (
-      <section>
+      <section className="page page-narrow page-product-editor">
         <div>
           <p>Сначала выберите магазин.</p>
           <Link to="/dashboard">
@@ -91,10 +91,10 @@ export function ProductEditorPage() {
     );
   }
 
-  if (isLoading || (id && !product)) return <section>Загрузка...</section>;
+  if (isLoading || (id && !product)) return <section className="page page-narrow page-product-editor">Загрузка...</section>;
 
   return (
-    <section>
+    <section className="page page-narrow page-product-editor">
       <p>{store?.name}</p>
       <h1>{id ? "Редактировать товар" : "Новый товар"}</h1>
       <ProductForm

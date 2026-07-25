@@ -141,13 +141,13 @@ export function AdminStoresPage() {
   }
 
   return (
-    <section>
+    <section className="page page-admin-stores">
       <h1>Управление магазинами</h1>
       <p>Создавайте и управляйте магазинами отдельно от владельцев.</p>
       <div>
         <div>
           <h2>Создать магазин</h2>
-          <form onSubmit={createStore}>
+          <form className="app-form" onSubmit={createStore}>
             <label>
               Владелец
               <select value={storeForm.ownerId} onChange={(e) => setStoreForm({ ...storeForm, ownerId: e.target.value })} required>
@@ -210,7 +210,7 @@ export function AdminStoresPage() {
                 <CloseIcon />
               </button>
             </div>
-            <form onSubmit={updateStore}>
+            <form className="app-form" onSubmit={updateStore}>
               <label>
                 Владелец
                 <select value={storeEditForm.ownerId} onChange={(e) => setStoreEditForm({ ...storeEditForm, ownerId: e.target.value })} required>

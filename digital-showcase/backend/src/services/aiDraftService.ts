@@ -99,13 +99,92 @@ AI не принимает финальных решений: возвращай
 `;
 
 const bulkDraftInstructions = `
-Ты группируешь фотографии одежды по отдельным товарам и предлагаешь карточки для цифровой витрины.
-Верни только JSON вида {"products":[...]}. Каждый элемент products соответствует одному типу товара и содержит поля обычного черновика:
-title, description, price, priceText, category, status, isVisible, sizes, colors, variants, а также imageIndexes — массив индексов приложенных изображений, начиная с 0.
-Каждое изображение должно относиться ровно к одному товару. Группируй по типу товара, а не только по цвету или ракурсу.
-Цвет, явно названный пользователем для товара, имеет приоритет над цветом на фотографии.
-Цена, явно названная для товара, относится именно к этому товару. Если цены нет, установи price=null, priceText="Уточнить у продавца" и status="CHECK_IN_STORE".
-Не выдумывай цены, размеры и цвета. Результат является редактируемым предложением и применяется только после подтверждения владельца.
+Ты каталогизатор одежды.
+
+Твоя главная задача — определить, какие фотографии относятся к одному и тому же ФИЗИЧЕСКОМУ изделию.
+
+ВАЖНО.
+
+Один товар может иметь несколько фотографий.
+
+Объединяй изображения если это:
+
+- вид спереди;
+- вид сзади;
+- другой ракурс;
+- крупный план;
+- фотография на модели;
+- фотография без модели;
+- фотографии одной и той же вещи.
+
+НЕ создавай новый товар если отличается только:
+
+- ракурс;
+- поза модели;
+- масштаб изображения;
+- фон;
+- освещение.
+
+Также объединяй в один товар одну модель вещи в разных цветах или комплектациях. Отличия цвета, карманов и других вариантов исполнения опиши через colors и variants, а все фотографии оставь в общем imageIndexes.
+
+Если вещь сфотографирована отдельно и на человеке, сопоставь фасон, материал, цвет, швы, карманы и другие детали. Фото человека в этой вещи относится к тому же товару. На фото с человеком каталогизируй именно одежду, наиболее похожую на вещи на остальных загруженных фотографиях.
+
+Создавай новый товар только если это действительно другое изделие.
+
+Если сомневаешься —
+объединяй изображения.
+
+Твоя цель —
+получить минимально возможное количество товаров.
+
+Пример.
+
+Фото 0 — джинсы спереди
+
+Фото 1 — джинсы сзади
+
+Фото 2 — карман этих же джинсов
+
+Фото 3 — футболка
+
+Ответ:
+
+{
+ "products":[
+   {
+      "title":"Джинсы",
+      "imageIndexes":[0,1,2]
+   },
+   {
+      "title":"Футболка",
+      "imageIndexes":[3]
+   }
+ ]
+}
+
+Верни только JSON.
+
+Каждый элемент products содержит:
+
+title,
+description,
+price,
+priceText,
+category,
+status,
+isVisible,
+sizes,
+colors,
+variants,
+imageIndexes.
+
+imageIndexes — это ВСЕ фотографии одного физического товара.
+
+Каждая фотография должна присутствовать ровно один раз.
+
+Не выдумывай цены, размеры и цвета.
+Если цена не определена, верни price=null и priceText="Уточнить у продавца".
+Если размер не определен, верни sizes=["Уточнить у продавца"].
 `;
 
 export async function createProductAiDraft(input: string | ProductAiDraftInput): Promise<ProductAiDraft> {
@@ -140,7 +219,21 @@ export async function createBulkProductAiDraft(input: ProductAiDraftInput): Prom
   const content = [
     {
       type: "input_text",
-      text: `Сгруппируй ${input.images.length} изображений по товарам и верни результат в формате JSON. ${description || "Дополнительное описание отсутствует."}`
+      text: `
+        Перед созданием карточек сначала найди фотографии,
+        относящиеся к одному физическому изделию.
+
+        После этого создай минимальное возможное количество карточек.
+
+        Если несколько фотографий являются одной и той же вещью,
+        они ОБЯЗАНЫ попасть в один imageIndexes.
+
+        Верни результат только в формате JSON с корневым полем products.
+
+        Количество фотографий: ${input.images.length}
+
+        ${description || "Дополнительное описание отсутствует."}
+        `
     },
     ...imageUrls.map((imageUrl) => ({ type: "input_image", image_url: imageUrl, detail: "low" }))
   ];
@@ -158,20 +251,27 @@ export async function createBulkProductAiDraft(input: ProductAiDraftInput): Prom
   });
 
   const payload = await readOpenAiPayload(response);
-  const parsed = parseJsonObject(extractResponseText(payload));
+  return normalizeBulkProductDrafts(extractResponseText(payload), input.images.length, description);
+}
+
+export function normalizeBulkProductDrafts(rawText: string, imageCount: number, fallbackPrompt = ""): BulkProductAiDraft[] {
+  const parsed = parseJsonObject(rawText);
   const products = Array.isArray(parsed?.products) ? parsed.products : [];
   const claimed = new Set<number>();
   const drafts = products.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const raw = item as Record<string, unknown>;
-    const normalized = normalizeAiDraft(JSON.stringify(raw), description);
-    const draft = normalized.price == null ? { ...normalized, priceText: "Уточнить у продавца", status: "CHECK_IN_STORE" as ProductStatus } : normalized;
-    const imageIndexes = normalizeImageIndexes(raw.imageIndexes, input.images!.length).filter((index) => !claimed.has(index));
+    const normalized = normalizeAiDraft(JSON.stringify(raw), fallbackPrompt);
+    const sizes = normalized.sizes.length ? normalized.sizes : ["Уточнить у продавца"];
+    const draft = normalized.price == null
+      ? { ...normalized, sizes, priceText: "Уточнить у продавца", status: "CHECK_IN_STORE" as ProductStatus }
+      : { ...normalized, sizes };
+    const imageIndexes = normalizeImageIndexes(raw.imageIndexes, imageCount).filter((index) => !claimed.has(index));
     imageIndexes.forEach((index) => claimed.add(index));
     return imageIndexes.length ? [{ ...draft, imageIndexes }] : [];
   });
 
-  const unclaimed = input.images.map((_, index) => index).filter((index) => !claimed.has(index));
+  const unclaimed = Array.from({ length: imageCount }, (_, index) => index).filter((index) => !claimed.has(index));
   if (unclaimed.length && drafts[0]) drafts[0].imageIndexes.push(...unclaimed);
   if (!drafts.length) throw new HttpError(502, "AI не смог сгруппировать изображения по товарам");
   return drafts;

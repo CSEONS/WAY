@@ -1,0 +1,21 @@
+# This is an example configuration file
+# To learn more, see the full config.yaml reference: https://docs.continue.dev/reference
+
+name: Local llm config
+version: 1.0.0
+schema: v1
+
+# Define which models can be used
+# https://docs.continue.dev/customization/models
+models:
+  - name: lm-gemma
+      provider: openai
+      model: google/gemma-4-e4b
+      apiBase: http://127.0.0.1:1234/v1
+      apiKey: lm-studio
+      roles:
+        - chat
+        - edit
+        - apply
+
+

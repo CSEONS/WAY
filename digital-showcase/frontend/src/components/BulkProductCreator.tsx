@@ -105,7 +105,7 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
                   <label>Категория<input value={draft.category ?? ""} onChange={(event) => updateDraft(index, { category: event.target.value || null })} /></label>
                   <label>Цена<input type="number" value={draft.price ?? ""} placeholder="Уточнить у продавца" onChange={(event) => updateDraft(index, { price: event.target.value ? Number(event.target.value) : null, priceText: event.target.value ? null : "Уточнить у продавца", status: event.target.value ? draft.status : "CHECK_IN_STORE" })} /></label>
                   <label>Цвета<input value={draft.colors.map((color) => color.name).join(", ")} onChange={(event) => updateDraft(index, { colors: event.target.value.split(",").map((name) => ({ name: name.trim(), hex: null })).filter((color) => color.name) })} /></label>
-                  <label>Размеры<input value={draft.sizes.join(", ")} onChange={(event) => updateDraft(index, { sizes: event.target.value.split(",").map((size) => size.trim()).filter(Boolean) })} /></label>
+                  <label>Размеры<input value={draft.sizes.join(", ")} placeholder="Уточнить у продавца" onChange={(event) => updateDraft(index, { sizes: event.target.value.split(",").map((size) => size.trim()).filter(Boolean) })} /></label>
                   <label>Наличие<select value={draft.status} onChange={(event) => updateDraft(index, { status: event.target.value as ProductStatus })}><option value="AVAILABLE">В наличии</option><option value="CHECK_IN_STORE">Уточнить у продавца</option><option value="NOT_AVAILABLE">Нет в наличии</option></select></label>
                 </div>
               </article>

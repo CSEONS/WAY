@@ -226,9 +226,9 @@ export function AdminStoresPage() {
               <label>Slug<input value={storeEditForm.slug} onChange={(e) => setStoreEditForm({ ...storeEditForm, slug: e.target.value })} required /></label>
               <label>Описание<textarea value={storeEditForm.description} onChange={(e) => setStoreEditForm({ ...storeEditForm, description: e.target.value })} /></label>
               <label>Адрес<input value={storeEditForm.address} onChange={(e) => setStoreEditForm({ ...storeEditForm, address: e.target.value })} /></label>
-              <label>Телефон<input value={storeEditForm.phone} onChange={(e) => setStoreEditForm({ ...storeEditForm, phone: e.target.value })} /></label>
-              <label>WhatsApp<input value={storeEditForm.whatsapp} onChange={(e) => setStoreEditForm({ ...storeEditForm, whatsapp: e.target.value })} /></label>
-              <label>Telegram<input value={storeEditForm.telegram} onChange={(e) => setStoreEditForm({ ...storeEditForm, telegram: e.target.value })} /></label>
+              <label>Телефон<input type="tel" value={storeEditForm.phone} placeholder="+79280123456" onChange={(e) => setStoreEditForm({ ...storeEditForm, phone: e.target.value })} /></label>
+              <label>WhatsApp<input type="tel" value={storeEditForm.whatsapp} placeholder="+79280123456" onChange={(e) => setStoreEditForm({ ...storeEditForm, whatsapp: e.target.value })} /></label>
+              <label>Telegram<input value={storeEditForm.telegram} placeholder="@Name" onChange={(e) => setStoreEditForm({ ...storeEditForm, telegram: e.target.value })} /></label>
               <label>Подписка до<input type="datetime-local" value={storeEditForm.subscriptionEndsAt} onChange={(e) => setStoreEditForm({ ...storeEditForm, subscriptionEndsAt: e.target.value })} /></label>
               <div className="modal-actions">
                 <button type="button" onClick={() => setStoreToEdit(null)}>Отмена</button>

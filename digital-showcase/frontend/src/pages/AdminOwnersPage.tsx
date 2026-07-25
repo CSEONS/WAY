@@ -118,7 +118,7 @@ export function AdminOwnersPage() {
             </label>
             <label>
               Телефон
-              <input value={ownerForm.phone} onChange={(e) => setOwnerForm({ ...ownerForm, phone: e.target.value })} />
+              <input type="tel" value={ownerForm.phone} placeholder="+79280123456" onChange={(e) => setOwnerForm({ ...ownerForm, phone: e.target.value })} />
             </label>
             <label>
               Пароль
@@ -186,7 +186,7 @@ export function AdminOwnersPage() {
               </label>
               <label>
                 Телефон
-                <input value={ownerEditForm.phone} onChange={(e) => setOwnerEditForm({ ...ownerEditForm, phone: e.target.value })} />
+                <input type="tel" value={ownerEditForm.phone} placeholder="+79280123456" onChange={(e) => setOwnerEditForm({ ...ownerEditForm, phone: e.target.value })} />
               </label>
               <div className="modal-actions">
                 <button type="button" onClick={() => setOwnerToEdit(null)}>

@@ -75,9 +75,9 @@ export function SettingsPage() {
         <label>Название<input value={store.name} onChange={(e) => setStore({ ...store, name: e.target.value })} /></label>
         <label>Описание<textarea value={store.description ?? ""} onChange={(e) => setStore({ ...store, description: e.target.value })} /></label>
         <label>Адрес<input value={store.address ?? ""} onChange={(e) => setStore({ ...store, address: e.target.value })} /></label>
-        <label>Телефон<input value={store.phone ?? ""} onChange={(e) => setStore({ ...store, phone: e.target.value })} /></label>
-        <label>WhatsApp<input value={store.whatsapp ?? ""} onChange={(e) => setStore({ ...store, whatsapp: e.target.value })} /></label>
-        <label>Telegram<input value={store.telegram ?? ""} onChange={(e) => setStore({ ...store, telegram: e.target.value })} /></label>
+        <label>Телефон<input type="tel" value={store.phone ?? ""} placeholder="+79280123456" onChange={(e) => setStore({ ...store, phone: e.target.value })} /></label>
+        <label>WhatsApp<input type="tel" value={store.whatsapp ?? ""} placeholder="+79280123456" onChange={(e) => setStore({ ...store, whatsapp: e.target.value })} /></label>
+        <label>Telegram<input value={store.telegram ?? ""} placeholder="@Name" onChange={(e) => setStore({ ...store, telegram: e.target.value })} /></label>
         <label>
           Логотип магазина
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />

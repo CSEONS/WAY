@@ -44,7 +44,7 @@ export function PublicStorePage() {
 
   if (error) {
     return (
-      <section className="empty">
+      <section>
         <EmptyState
           title={error.includes("временно") || error.includes("подпис") ? "Магазин недоступен" : "Магазин не найден"}
           description={error.includes("временно") || error.includes("подпис") ? "Подписка могла истечь или магазин был архивирован." : error}
@@ -52,17 +52,17 @@ export function PublicStorePage() {
       </section>
     );
   }
-  if (!store) return <section className="empty">Загрузка...</section>;
+  if (!store) return <section>Загрузка...</section>;
 
   return (
-    <section className="storefront-page">
-      <aside className="storefront-filters">
-        <div className="filter-head">
+    <section>
+      <aside>
+        <div>
           <strong>Фильтры</strong>
           <button type="button" onClick={resetFilters}>Сбросить все</button>
         </div>
         <label>
-          <span className="visually-hidden">Поиск</span>
+          <span>Поиск</span>
           <input placeholder="Поиск по названию" value={draftFilters.q} onChange={(e) => setDraftFilters({ ...draftFilters, q: e.target.value })} />
         </label>
         <label>
@@ -86,16 +86,16 @@ export function PublicStorePage() {
             {options.colors.map((v) => <option key={v}>{v}</option>)}
           </select>
         </label>
-        <button className="primary" type="button" onClick={() => setFilters(draftFilters)}>Применить</button>
+        <button type="button" onClick={() => setFilters(draftFilters)}>Применить</button>
       </aside>
-      <div className="storefront-content">
-        <div className="storefront-top">
+      <div>
+        <div>
           <div>
             <h1>{store.name}</h1>
             {store.description && <p>{store.description}</p>}
           </div>
           <label>
-            <span className="visually-hidden">Сортировка</span>
+            <span>Сортировка</span>
             <select value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="new">Сортировка: Новые</option>
               <option value="price-asc">Цена: сначала ниже</option>
@@ -103,7 +103,7 @@ export function PublicStorePage() {
             </select>
           </label>
         </div>
-        <div className="product-grid">
+        <div>
           {visibleProducts.map((product) => <ProductCard key={product.id} product={product} slug={storeSlug} />)}
         </div>
         {!visibleProducts.length && (

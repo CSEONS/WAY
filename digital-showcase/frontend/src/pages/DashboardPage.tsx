@@ -236,34 +236,34 @@ function StoreChoiceCard({ store }: { store: Store }) {
   }
 
   return (
-    <article className="store-choice-card">
-      <div className="store-choice-head">
-        <div className="store-choice-logo">
+    <article>
+      <div>
+        <div>
           {store.logoUrl ? <img src={store.logoUrl} alt="" /> : <StorefrontIcon />}
         </div>
-        <div className="store-choice-title">
+        <div>
           <h2>{store.name}</h2>
-          <span className={store.isActive ? "status-pill active" : "status-pill"}>
+          <span>
             <span />
             {store.isActive ? "Активен" : "В архиве"}
           </span>
         </div>
-        <button className="store-menu-button" type="button" aria-label={`Операции магазина ${store.name}`}>
+        <button type="button" aria-label={`Операции магазина ${store.name}`}>
           <StoreCardIcon type="menu" />
         </button>
       </div>
 
-      <div className="store-choice-body">
-        <div className="store-link-label">
+      <div>
+        <div>
           <StoreCardIcon type="link" />
           <span>Публичная ссылка</span>
         </div>
-        <div className="store-public-link">
-          <span className="store-public-link-icon">
+        <div>
+          <span>
             <StoreCardIcon type="globe" />
           </span>
           <a href={`/m/${store.slug}`}>{publicUrl}</a>
-          <div className="public-link-actions">
+          <div>
             <button type="button" onClick={copyPublicUrl}>
               <StoreCardIcon type="copy" />
               Копировать
@@ -271,19 +271,19 @@ function StoreChoiceCard({ store }: { store: Store }) {
             <QrShareButton url={publicUrl} label="QR" />
           </div>
         </div>
-        <p className="store-link-note">{isCopied ? "Ссылка скопирована" : "Эта ссылка доступна для всех пользователей"}</p>
-        <div className="store-choice-actions">
-          <Link className="primary button-link store-select-button" to={`/dashboard/stores/${store.id}`}>
+        <p>{isCopied ? "Ссылка скопирована" : "Эта ссылка доступна для всех пользователей"}</p>
+        <div>
+          <Link to={`/dashboard/stores/${store.id}`}>
             <StoreCardIcon type="bag" />
             <span>Выбрать магазин</span>
             <StoreCardIcon type="arrow" />
           </Link>
-          <Link className="button-link store-details-button" to={`/dashboard/stores/${store.id}/settings`}>
+          <Link to={`/dashboard/stores/${store.id}/settings`}>
             <StoreCardIcon type="edit" />
             <span>Реквизиты</span>
           </Link>
         </div>
-        <div className="store-created-note">
+        <div>
           <StoreCardIcon type="info" />
           <span>{formatStoreDate(store.createdAt)}</span>
         </div>
@@ -400,12 +400,12 @@ export function DashboardPage() {
     setAnalytics(analyticsRes.data);
   }
 
-  if (isLoading) return <section className="empty">Загрузка...</section>;
+  if (isLoading) return <section>Загрузка...</section>;
 
   if (!storeId) {
     return (
       <section>
-        <div className="section-head">
+        <div>
           <div>
             <h1>Кабинет владельца</h1>
             <p>Сначала выберите магазин, затем добавляйте товары или меняйте реквизиты.</p>
@@ -413,7 +413,7 @@ export function DashboardPage() {
         </div>
 
         {stores.length ? (
-          <div className="store-choice-grid">
+          <div>
             {stores.map((store) => (
               <StoreChoiceCard store={store} key={store.id} />
             ))}
@@ -430,12 +430,12 @@ export function DashboardPage() {
 
   if (!selectedStore) {
     return (
-      <section className="empty">
+      <section>
         <EmptyState
           title="Магазин недоступен"
           description="Магазин не найден или больше не привязан к вашему аккаунту."
           action={
-            <Link className="button-link" to="/dashboard">
+            <Link to="/dashboard">
               Вернуться к выбору магазина
             </Link>
           }
@@ -445,8 +445,8 @@ export function DashboardPage() {
   }
 
   return (
-    <section className="owner-products-page">
-      <div className="owner-breadcrumbs">
+    <section>
+      <div>
         <Link to="/dashboard" aria-label="К выбору магазина">
           <OwnerIcon type="home" />
         </Link>
@@ -456,23 +456,23 @@ export function DashboardPage() {
         <span>{selectedStore.name}</span>
       </div>
 
-      <div className="owner-store-header">
-        <div className="owner-store-summary">
-          <div className="owner-store-logo">
+      <div>
+        <div>
+          <div>
             {selectedStore.logoUrl ? <img src={selectedStore.logoUrl} alt="" /> : <StorefrontIcon />}
-            <span className={selectedStore.isActive ? "owner-store-status active" : "owner-store-status"}>
+            <span>
               <span />
               {selectedStore.isActive ? "Активен" : "В архиве"}
             </span>
           </div>
-          <div className="owner-store-copy">
-            <div className="owner-store-title-row">
+          <div>
+            <div>
               <h1>{selectedStore.name}</h1>
               <Link to={`/dashboard/stores/${selectedStore.id}/settings`} aria-label="Редактировать магазин">
                 <OwnerIcon type="edit" />
               </Link>
             </div>
-            <div className="owner-public-link">
+            <div>
               <span>Публичная ссылка:</span>
               <a href={`/m/${selectedStore.slug}`}>{publicStoreUrl}</a>
               <button type="button" onClick={copySelectedStoreUrl}>
@@ -481,19 +481,19 @@ export function DashboardPage() {
               </button>
               <QrShareButton url={publicStoreUrl} label="QR" />
             </div>
-            <p className={copiedPublicUrl ? "copy-note visible" : "copy-note"}>Ссылка скопирована</p>
+            <p>Ссылка скопирована</p>
           </div>
         </div>
-        <div className="owner-store-actions">
-          <Link className="button-link" to="/dashboard">
+        <div>
+          <Link to="/dashboard">
             <OwnerIcon type="swap" />
             Сменить магазин
           </Link>
-          <Link className="button-link" to={`/dashboard/stores/${selectedStore.id}/settings`}>
+          <Link to={`/dashboard/stores/${selectedStore.id}/settings`}>
             <OwnerIcon type="edit" />
             Реквизиты магазина
           </Link>
-          <Link className="primary button-link" to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+          <Link to={`/dashboard/stores/${selectedStore.id}/products/new`}>
             <OwnerIcon type="plus" />
             Добавить товар
           </Link>
@@ -516,25 +516,25 @@ export function DashboardPage() {
       )}
 
       {selectedStore.isActive && !isSubscriptionExpired && isStoreProfileIncomplete && (
-        <div className="onboarding-panel">
+        <div>
           <div>
             <h2>Запустите магазин</h2>
             <p>Закройте базовые шаги, чтобы витрина выглядела готовой для клиентов.</p>
           </div>
           <ol>
-            <li className={selectedStore.description || selectedStore.phone || selectedStore.whatsapp || selectedStore.telegram ? "done" : ""}>
+            <li>
               <span>1</span>
               Заполните информацию о магазине
             </li>
-            <li className={selectedStore.logoUrl ? "done" : ""}>
+            <li>
               <span>2</span>
               Загрузите логотип
             </li>
-            <li className={products.length ? "done" : ""}>
+            <li>
               <span>3</span>
               Добавьте первый товар
             </li>
-            <li className={copiedPublicUrl ? "done" : ""}>
+            <li>
               <span>4</span>
               Скопируйте ссылку
             </li>
@@ -542,47 +542,47 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="tabs">
+      <div>
         <Link to={`/dashboard/stores/${selectedStore.id}/products`}>Товары</Link>
         <Link to={`/dashboard/stores/${selectedStore.id}/settings`}>Настройки магазина</Link>
       </div>
 
-      <div className="owner-products-panel">
-        <div className="owner-analytics-grid">
-          <div className="owner-analytics-card">
+      <div>
+        <div>
+          <div>
             <small>Количество товаров</small>
             <strong>{analytics.productCount || stats.total}</strong>
           </div>
-          <div className="owner-analytics-card">
+          <div>
             <small>Просмотры магазина</small>
             <strong>{analytics.storeViews}</strong>
           </div>
-          <div className="owner-analytics-card">
+          <div>
             <small>Просмотры товаров</small>
             <strong>{analytics.productViews}</strong>
           </div>
         </div>
-        <div className="owner-stat-grid">
-          <div className="owner-stat-card total">
+        <div>
+          <div>
             <span><OwnerIcon type="cube" /></span>
             <div><small>Всего товаров</small><strong>{stats.total}</strong></div>
           </div>
-          <div className="owner-stat-card published">
+          <div>
             <span><OwnerIcon type="eye" /></span>
             <div><small>Опубликовано</small><strong>{stats.published}</strong></div>
           </div>
-          <div className="owner-stat-card draft">
+          <div>
             <span><OwnerIcon type="clock" /></span>
             <div><small>Черновики</small><strong>{stats.draft}</strong></div>
           </div>
-          <div className="owner-stat-card archive">
+          <div>
             <span><OwnerIcon type="archive" /></span>
             <div><small>Архив</small><strong>{stats.archive}</strong></div>
           </div>
         </div>
 
-        <div className="owner-product-toolbar">
-          <label className="owner-search">
+        <div>
+          <label>
             <OwnerIcon type="search" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск товара..." />
           </label>
@@ -602,7 +602,7 @@ export function DashboardPage() {
               {categories.map((category) => <option value={category} key={category}>{category}</option>)}
             </select>
           </label>
-          <label className="owner-sort">
+          <label>
             <OwnerIcon type="filter" />
             <span>Сортировка:</span>
             <select value={sort} onChange={(event) => setSort(event.target.value)}>
@@ -614,8 +614,8 @@ export function DashboardPage() {
           </label>
         </div>
 
-        <div className="owner-product-table">
-          <div className="owner-product-row owner-product-head">
+        <div>
+          <div>
             <span>Товар</span>
             <span>Статус</span>
             <span>Цена</span>
@@ -626,19 +626,19 @@ export function DashboardPage() {
           {filteredProducts.map((product) => {
             const status = productOwnerStatus(product);
             return (
-              <div className="owner-product-row" key={product.id}>
-                <div className="owner-product-main">
-                  <span className="owner-product-thumb"><ProductThumb product={product} /></span>
+              <div key={product.id}>
+                <div>
+                  <span><ProductThumb product={product} /></span>
                   <div>
                     <strong>{product.title}</strong>
                     <small>{productDetails(product)}</small>
                   </div>
                 </div>
-                <span className={`owner-product-status ${status}`}>{productStatusLabel(status)}</span>
+                <span>{productStatusLabel(status)}</span>
                 <span>{productPrice(product)}</span>
                 <span>{product.category || "Без категории"}</span>
                 <span>{formatProductDate(product.updatedAt ?? product.createdAt)}</span>
-                <div className="owner-product-actions">
+                <div>
                   <Link to={`/m/${selectedStore.slug}/p/${product.id}`} aria-label="Открыть товар">
                     <OwnerIcon type="eye" />
                   </Link>
@@ -658,7 +658,7 @@ export function DashboardPage() {
               description={products.length ? "Попробуйте изменить поиск, фильтры или сортировку." : "Добавьте первый товар, чтобы витрина начала наполняться."}
               action={
                 !products.length && (
-                  <Link className="primary button-link" to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+                  <Link to={`/dashboard/stores/${selectedStore.id}/products/new`}>
                     <OwnerIcon type="plus" />
                     Добавить товар
                   </Link>
@@ -668,11 +668,11 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="owner-product-footer">
+        <div>
           <span>Показано {filteredProducts.length ? `1-${filteredProducts.length}` : "0"} из {products.length}</span>
-          <div className="owner-pagination" aria-hidden="true">
+          <div aria-hidden="true">
             <button type="button">‹</button>
-            <button className="active" type="button">1</button>
+            <button type="button">1</button>
             <button type="button">2</button>
             <button type="button">3</button>
             <button type="button">›</button>

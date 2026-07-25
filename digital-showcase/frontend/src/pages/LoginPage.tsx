@@ -23,13 +23,13 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
   }
 
   return (
-    <section className="narrow">
+    <section>
       <h1>Вход</h1>
-      <form className="form" onSubmit={submit}>
+      <form onSubmit={submit}>
         <label>Почта или телефон<input value={login} onChange={(e) => setLogin(e.target.value)} /></label>
         <label>Пароль<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-        {error && <p className="error">{error}</p>}
-        <button className="primary">Войти</button>
+        {error && <p>{error}</p>}
+        <button>Войти</button>
       </form>
     </section>
   );

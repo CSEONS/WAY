@@ -25,23 +25,23 @@ export function QrShareButton({ url, label = "QR" }: { url: string; label?: stri
         {label}
       </button>
       {isOpen && (
-        <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setIsOpen(false)}>
-          <div className="modal qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
-            <div className="modal-head">
+        <div role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setIsOpen(false)}>
+          <div role="dialog" aria-modal="true">
+            <div>
               <div>
-                <h2 id="qr-title">QR-код витрины</h2>
+                <h2>QR-код витрины</h2>
                 <p>{url}</p>
               </div>
-              <button className="icon-button" type="button" aria-label="Закрыть" onClick={() => setIsOpen(false)}>
+              <button type="button" aria-label="Закрыть" onClick={() => setIsOpen(false)}>
                 x
               </button>
             </div>
-            {qrDataUrl && <img className="qr-image" src={qrDataUrl} alt="QR-код публичной витрины" />}
-            <div className="modal-actions">
-              <a className="button-link" href={qrDataUrl} download="store-qr.png">
+            {qrDataUrl && <img src={qrDataUrl} alt="QR-код публичной витрины" />}
+            <div>
+              <a href={qrDataUrl} download="store-qr.png">
                 Скачать
               </a>
-              <button className="primary" type="button" onClick={shareQr}>
+              <button type="button" onClick={shareQr}>
                 Поделиться
               </button>
             </div>

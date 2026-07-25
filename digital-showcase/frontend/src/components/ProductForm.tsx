@@ -367,19 +367,19 @@ export function ProductForm({
   }
 
   return (
-    <form className="form" onSubmit={submit} onKeyDownCapture={selectFieldText}>
+    <form onSubmit={submit} onKeyDownCapture={selectFieldText}>
       {isDraftNoticeVisible && (
-        <div className="autosave-note">
+        <div>
           <span>Восстановлен локальный черновик</span>
           <button type="button" onClick={clearSavedDraft}>
             Очистить
           </button>
         </div>
       )}
-      <div className="mode-switch">
+      <div>
         <span>Обычный ввод</span>
         <button
-          className={aiMode ? "switch active" : "switch"}
+         
           type="button"
           disabled={!aiFormEnabled}
           aria-pressed={aiMode}
@@ -393,22 +393,22 @@ export function ProductForm({
         <span>ИИ ввод {!aiFormEnabled && <LockIcon />}</span>
       </div>
       {!aiFormEnabled && (
-        <div className="ai-unavailable-note">
+        <div>
           <strong>AI недоступен</strong>
           <span>Администратор еще не подключил AI-заполнение для этого магазина.</span>
         </div>
       )}
       {aiMode && aiDraftApplied && (
-        <div className="ai-result-summary">
+        <div>
           <span>ИИ заполнил форму — проверьте результат ниже.</span>
           <button type="button" onClick={() => setAiDraftApplied(false)}>Изменить запрос</button>
         </div>
       )}
       {aiMode && !aiDraftApplied && (
-        <div className={aiLoading ? "ai-draft-box loading" : "ai-draft-box"} aria-busy={aiLoading}>
-          <div className="segmented">
-            <button className={aiInputMode === "text" ? "active" : ""} type="button" onClick={() => setAiInputMode("text")}>Текст</button>
-            <button className={aiInputMode === "voice" ? "active" : ""} type="button" onClick={() => setAiInputMode("voice")}>Голос</button>
+        <div aria-busy={aiLoading}>
+          <div>
+            <button type="button" onClick={() => setAiInputMode("text")}>Текст</button>
+            <button type="button" onClick={() => setAiInputMode("voice")}>Голос</button>
           </div>
           {aiInputMode === "text" && (
             <label>
@@ -417,12 +417,12 @@ export function ProductForm({
             </label>
           )}
           {aiInputMode === "voice" && (
-            <div className="voice-panel">
-              <div className={isListening ? "recording-status active" : "recording-status"}>
+            <div>
+              <div>
                 <MicrophoneIcon />
                 {isListening ? `Идет запись... ${formatDuration(recordingSeconds)}` : voiceBlob ? `Голосовое сообщение записано: ${formatDuration(voiceDurationSeconds)}` : "Запись не запущена"}
                 {isListening && (
-                  <span className="recording-visual" aria-hidden="true">
+                  <span aria-hidden="true">
                     <span />
                     <span />
                     <span />
@@ -436,43 +436,43 @@ export function ProductForm({
               </ol>
             </div>
           )}
-          {aiError && <p className="error">{aiError}</p>}
-          <div className="section-head">
+          {aiError && <p>{aiError}</p>}
+          <div>
             {aiInputMode === "voice" && (
               <button type="button" onClick={recordVoice}>
                 <MicrophoneIcon />
                 {isListening ? "Остановить запись" : voiceBlob ? "Перезаписать" : "Надиктовать"}
               </button>
             )}
-            <button className="primary" type="button" disabled={(aiInputMode === "text" ? !aiPrompt.trim() : !voiceBlob || isListening) || aiLoading} onClick={fillWithAi}>
-              {aiLoading && <span className="spinner" aria-hidden="true" />}
+            <button type="button" disabled={(aiInputMode === "text" ? !aiPrompt.trim() : !voiceBlob || isListening) || aiLoading} onClick={fillWithAi}>
+              {aiLoading && <span aria-hidden="true" />}
               {aiLoading ? "ИИ обрабатывает данные..." : "Заполнить форму"}
             </button>
           </div>
         </div>
       )}
-      <div className="image-uploader">
-        <div className="section-head">
+      <div>
+        <div>
           <h2>Картинки товара</h2>
-          <div className="image-tools">
-            <label className="button-link">
+          <div>
+            <label>
               Добавить картинки
               <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(e) => addImages(e.target.files)} />
             </label>
           </div>
         </div>
         {images.length ? (
-          <div className="image-gallery-picker">
-            <div className="image-preview-main">
+          <div>
+            <div>
               <img src={previewImage.url} alt={previewImage.name} />
             </div>
-            <div className="image-thumb-strip">
+            <div>
               {images.map((image) => (
-                <div className={previewImageId === image.id ? "image-thumb active" : "image-thumb"} key={image.id}>
+                <div key={image.id}>
                   <button type="button" onClick={() => setPreviewImageId(image.id)} aria-label={`Выбрать ${image.name} как превью`}>
                     <img src={image.url} alt={image.name} />
                   </button>
-                  <button className="image-remove" type="button" onClick={() => removeImage(image.id)} aria-label={`Удалить ${image.name}`}>
+                  <button type="button" onClick={() => removeImage(image.id)} aria-label={`Удалить ${image.name}`}>
                     x
                   </button>
                 </div>
@@ -480,17 +480,17 @@ export function ProductForm({
             </div>
           </div>
         ) : (
-          <div className="empty-upload">Картинки еще не выбраны</div>
+          <div>Картинки еще не выбраны</div>
         )}
       </div>
       {(!aiMode || aiDraftApplied) && (
         <>
           <label>Название<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></label>
           <label>Описание<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <div className="price-mode">
-            <div className="segmented">
-              <button className={priceMode === "number" ? "active" : ""} type="button" onClick={() => setPriceMode("number")}>Цена</button>
-              <button className={priceMode === "ask" ? "active" : ""} type="button" onClick={() => setPriceMode("ask")}>Уточнить у продавца</button>
+          <div>
+            <div>
+              <button type="button" onClick={() => setPriceMode("number")}>Цена</button>
+              <button type="button" onClick={() => setPriceMode("ask")}>Уточнить у продавца</button>
             </div>
             {priceMode === "number" ? (
               <label>Цена<input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
@@ -499,7 +499,7 @@ export function ProductForm({
             )}
           </div>
           <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
-          <div className="publish-controls">
+          <div>
             <label>
               Наличие
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProductStatus })}>
@@ -508,7 +508,7 @@ export function ProductForm({
                 <option value="NOT_AVAILABLE">Нет в наличии</option>
               </select>
             </label>
-            <label className="inline-check">
+            <label>
               <input
                 type="checkbox"
                 checked={Boolean(form.isVisible)}
@@ -517,12 +517,12 @@ export function ProductForm({
               Показывать в витрине
             </label>
           </div>
-          <div className="variant-editor">
-            <div className="section-head">
+          <div>
+            <div>
               <h2>Комбинации товара</h2>
             </div>
-            <div className="variant-list">
-              <div className="variant-header" aria-hidden="true">
+            <div>
+              <div aria-hidden="true">
                 <span>Цвет</span>
                 <span>HEX</span>
                 <span>Размер</span>
@@ -530,11 +530,11 @@ export function ProductForm({
                 <span />
               </div>
               {variants.map((variant) => (
-                <div className="variant-row" key={variant.id}>
+                <div key={variant.id}>
                   <input aria-label="Цвет" value={variant.colorName} onChange={(e) => updateVariant(variant.id, { colorName: e.target.value })} placeholder="Синий" />
                   <input
                     aria-label="HEX"
-                    className="color-picker"
+                   
                     type="color"
                     value={variant.colorHex || "#2779a7"}
                     onChange={(e) => updateVariant(variant.id, { colorHex: e.target.value })}
@@ -547,23 +547,23 @@ export function ProductForm({
                 </div>
               ))}
             </div>
-            <div className="variant-actions">
+            <div>
               <button type="button" onClick={() => setVariants([...variants, createEmptyVariant()])}>
                 Добавить комбинацию
               </button>
             </div>
           </div>
-          <button className="primary">Сохранить</button>
+          <button>Сохранить</button>
         </>
       )}
-      {aiSuccessVisible && <div className="toast success" role="status">ИИ закончил обработку. Проверьте заполненные поля.</div>}
+      {aiSuccessVisible && <div role="status">ИИ закончил обработку. Проверьте заполненные поля.</div>}
     </form>
   );
 }
 
 function LockIcon() {
   return (
-    <svg className="inline-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1Zm2 0h6V8a3 3 0 0 0-6 0v2Z" />
     </svg>
   );
@@ -571,7 +571,7 @@ function LockIcon() {
 
 function MicrophoneIcon() {
   return (
-    <svg className="inline-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21a1 1 0 1 1-2 0v-3.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
     </svg>
   );

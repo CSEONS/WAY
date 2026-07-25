@@ -15,27 +15,27 @@ export function ProductCard({ product, slug }: { product: Product; slug: string 
   const priceText = product.priceText ? `Цена: ${product.priceText}` : displayPrice != null ? `${displayPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине";
 
   return (
-    <Link className={isUnavailable ? "product-card unavailable" : "product-card"} to={`/m/${slug}/p/${product.id}`}>
-      {isUnavailable && <span className="unavailable-overlay">Нет в наличии</span>}
-      <span className="product-badge">Новинка</span>
-      <div className="product-image">
+    <Link to={`/m/${slug}/p/${product.id}`}>
+      {isUnavailable && <span>Нет в наличии</span>}
+      <span>Новинка</span>
+      <div>
         {product.images[0] ? <img src={product.images[0].url} alt={product.title} /> : <span>Фото скоро</span>}
       </div>
-      <div className="product-body">
+      <div>
         <h3>{product.title}</h3>
         <p>{priceText}</p>
         <small>{product.category || "Без категории"}</small>
-        <div className="card-meta">
+        <div>
           {product.sizes.map((size) => (
             <span key={size.id}>{size.value}</span>
           ))}
-          <div className="color-stack">
+          <div>
             {product.colors.map((color) => (
               <span key={color.id} title={color.name} style={{ background: color.hex ?? "#d8e5e8" }} />
             ))}
           </div>
         </div>
-        {product.status !== "NOT_AVAILABLE" && <strong className="stock-status">{statusMap[product.status]}</strong>}
+        {product.status !== "NOT_AVAILABLE" && <strong>{statusMap[product.status]}</strong>}
       </div>
     </Link>
   );

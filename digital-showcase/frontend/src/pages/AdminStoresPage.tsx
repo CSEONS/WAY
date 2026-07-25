@@ -144,10 +144,10 @@ export function AdminStoresPage() {
     <section>
       <h1>Управление магазинами</h1>
       <p>Создавайте и управляйте магазинами отдельно от владельцев.</p>
-      <div className="admin-grid">
-        <div className="panel">
+      <div>
+        <div>
           <h2>Создать магазин</h2>
-          <form className="form" onSubmit={createStore}>
+          <form onSubmit={createStore}>
             <label>
               Владелец
               <select value={storeForm.ownerId} onChange={(e) => setStoreForm({ ...storeForm, ownerId: e.target.value })} required>
@@ -171,14 +171,14 @@ export function AdminStoresPage() {
               Подписка до
               <input type="datetime-local" value={storeForm.subscriptionEndsAt} onChange={(e) => setStoreForm({ ...storeForm, subscriptionEndsAt: e.target.value })} />
             </label>
-            <button className="primary">Создать</button>
+            <button>Создать</button>
           </form>
         </div>
-        <div className="panel">
+        <div>
           <h2>Список магазинов</h2>
-          <div className="table">
+          <div>
             {stores.map((store) => (
-              <div className="row" key={store.id}>
+              <div key={store.id}>
                 <span>
                   <strong>{store.name}</strong>
                   <br />/m/{store.slug}
@@ -192,25 +192,25 @@ export function AdminStoresPage() {
                 <button onClick={() => openEditStore(store)}>Редактировать</button>
                 <button onClick={() => toggleAiForm(store)}>{store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}</button>
                 <button onClick={() => (store.isActive ? setStoreToArchive(store) : toggle(store))}>{store.isActive ? "Архивировать" : "Восстановить"}</button>
-                <button className="danger" onClick={() => setStoreToDelete(store)}>Удалить</button>
+                <button onClick={() => setStoreToDelete(store)}>Удалить</button>
               </div>
             ))}
           </div>
         </div>
       </div>
       {storeToEdit && (
-        <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setStoreToEdit(null)}>
-          <div className="modal wide-modal" role="dialog" aria-modal="true" aria-labelledby="edit-store-title">
-            <div className="modal-head">
+        <div role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setStoreToEdit(null)}>
+          <div role="dialog" aria-modal="true">
+            <div>
               <div>
-                <h2 id="edit-store-title">Редактировать магазин</h2>
+                <h2>Редактировать магазин</h2>
                 <p>/m/{storeToEdit.slug}</p>
               </div>
-              <button className="icon-button" type="button" aria-label="Закрыть" onClick={() => setStoreToEdit(null)}>
+              <button type="button" aria-label="Закрыть" onClick={() => setStoreToEdit(null)}>
                 <CloseIcon />
               </button>
             </div>
-            <form className="form" onSubmit={updateStore}>
+            <form onSubmit={updateStore}>
               <label>
                 Владелец
                 <select value={storeEditForm.ownerId} onChange={(e) => setStoreEditForm({ ...storeEditForm, ownerId: e.target.value })} required>
@@ -230,9 +230,9 @@ export function AdminStoresPage() {
               <label>WhatsApp<input type="tel" value={storeEditForm.whatsapp} placeholder="+79280123456" onChange={(e) => setStoreEditForm({ ...storeEditForm, whatsapp: e.target.value })} /></label>
               <label>Telegram<input value={storeEditForm.telegram} placeholder="@Name" onChange={(e) => setStoreEditForm({ ...storeEditForm, telegram: e.target.value })} /></label>
               <label>Подписка до<input type="datetime-local" value={storeEditForm.subscriptionEndsAt} onChange={(e) => setStoreEditForm({ ...storeEditForm, subscriptionEndsAt: e.target.value })} /></label>
-              <div className="modal-actions">
+              <div>
                 <button type="button" onClick={() => setStoreToEdit(null)}>Отмена</button>
-                <button className="primary">Сохранить</button>
+                <button>Сохранить</button>
               </div>
             </form>
           </div>
@@ -267,7 +267,7 @@ export function AdminStoresPage() {
 
 function CloseIcon() {
   return (
-    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6.7 5.3 12 10.6l5.3-5.3 1.4 1.4-5.3 5.3 5.3 5.3-1.4 1.4-5.3-5.3-5.3 5.3-1.4-1.4 5.3-5.3-5.3-5.3z" />
     </svg>
   );

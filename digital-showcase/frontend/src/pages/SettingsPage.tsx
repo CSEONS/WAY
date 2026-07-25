@@ -54,10 +54,10 @@ export function SettingsPage() {
 
   if (!storeId) {
     return (
-      <section className="empty">
+      <section>
         <div>
           <p>Сначала выберите магазин.</p>
-          <Link className="button-link" to="/dashboard">
+          <Link to="/dashboard">
             К выбору магазина
           </Link>
         </div>
@@ -65,13 +65,13 @@ export function SettingsPage() {
     );
   }
 
-  if (!store) return <section className="empty">Загрузка...</section>;
+  if (!store) return <section>Загрузка...</section>;
 
   return (
-    <section className="narrow">
-      <p className="eyebrow">{store.name}</p>
+    <section>
+      <p>{store.name}</p>
       <h1>Реквизиты магазина</h1>
-      <form className="form" onSubmit={submit}>
+      <form onSubmit={submit}>
         <label>Название<input value={store.name} onChange={(e) => setStore({ ...store, name: e.target.value })} /></label>
         <label>Описание<textarea value={store.description ?? ""} onChange={(e) => setStore({ ...store, description: e.target.value })} /></label>
         <label>Адрес<input value={store.address ?? ""} onChange={(e) => setStore({ ...store, address: e.target.value })} /></label>
@@ -83,19 +83,19 @@ export function SettingsPage() {
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
         </label>
         {(logoFile || store.logoUrl) && (
-          <div className="store-logo-preview">
+          <div>
             <img src={logoPreviewUrl} alt="Предпросмотр логотипа" />
             <span>{logoFile ? logoFile.name : "Текущий логотип"}</span>
           </div>
         )}
-        <div className="action-row">
-          <Link className="button-link" to={`/dashboard/stores/${store.id}`}>
+        <div>
+          <Link to={`/dashboard/stores/${store.id}`}>
             Назад к товарам
           </Link>
-          <button className="primary" disabled={isSaving}>{isSaving ? "Сохраняю..." : "Сохранить"}</button>
+          <button disabled={isSaving}>{isSaving ? "Сохраняю..." : "Сохранить"}</button>
         </div>
-        {error && <p className="error">{error}</p>}
-        {saved && <div className="toast success" role="status">Реквизиты сохранены</div>}
+        {error && <p>{error}</p>}
+        {saved && <div role="status">Реквизиты сохранены</div>}
       </form>
     </section>
   );

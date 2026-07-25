@@ -10,8 +10,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="empty-state">
-      <div className="empty-state-icon" aria-hidden="true">
+    <div>
+      <div aria-hidden="true">
         <svg viewBox="0 0 24 24">
           <path d="M4 7h16" />
           <path d="M6 7v13h12V7" />

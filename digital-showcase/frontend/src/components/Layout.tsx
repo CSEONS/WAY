@@ -18,8 +18,8 @@ export function Layout({ user, onLogout }: Props) {
 
   return (
     <>
-      <header className="topbar">
-        <Link className="brand" to="/">
+      <header>
+        <Link to="/">
           Витрины
         </Link>
         {!hidePublicStoreNav && (

@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import type { Product } from "../types/models";
 
 const statusMap = {
@@ -40,3 +40,4 @@ export function ProductCard({ product, slug }: { product: Product; slug: string 
     </Link>
   );
 }
+

@@ -1,4 +1,4 @@
-export function ConfirmModal({
+﻿export function ConfirmModal({
   title,
   description,
   confirmLabel,
@@ -34,3 +34,4 @@ export function ConfirmModal({
     </div>
   );
 }
+

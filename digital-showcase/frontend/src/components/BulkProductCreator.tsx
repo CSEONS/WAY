@@ -47,7 +47,7 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
   }
 
   function updateDraft(index: number, patch: Partial<BulkDraft>) {
-    setDrafts((current) => current.map((draft, draftIndex) => draftIndex === index ? { ...draft, ...patch } : draft));
+    setDrafts((current) => current.map((draft, draftIndex) => (draftIndex === index ? { ...draft, ...patch } : draft)));
   }
 
   async function createProducts() {
@@ -79,27 +79,40 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
   }
 
   return (
-    <div role="presentation">
-      <div role="dialog" aria-modal="true">
-        <div>
-          <div><h2>Массовое добавление товаров</h2><p>ИИ сгруппирует фотографии. Перед созданием проверьте предложения.</p></div>
+    <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && onClose()}>
+      <div className="modal bulk-product-modal" role="dialog" aria-modal="true">
+        <div className="modal-head">
+          <div className="modal-title">
+            <h2>Массовое добавление товаров</h2>
+            <p>ИИ сгруппирует фотографии. Перед созданием проверьте предложения.</p>
+          </div>
           <button type="button" aria-label="Закрыть" onClick={onClose} disabled={loading || saving}>×</button>
         </div>
+
         {!drafts.length ? (
-          <div>
-            <label>Фотографии товаров (от 2 до 40)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setImages([...event.target.files ?? []].slice(0, 40))} /></label>
-            {previews.length > 0 && <div>{previews.map((url, index) => <img src={url} alt={`Изображение ${index + 1}`} key={url} />)}</div>}
-            <label>Текстовое описание<textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Например: джинсы по 1000, носки по 50, размеры кепки 44..." /></label>
-            <label>Или голосовой файл<input type="file" accept="audio/*,video/webm" onChange={(event) => setVoice(event.target.files?.[0] ?? null)} /></label>
+          <div className="modal-body bulk-step">
+            <label>
+              Фотографии товаров (от 2 до 40)
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setImages([...event.target.files ?? []].slice(0, 40))} />
+            </label>
+            {previews.length > 0 && <div className="bulk-preview-grid">{previews.map((url, index) => <img src={url} alt={`Изображение ${index + 1}`} key={url} />)}</div>}
+            <label>
+              Текстовое описание
+              <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Например: джинсы по 1000, носки по 50, размеры кепки 44..." />
+            </label>
+            <label>
+              Или голосовой файл
+              <input type="file" accept="audio/*,video/webm" onChange={(event) => setVoice(event.target.files?.[0] ?? null)} />
+            </label>
             {error && <p>{error}</p>}
             <button type="button" disabled={images.length < 2 || loading} onClick={groupImages}>{loading && <span />}{loading ? "ИИ группирует изображения..." : "Сгруппировать"}</button>
           </div>
         ) : (
-          <div>
+          <div className="bulk-result-step">
             {drafts.map((draft, index) => (
-              <article key={index}>
-                <div>{draft.imageIndexes.map((imageIndex) => previews[imageIndex] && <img src={previews[imageIndex]} alt="" key={imageIndex} />)}</div>
-                <div>
+              <article className="bulk-draft-card" key={index}>
+                <div className="bulk-draft-images">{draft.imageIndexes.map((imageIndex) => previews[imageIndex] && <img src={previews[imageIndex]} alt="" key={imageIndex} />)}</div>
+                <div className="bulk-draft-body">
                   <label>Название<input value={draft.title} onChange={(event) => updateDraft(index, { title: event.target.value })} required /></label>
                   <label>Описание<textarea value={draft.description ?? ""} onChange={(event) => updateDraft(index, { description: event.target.value || null })} /></label>
                   <label>Категория<input value={draft.category ?? ""} onChange={(event) => updateDraft(index, { category: event.target.value || null })} /></label>
@@ -112,7 +125,7 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
             ))}
             {error && <p>{error}</p>}
             {progress && <p role="status">{progress}</p>}
-            <div><button type="button" onClick={() => setDrafts([])} disabled={saving}>Назад</button><button type="button" onClick={createProducts} disabled={saving || drafts.some((draft) => !draft.title.trim())}>{saving ? "Создаю товары..." : `Создать товары (${drafts.length})`}</button></div>
+            <div className="modal-actions"><button type="button" onClick={() => setDrafts([])} disabled={saving}>Назад</button><button type="button" onClick={createProducts} disabled={saving || drafts.some((draft) => !draft.title.trim())}>{saving ? "Создаю товары..." : `Создать товары (${drafts.length})`}</button></div>
           </div>
         )}
       </div>

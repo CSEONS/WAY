@@ -1,4 +1,4 @@
-import QRCode from "qrcode";
+﻿import QRCode from "qrcode";
 import { useState } from "react";
 
 export function QrShareButton({ url, label = "QR" }: { url: string; label?: string }) {
@@ -51,3 +51,4 @@ export function QrShareButton({ url, label = "QR" }: { url: string; label?: stri
     </>
   );
 }
+

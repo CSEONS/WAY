@@ -1,4 +1,4 @@
-export function HomePage() {
+﻿export function HomePage() {
   return (
     <section className="page page-home">
       <div>
@@ -11,3 +11,4 @@ export function HomePage() {
     </section>
   );
 }
+

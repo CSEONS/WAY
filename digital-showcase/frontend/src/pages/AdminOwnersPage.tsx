@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+﻿import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -186,7 +186,7 @@ export function AdminOwnersPage() {
               </label>
               <label>
                 Телефон
-                <input type="tel" value={ownerEditForm.phone} placeholder="+79280123456" onChange={(e) => setOwnerEditForm({ ...ownerEditForm, phone: e.target.value })} />
+                <input value={ownerEditForm.phone} onChange={(e) => setOwnerEditForm({ ...ownerEditForm, phone: e.target.value })} />
               </label>
               <div>
                 <button type="button" onClick={() => setOwnerToEdit(null)}>
@@ -266,3 +266,4 @@ function CloseIcon() {
     </svg>
   );
 }
+

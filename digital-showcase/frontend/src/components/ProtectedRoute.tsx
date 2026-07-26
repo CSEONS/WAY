@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from "react-router-dom";
+﻿import { Navigate, Outlet } from "react-router-dom";
 import type { Role, User } from "../types/models";
 
 export function ProtectedRoute({ user, role, isLoading }: { user: User | null; role: Role; isLoading: boolean }) {
@@ -7,3 +7,4 @@ export function ProtectedRoute({ user, role, isLoading }: { user: User | null; r
   if (user.role !== role) return <Navigate to="/" replace />;
   return <Outlet />;
 }
+

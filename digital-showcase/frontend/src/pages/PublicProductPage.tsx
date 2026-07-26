@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Product, Store } from "../types/models";
@@ -169,3 +169,4 @@ function uniqueBy<T>(items: T[], getKey: (item: T) => string) {
     return true;
   });
 }
+

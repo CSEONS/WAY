@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+﻿import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -272,3 +272,4 @@ function CloseIcon() {
     </svg>
   );
 }
+

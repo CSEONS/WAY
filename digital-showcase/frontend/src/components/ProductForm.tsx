@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+﻿import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Product, ProductStatus } from "../types/models";
 
@@ -582,3 +582,4 @@ function formatDuration(totalSeconds: number) {
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
+

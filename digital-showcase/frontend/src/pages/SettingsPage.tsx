@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+﻿import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Store } from "../types/models";
@@ -100,3 +100,4 @@ export function SettingsPage() {
     </section>
   );
 }
+

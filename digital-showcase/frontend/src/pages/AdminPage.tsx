@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 
 export function AdminPage() {
   return (
@@ -16,3 +16,4 @@ export function AdminPage() {
     </section>
   );
 }
+

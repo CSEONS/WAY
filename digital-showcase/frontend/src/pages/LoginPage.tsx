@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+﻿import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { User } from "../types/models";
@@ -34,3 +34,4 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
     </section>
   );
 }
+

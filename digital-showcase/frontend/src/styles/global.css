@@ -531,6 +531,80 @@ hr {
   border-top: 1px solid var(--line);
 }
 
+.bulk-product-modal {
+  width: min(100%, 920px);
+}
+
+.modal-title {
+  display: grid;
+  gap: 6px;
+}
+
+.modal-body,
+.bulk-result-step,
+.bulk-step {
+  display: grid;
+  gap: 14px;
+}
+
+.bulk-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bulk-preview-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+
+.bulk-draft-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.bulk-draft-images {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bulk-draft-images img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.bulk-draft-body {
+  display: grid;
+  gap: 12px;
+}
+
+.bulk-draft-body input,
+.bulk-draft-body textarea,
+.bulk-draft-body select {
+  background: rgba(245, 245, 247, 0.92);
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-actions button {
+  flex: 1 1 180px;
+}
+
 .page {
   width: min(100%, 1180px);
   margin: 0 auto;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductForm, type ProductImageSelection, type ProductPayload } from "../components/ProductForm";
@@ -107,3 +107,4 @@ export function ProductEditorPage() {
     </section>
   );
 }
+

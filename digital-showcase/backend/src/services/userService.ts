@@ -25,6 +25,10 @@ export async function getOwner(id: string) {
 }
 
 export async function createOwner(input: { name: string; email?: string; phone?: string; password: string }) {
+  if (input.password.length < 6) {
+    throw new Error("Пароль должен содержать минимум 6 символов");
+  }
+
   const db = await getDb();
   const now = new Date().toISOString();
   const passwordHash = await bcrypt.hash(input.password, 10);
@@ -43,6 +47,10 @@ export async function createOwner(input: { name: string; email?: string; phone?:
 }
 
 export async function updateOwner(id: string, input: { name?: string; email?: string | null; phone?: string | null; password?: string }) {
+  if (input.password !== undefined && input.password.length < 6) {
+    throw new Error("Пароль должен содержать минимум 6 символов");
+  }
+
   const db = await getDb();
   const current = await getOwner(id);
   if (!current) return null;

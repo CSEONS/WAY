@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeBulkProductDrafts } from "../src/services/aiDraftService.js";
+import { createOwner } from "../src/services/userService.js";
 
 test("группирует сценарий из TODO в три товара и заполняет неизвестные поля", () => {
   const response = JSON.stringify({
@@ -37,4 +38,8 @@ test("каждое изображение назначается только о
 
   assert.deepEqual(drafts[0].imageIndexes, [0, 1, 3]);
   assert.deepEqual(drafts[1].imageIndexes, [2]);
+});
+
+test("создание владельца отклоняет пароль короче 6 символов", async () => {
+  await assert.rejects(() => createOwner({ name: "Тест", password: "12345" }), /минимум 6 символов/);
 });

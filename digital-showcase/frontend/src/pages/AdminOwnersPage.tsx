@@ -129,7 +129,7 @@ export function AdminOwnersPage() {
             </label>
             <label>
               Пароль
-              <input value={ownerForm.password} onChange={(e) => setOwnerForm({ ...ownerForm, password: e.target.value })} required />
+              <input value={ownerForm.password} onChange={(e) => setOwnerForm({ ...ownerForm, password: e.target.value })} minLength={6} required />
             </label>
             <button className="btn btn-primary">Создать</button>
           </form>

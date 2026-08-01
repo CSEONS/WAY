@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
 import initSqlJs, { type Database as SqlJsDatabase, type SqlValue } from "sql.js";
+
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+dotenv.config({ path: path.join(rootDir, ".env") });
 
 interface DatabaseClient {
   exec(sql: string): Promise<void>;
@@ -15,8 +20,11 @@ let client: DatabaseClient;
 let dbFile = "";
 
 function databaseFilename() {
-  const value = process.env.DATABASE_URL ?? "file:./data/database.sqlite";
-  return value.replace(/^file:/, "");
+  const configuredValue = process.env.DATABASE_URL?.trim();
+  const localValue = "file:./data/database.sqlite";
+  const value = configuredValue && configuredValue !== "file:/app/data/database.sqlite" ? configuredValue : localValue;
+  const normalized = value.replace(/^file:/, "");
+  return normalized.startsWith("/") ? normalized : path.resolve(process.cwd(), normalized);
 }
 
 export async function getDb() {
@@ -62,6 +70,47 @@ function select<T>(sql: string, params: unknown[]) {
 
 function save() {
   fs.writeFileSync(dbFile, Buffer.from(sqlDb.export()));
+}
+
+export async function syncAdminUser(database: Pick<DatabaseClient, "get" | "run">, env: NodeJS.ProcessEnv = process.env) {
+  const email = env.ADMIN_EMAIL?.trim();
+  const password = env.ADMIN_PASSWORD;
+  if (!email || !password) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required to create the first administrator");
+  }
+  if (password.length < 6) {
+    throw new Error("ADMIN_PASSWORD must contain at least 6 characters");
+  }
+
+  const now = new Date().toISOString();
+  const passwordHash = await bcrypt.hash(password, 12);
+  const existing = await database.get<{ id: string; name: string; email: string | null }>(
+    "SELECT id, name, email FROM users WHERE role = 'ADMIN' ORDER BY createdAt ASC LIMIT 1"
+  );
+
+  if (!existing) {
+    await database.run(
+      "INSERT INTO users (id, name, email, phone, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 'ADMIN', ?, ?)",
+      crypto.randomUUID(),
+      "Admin",
+      email,
+      null,
+      passwordHash,
+      now,
+      now
+    );
+    return "created";
+  }
+
+  await database.run(
+    "UPDATE users SET name = ?, email = ?, passwordHash = ?, updatedAt = ? WHERE id = ?",
+    "Admin",
+    email,
+    passwordHash,
+    now,
+    existing.id
+  );
+  return "updated";
 }
 
 export async function initDatabase() {
@@ -152,25 +201,12 @@ export async function initDatabase() {
 
   const existing = await database.get<{ count: number }>("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");
   if (!existing?.count) {
+    await syncAdminUser(database, process.env);
+  } else {
     const email = process.env.ADMIN_EMAIL?.trim();
     const password = process.env.ADMIN_PASSWORD;
-    if (!email || !password) {
-      throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required to create the first administrator");
+    if (email && password) {
+      await syncAdminUser(database, process.env);
     }
-    if (password.length < 12) {
-      throw new Error("ADMIN_PASSWORD must contain at least 12 characters");
-    }
-    const now = new Date().toISOString();
-    const passwordHash = await bcrypt.hash(password, 12);
-    await database.run(
-      "INSERT INTO users (id, name, email, phone, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 'ADMIN', ?, ?)",
-      crypto.randomUUID(),
-      "Admin",
-      email,
-      null,
-      passwordHash,
-      now,
-      now
-    );
   }
 }

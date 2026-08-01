@@ -77,8 +77,16 @@ const voiceQuestions = [
   "К какой категории его отнести?"
 ];
 
+function createId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function createEmptyVariant(): VariantFormRow {
-  return { id: crypto.randomUUID(), colorName: "", colorHex: "#2779a7", size: "", price: "" };
+  return { id: createId(), colorName: "", colorHex: "#2779a7", size: "", price: "" };
 }
 
 function initialVariants(initial?: Product): VariantFormRow[] {
@@ -97,7 +105,7 @@ function initialVariants(initial?: Product): VariantFormRow[] {
     const colors = initial.colors.length ? initial.colors : [{ id: "default-color", name: "", hex: null }];
     return colors.flatMap((color) =>
       sizes.map((size) => ({
-        id: crypto.randomUUID(),
+        id: createId(),
         colorName: color.name,
         colorHex: color.hex ?? "#2779a7",
         size: size.value,
@@ -224,7 +232,7 @@ export function ProductForm({
 
   function addImages(files: FileList | null) {
     if (!files?.length) return;
-    const nextImages = [...files].map((file) => ({ id: crypto.randomUUID(), existingId: null, file, name: file.name, url: URL.createObjectURL(file) }));
+    const nextImages = [...files].map((file) => ({ id: createId(), existingId: null, file, name: file.name, url: URL.createObjectURL(file) }));
     setImages((current) => [...current, ...nextImages]);
     setPreviewImageId((current) => current ?? nextImages[0]?.id ?? null);
   }
@@ -253,7 +261,7 @@ export function ProductForm({
     if (draft.variants?.length) {
       setVariants(
         draft.variants.map((variant) => ({
-          id: crypto.randomUUID(),
+          id: createId(),
           colorName: variant.colorName,
           colorHex: variant.colorHex ?? "#2779a7",
           size: variant.size,

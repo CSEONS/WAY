@@ -9,9 +9,13 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@hugeicons/core-free-icons": "^4.2.3",
+    "@hugeicons/react": "^1.1.9",
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-react": "^4.3.4",
     "axios": "^1.7.9",
+    "lucide-react": "^1.27.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

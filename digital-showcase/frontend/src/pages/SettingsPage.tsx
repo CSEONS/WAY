@@ -1,4 +1,5 @@
-﻿import { FormEvent, useEffect, useMemo, useState } from "react";
+﻿import { ArrowLeft } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Store } from "../types/models";
@@ -54,7 +55,7 @@ export function SettingsPage() {
 
   if (!storeId) {
     return (
-      <section className="page page-narrow page-settings">
+      <section className="page page-narrow page-settings page-legacy">
         <div>
           <p>Сначала выберите магазин.</p>
           <Link to="/dashboard">
@@ -65,11 +66,14 @@ export function SettingsPage() {
     );
   }
 
-  if (!store) return <section className="page page-narrow page-settings">Загрузка...</section>;
+  if (!store) return <section className="page page-narrow page-settings page-legacy">Загрузка...</section>;
 
   return (
-    <section className="page page-narrow page-settings">
-      <p>{store.name}</p>
+    <section className="page page-narrow page-settings page-legacy">
+      <Link className="back-link" to={`/dashboard/stores/${storeId}`}>
+        <ArrowLeft size={16} strokeWidth={2} />
+        Вернуться назад
+      </Link>
       <h1>Реквизиты магазина</h1>
       <form className="app-form settings-form" onSubmit={submit}>
         <label>Название<input value={store.name} onChange={(e) => setStore({ ...store, name: e.target.value })} /></label>
@@ -88,12 +92,7 @@ export function SettingsPage() {
             <span>{logoFile ? logoFile.name : "Текущий логотип"}</span>
           </div>
         )}
-        <div>
-          <Link to={`/dashboard/stores/${store.id}`}>
-            Назад к товарам
-          </Link>
-          <button disabled={isSaving}>{isSaving ? "Сохраняю..." : "Сохранить"}</button>
-        </div>
+        <button disabled={isSaving}>{isSaving ? "Сохраняю..." : "Сохранить"}</button>
         {error && <p>{error}</p>}
         {saved && <div role="status">Реквизиты сохранены</div>}
       </form>

@@ -1,7 +1,20 @@
-﻿import { FormEvent, useEffect, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AiMagicIcon,
+  ArchiveArrowDownIcon,
+  ArchiveArrowUpIcon,
+  CalendarAdd01Icon,
+  Cancel01Icon,
+  Delete02Icon,
+  Edit02Icon,
+  Store01Icon
+} from "@hugeicons/core-free-icons";
+import { ArrowLeft } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { Select } from "../components/Select";
 import type { Store, User } from "../types/models";
 
 interface StoreFormState {
@@ -89,6 +102,7 @@ export function AdminStoresPage() {
 
   async function createStore(event: FormEvent) {
     event.preventDefault();
+    if (!storeForm.ownerId) return;
     await api.post("/admin/stores", { ...storePayload(storeForm), isActive: 1 });
     setStoreForm(emptyStoreForm);
     load();
@@ -111,7 +125,7 @@ export function AdminStoresPage() {
 
   async function updateStore(event: FormEvent) {
     event.preventDefault();
-    if (!storeToEdit) return;
+    if (!storeToEdit || !storeEditForm.ownerId) return;
     await api.patch(`/admin/stores/${storeToEdit.id}`, storePayload(storeEditForm));
     setStoreToEdit(null);
     load();
@@ -141,23 +155,26 @@ export function AdminStoresPage() {
   }
 
   return (
-    <section className="page page-admin-stores">
+    <section className="page page-admin-stores page-legacy">
+      <Link className="back-link" to="/admin">
+        <ArrowLeft size={16} strokeWidth={2} />
+        Назад в админку
+      </Link>
       <h1>Управление магазинами</h1>
       <p>Создавайте и управляйте магазинами отдельно от владельцев.</p>
       <div>
-        <div>
+        <div className="panel">
           <h2>Создать магазин</h2>
           <form className="app-form" onSubmit={createStore}>
             <label>
               Владелец
-              <select value={storeForm.ownerId} onChange={(e) => setStoreForm({ ...storeForm, ownerId: e.target.value })} required>
-                <option value="">Выберите</option>
-                {owners.map((owner) => (
-                  <option value={owner.id} key={owner.id}>
-                    {owner.name}
-                  </option>
-                ))}
-              </select>
+              <Select
+                ariaLabel="Владелец"
+                placeholder="Выберите"
+                value={storeForm.ownerId}
+                onChange={(value) => setStoreForm({ ...storeForm, ownerId: value })}
+                options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
+              />
             </label>
             <label>
               Название
@@ -171,56 +188,77 @@ export function AdminStoresPage() {
               Подписка до
               <input type="datetime-local" value={storeForm.subscriptionEndsAt} onChange={(e) => setStoreForm({ ...storeForm, subscriptionEndsAt: e.target.value })} />
             </label>
-            <button>Создать</button>
+            <button className="btn btn-primary">Создать</button>
           </form>
         </div>
-        <div>
+        <div className="panel">
           <h2>Список магазинов</h2>
-          <div>
+          <div className="stack-list">
             {stores.map((store) => (
-              <div key={store.id}>
-                <span>
-                  <strong>{store.name}</strong>
-                  <br />/m/{store.slug}
-                </span>
-                <span>
-                  {store.isActive ? "Активен" : "В архиве"}
-                  <br />до {store.subscriptionEndsAt ? new Date(store.subscriptionEndsAt).toLocaleDateString("ru-RU") : "без даты"}
-                </span>
-                <span>{store.ownerName}</span>
-                <button onClick={() => extend(store.id)}>+30 дней</button>
-                <button onClick={() => openEditStore(store)}>Редактировать</button>
-                <button onClick={() => toggleAiForm(store)}>{store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}</button>
-                <button onClick={() => (store.isActive ? setStoreToArchive(store) : toggle(store))}>{store.isActive ? "Архивировать" : "Восстановить"}</button>
-                <button onClick={() => setStoreToDelete(store)}>Удалить</button>
+              <div className="list-row" key={store.id}>
+                <div className="list-row-main">
+                  <span className="list-row-icon">
+                    <HugeiconsIcon icon={Store01Icon} size={18} strokeWidth={1.6} />
+                  </span>
+                  <div>
+                    <strong>{store.name}</strong>
+                    <small>/m/{store.slug}</small>
+                  </div>
+                </div>
+                <div className="list-row-meta">
+                  <span className={`badge ${store.isActive ? "badge-success" : "badge-neutral"}`}>{store.isActive ? "Активен" : "В архиве"}</span>
+                  <span>до {store.subscriptionEndsAt ? new Date(store.subscriptionEndsAt).toLocaleDateString("ru-RU") : "без даты"}</span>
+                  <span>{store.ownerName}</span>
+                </div>
+                <div className="list-row-actions">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => extend(store.id)}>
+                    <HugeiconsIcon icon={CalendarAdd01Icon} size={15} strokeWidth={1.8} />
+                    +30 дней
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEditStore(store)}>
+                    <HugeiconsIcon icon={Edit02Icon} size={15} strokeWidth={1.8} />
+                    Редактировать
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => toggleAiForm(store)}>
+                    <HugeiconsIcon icon={AiMagicIcon} size={15} strokeWidth={1.8} />
+                    {store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => (store.isActive ? setStoreToArchive(store) : toggle(store))}>
+                    <HugeiconsIcon icon={store.isActive ? ArchiveArrowDownIcon : ArchiveArrowUpIcon} size={15} strokeWidth={1.8} />
+                    {store.isActive ? "Архивировать" : "Восстановить"}
+                  </button>
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => setStoreToDelete(store)}>
+                    <HugeiconsIcon icon={Delete02Icon} size={15} strokeWidth={1.8} />
+                    Удалить
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
       {storeToEdit && (
-        <div role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setStoreToEdit(null)}>
-          <div role="dialog" aria-modal="true">
-            <div>
-              <div>
+        <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setStoreToEdit(null)}>
+          <div className="modal" role="dialog" aria-modal="true">
+            <div className="modal-head">
+              <div className="modal-title">
                 <h2>Редактировать магазин</h2>
                 <p>/m/{storeToEdit.slug}</p>
               </div>
-              <button type="button" aria-label="Закрыть" onClick={() => setStoreToEdit(null)}>
-                <CloseIcon />
+              <button type="button" className="btn-icon btn-ghost" aria-label="Закрыть" onClick={() => setStoreToEdit(null)}>
+                <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />
               </button>
             </div>
             <form className="app-form" onSubmit={updateStore}>
               <label>
                 Владелец
-                <select value={storeEditForm.ownerId} onChange={(e) => setStoreEditForm({ ...storeEditForm, ownerId: e.target.value })} required>
-                  <option value="">Выберите</option>
-                  {owners.map((owner) => (
-                    <option value={owner.id} key={owner.id}>
-                      {owner.name}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  ariaLabel="Владелец"
+                  placeholder="Выберите"
+                  value={storeEditForm.ownerId}
+                  onChange={(value) => setStoreEditForm({ ...storeEditForm, ownerId: value })}
+                  options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
+                />
               </label>
               <label>Название<input value={storeEditForm.name} onChange={(e) => setStoreEditForm({ ...storeEditForm, name: e.target.value })} required /></label>
               <label>Slug<input value={storeEditForm.slug} onChange={(e) => setStoreEditForm({ ...storeEditForm, slug: e.target.value })} required /></label>
@@ -230,9 +268,9 @@ export function AdminStoresPage() {
               <label>WhatsApp<input type="tel" value={storeEditForm.whatsapp} placeholder="+79280123456" onChange={(e) => setStoreEditForm({ ...storeEditForm, whatsapp: e.target.value })} /></label>
               <label>Telegram<input value={storeEditForm.telegram} placeholder="@Name" onChange={(e) => setStoreEditForm({ ...storeEditForm, telegram: e.target.value })} /></label>
               <label>Подписка до<input type="datetime-local" value={storeEditForm.subscriptionEndsAt} onChange={(e) => setStoreEditForm({ ...storeEditForm, subscriptionEndsAt: e.target.value })} /></label>
-              <div>
-                <button type="button" onClick={() => setStoreToEdit(null)}>Отмена</button>
-                <button>Сохранить</button>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setStoreToEdit(null)}>Отмена</button>
+                <button className="btn btn-primary">Сохранить</button>
               </div>
             </form>
           </div>
@@ -258,18 +296,6 @@ export function AdminStoresPage() {
           onConfirm={deleteStore}
         />
       )}
-      <p>
-        <Link to="/admin">← Назад в админку</Link>
-      </p>
     </section>
   );
 }
-
-function CloseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6.7 5.3 12 10.6l5.3-5.3 1.4 1.4-5.3 5.3 5.3 5.3-1.4 1.4-5.3-5.3-5.3 5.3-1.4-1.4 5.3-5.3-5.3-5.3z" />
-    </svg>
-  );
-}
-

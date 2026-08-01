@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from "react";
+﻿import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductForm, type ProductImageSelection, type ProductPayload } from "../components/ProductForm";
@@ -80,7 +81,7 @@ export function ProductEditorPage() {
 
   if (!storeId) {
     return (
-      <section className="page page-narrow page-product-editor">
+      <section className="page page-narrow page-product-editor page-legacy">
         <div>
           <p>Сначала выберите магазин.</p>
           <Link to="/dashboard">
@@ -91,11 +92,14 @@ export function ProductEditorPage() {
     );
   }
 
-  if (isLoading || (id && !product)) return <section className="page page-narrow page-product-editor">Загрузка...</section>;
+  if (isLoading || (id && !product)) return <section className="page page-narrow page-product-editor page-legacy">Загрузка...</section>;
 
   return (
-    <section className="page page-narrow page-product-editor">
-      <p>{store?.name}</p>
+    <section className="page page-narrow page-product-editor page-legacy">
+      <Link className="back-link" to={`/dashboard/stores/${storeId}`}>
+        <ArrowLeft size={16} strokeWidth={2} />
+        Вернуться назад
+      </Link>
       <h1>{id ? "Редактировать товар" : "Новый товар"}</h1>
       <ProductForm
         initial={product}

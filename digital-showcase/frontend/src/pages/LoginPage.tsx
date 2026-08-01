@@ -1,11 +1,13 @@
-﻿import { FormEvent, useState } from "react";
+﻿import { HugeiconsIcon } from "@hugeicons/react";
+import { Alert02Icon, LockKeyIcon } from "@hugeicons/core-free-icons";
+import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { User } from "../types/models";
 
 export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
   const [login, setLogin] = useState("admin@example.com");
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("admin123456789");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -23,14 +25,35 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
   }
 
   return (
-    <section className="page page-narrow page-login">
-      <h1>Вход</h1>
-      <form className="app-form auth-form" onSubmit={submit}>
-        <label>Почта или телефон<input value={login} onChange={(e) => setLogin(e.target.value)} /></label>
-        <label>Пароль<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-        {error && <p>{error}</p>}
-        <button>Войти</button>
-      </form>
+    <section className="page page-login">
+      <div className="auth-shell">
+        <div className="auth-card">
+          <div className="auth-icon">
+            <HugeiconsIcon icon={LockKeyIcon} size={20} strokeWidth={1.8} />
+          </div>
+          <div className="auth-heading">
+            <h1>Вход</h1>
+            <p>Войдите, чтобы управлять магазином или витринами.</p>
+          </div>
+          <form className="auth-form" onSubmit={submit}>
+            <label>
+              Почта или телефон
+              <input value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" />
+            </label>
+            <label>
+              Пароль
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+            </label>
+            {error && (
+              <p className="auth-error">
+                <HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.8} />
+                {error}
+              </p>
+            )}
+            <button className="btn btn-primary btn-lg btn-block">Войти</button>
+          </form>
+        </div>
+      </div>
     </section>
   );
 }

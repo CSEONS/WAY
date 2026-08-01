@@ -1,5 +1,20 @@
-﻿import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+﻿import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AiMagicIcon,
+  Alert02Icon,
+  Cancel01Icon,
+  CheckmarkCircle02Icon,
+  Delete02Icon,
+  Edit02Icon,
+  ImageAdd01Icon,
+  InformationCircleIcon,
+  LockKeyIcon,
+  Mic01Icon,
+  TextFontIcon
+} from "@hugeicons/core-free-icons";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
+import { Select } from "./Select";
 import type { Product, ProductStatus } from "../types/models";
 
 interface VariantFormRow {
@@ -153,7 +168,7 @@ export function ProductForm({
     }
   );
   const [priceMode, setPriceMode] = useState<"number" | "ask">(savedDraft?.priceMode ?? initialPriceMode);
-  const [aiMode, setAiMode] = useState(false);
+  const [aiMode, setAiMode] = useState(() => aiFormEnabled && !initial);
   const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -369,46 +384,71 @@ export function ProductForm({
   return (
     <form className="app-form product-form" onSubmit={submit} onKeyDownCapture={selectFieldText}>
       {isDraftNoticeVisible && (
-        <div>
-          <span>Восстановлен локальный черновик</span>
-          <button type="button" onClick={clearSavedDraft}>
+        <div className="draft-banner">
+          <span>
+            <HugeiconsIcon icon={InformationCircleIcon} size={16} strokeWidth={1.8} /> Восстановлен локальный черновик
+          </span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={clearSavedDraft}>
             Очистить
           </button>
         </div>
       )}
-      <div>
-        <span>Обычный ввод</span>
-        <button
-         
-          type="button"
-          disabled={!aiFormEnabled}
-          aria-pressed={aiMode}
-          onClick={() => {
-            setAiMode(!aiMode);
-            setAiDraftApplied(false);
-          }}
-        >
-          <span />
-        </button>
-        <span>ИИ ввод {!aiFormEnabled && <LockIcon />}</span>
-      </div>
-      {!aiFormEnabled && (
-        <div>
-          <strong>AI недоступен</strong>
-          <span>Администратор еще не подключил AI-заполнение для этого магазина.</span>
+
+      {aiFormEnabled ? (
+        <div className="segmented">
+          <button
+            type="button"
+            className={!aiMode ? "is-active" : ""}
+            aria-pressed={!aiMode}
+            onClick={() => setAiMode(false)}
+          >
+            <HugeiconsIcon icon={Edit02Icon} size={16} strokeWidth={1.8} />
+            Обычный ввод
+          </button>
+          <button
+            type="button"
+            className={aiMode ? "is-active" : ""}
+            aria-pressed={aiMode}
+            onClick={() => {
+              setAiMode(true);
+              setAiDraftApplied(false);
+            }}
+          >
+            <HugeiconsIcon icon={AiMagicIcon} size={16} strokeWidth={1.8} />
+            ИИ ввод
+          </button>
         </div>
-      )}
-      {aiMode && aiDraftApplied && (
-        <div>
-          <span>ИИ заполнил форму — проверьте результат ниже.</span>
-          <button type="button" onClick={() => setAiDraftApplied(false)}>Изменить запрос</button>
-        </div>
-      )}
-      {aiMode && !aiDraftApplied && (
-        <div aria-busy={aiLoading}>
+      ) : (
+        <div className="notice-banner">
+          <HugeiconsIcon icon={LockKeyIcon} size={18} strokeWidth={1.8} />
           <div>
-            <button type="button" onClick={() => setAiInputMode("text")}>Текст</button>
-            <button type="button" onClick={() => setAiInputMode("voice")}>Голос</button>
+            <strong>AI недоступен</strong>
+            <span>Администратор еще не подключил AI-заполнение для этого магазина.</span>
+          </div>
+        </div>
+      )}
+
+      {aiMode && aiDraftApplied && (
+        <div className="notice-banner notice-success">
+          <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} strokeWidth={1.8} />
+          <span>ИИ заполнил форму — проверьте результат ниже.</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAiDraftApplied(false)}>
+            Изменить запрос
+          </button>
+        </div>
+      )}
+
+      {aiMode && !aiDraftApplied && (
+        <div className="ai-panel" aria-busy={aiLoading}>
+          <div className="segmented segmented-sm">
+            <button type="button" className={aiInputMode === "text" ? "is-active" : ""} onClick={() => setAiInputMode("text")}>
+              <HugeiconsIcon icon={TextFontIcon} size={14} strokeWidth={1.8} />
+              Текст
+            </button>
+            <button type="button" className={aiInputMode === "voice" ? "is-active" : ""} onClick={() => setAiInputMode("voice")}>
+              <HugeiconsIcon icon={Mic01Icon} size={14} strokeWidth={1.8} />
+              Голос
+            </button>
           </div>
           {aiInputMode === "text" && (
             <label>
@@ -417,80 +457,96 @@ export function ProductForm({
             </label>
           )}
           {aiInputMode === "voice" && (
-            <div>
-              <div>
-                <MicrophoneIcon />
+            <div className="voice-recorder">
+              <div className={`voice-recorder-status${isListening ? " is-recording" : ""}`}>
+                <HugeiconsIcon icon={Mic01Icon} size={16} strokeWidth={1.8} />
                 {isListening ? `Идет запись... ${formatDuration(recordingSeconds)}` : voiceBlob ? `Голосовое сообщение записано: ${formatDuration(voiceDurationSeconds)}` : "Запись не запущена"}
                 {isListening && (
-                  <span aria-hidden="true">
+                  <span className="recording-dots" aria-hidden="true">
                     <span />
                     <span />
                     <span />
                   </span>
                 )}
               </div>
-              <ol>
+              <ol className="voice-questions">
                 {voiceQuestions.map((question) => (
                   <li key={question}>{question}</li>
                 ))}
               </ol>
             </div>
           )}
-          {aiError && <p>{aiError}</p>}
-          <div>
+          {aiError && (
+            <p className="auth-error">
+              <HugeiconsIcon icon={Alert02Icon} size={16} strokeWidth={1.8} />
+              {aiError}
+            </p>
+          )}
+          <div className="ai-panel-actions">
             {aiInputMode === "voice" && (
-              <button type="button" onClick={recordVoice}>
-                <MicrophoneIcon />
+              <button type="button" className="btn btn-secondary" onClick={recordVoice}>
+                <HugeiconsIcon icon={Mic01Icon} size={16} strokeWidth={1.8} />
                 {isListening ? "Остановить запись" : voiceBlob ? "Перезаписать" : "Надиктовать"}
               </button>
             )}
-            <button type="button" disabled={(aiInputMode === "text" ? !aiPrompt.trim() : !voiceBlob || isListening) || aiLoading} onClick={fillWithAi}>
-              {aiLoading && <span aria-hidden="true" />}
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={(aiInputMode === "text" ? !aiPrompt.trim() : !voiceBlob || isListening) || aiLoading}
+              onClick={fillWithAi}
+            >
+              <HugeiconsIcon icon={AiMagicIcon} size={16} strokeWidth={1.8} />
               {aiLoading ? "ИИ обрабатывает данные..." : "Заполнить форму"}
             </button>
           </div>
         </div>
       )}
-      <div>
-        <div>
+
+      <div className="form-section">
+        <div className="form-section-head">
           <h2>Картинки товара</h2>
-          <div>
-            <label>
-              Добавить картинки
-              <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(e) => addImages(e.target.files)} />
-            </label>
-          </div>
+          <label className="btn btn-secondary btn-sm">
+            <HugeiconsIcon icon={ImageAdd01Icon} size={16} strokeWidth={1.8} />
+            Добавить картинки
+            <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(e) => addImages(e.target.files)} hidden />
+          </label>
         </div>
         {images.length ? (
-          <div>
-            <div>
+          <>
+            <div className="image-manager-preview">
               <img src={previewImage.url} alt={previewImage.name} />
             </div>
-            <div>
+            <div className="image-manager-grid">
               {images.map((image) => (
-                <div key={image.id}>
-                  <button type="button" onClick={() => setPreviewImageId(image.id)} aria-label={`Выбрать ${image.name} как превью`}>
+                <div className="image-manager-thumb" key={image.id}>
+                  <button
+                    type="button"
+                    className={image.id === previewImage.id ? "is-active" : ""}
+                    onClick={() => setPreviewImageId(image.id)}
+                    aria-label={`Выбрать ${image.name} как превью`}
+                  >
                     <img src={image.url} alt={image.name} />
                   </button>
-                  <button type="button" onClick={() => removeImage(image.id)} aria-label={`Удалить ${image.name}`}>
-                    x
+                  <button type="button" className="image-manager-remove" onClick={() => removeImage(image.id)} aria-label={`Удалить ${image.name}`}>
+                    <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
                   </button>
                 </div>
               ))}
             </div>
-          </div>
+          </>
         ) : (
-          <div>Картинки еще не выбраны</div>
+          <div className="image-manager-empty">Картинки еще не выбраны</div>
         )}
       </div>
+
       {(!aiMode || aiDraftApplied) && (
         <>
           <label>Название<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></label>
           <label>Описание<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <div>
-            <div>
-              <button type="button" onClick={() => setPriceMode("number")}>Цена</button>
-              <button type="button" onClick={() => setPriceMode("ask")}>Уточнить у продавца</button>
+          <div className="form-section">
+            <div className="segmented segmented-sm">
+              <button type="button" className={priceMode === "number" ? "is-active" : ""} onClick={() => setPriceMode("number")}>Цена</button>
+              <button type="button" className={priceMode === "ask" ? "is-active" : ""} onClick={() => setPriceMode("ask")}>Уточнить у продавца</button>
             </div>
             {priceMode === "number" ? (
               <label>Цена<input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
@@ -499,16 +555,21 @@ export function ProductForm({
             )}
           </div>
           <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
-          <div>
+          <div className="inline-fields">
             <label>
               Наличие
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProductStatus })}>
-                <option value="AVAILABLE">В наличии</option>
-                <option value="CHECK_IN_STORE">Уточнить в магазине</option>
-                <option value="NOT_AVAILABLE">Нет в наличии</option>
-              </select>
+              <Select
+                ariaLabel="Наличие"
+                value={form.status}
+                onChange={(value) => setForm({ ...form, status: value as ProductStatus })}
+                options={[
+                  { value: "AVAILABLE", label: "В наличии" },
+                  { value: "CHECK_IN_STORE", label: "Уточнить в магазине" },
+                  { value: "NOT_AVAILABLE", label: "Нет в наличии" }
+                ]}
+              />
             </label>
-            <label>
+            <label className="inline-field">
               <input
                 type="checkbox"
                 checked={Boolean(form.isVisible)}
@@ -517,63 +578,52 @@ export function ProductForm({
               Показывать в витрине
             </label>
           </div>
-          <div>
-            <div>
+          <div className="form-section">
+            <div className="form-section-head">
               <h2>Комбинации товара</h2>
             </div>
-            <div>
-              <div aria-hidden="true">
+            <div className="variant-table">
+              <div className="variant-table-head" aria-hidden="true">
                 <span>Цвет</span>
                 <span>HEX</span>
                 <span>Размер</span>
                 <span>Цена</span>
-                <span />
               </div>
               {variants.map((variant) => (
-                <div key={variant.id}>
-                  <input aria-label="Цвет" value={variant.colorName} onChange={(e) => updateVariant(variant.id, { colorName: e.target.value })} placeholder="Синий" />
-                  <input
-                    aria-label="HEX"
-                   
-                    type="color"
-                    value={variant.colorHex || "#2779a7"}
-                    onChange={(e) => updateVariant(variant.id, { colorHex: e.target.value })}
-                  />
-                  <input aria-label="Размер" value={variant.size} onChange={(e) => updateVariant(variant.id, { size: e.target.value })} placeholder="M" />
-                  <input aria-label="Цена" type="number" value={variant.price} onChange={(e) => updateVariant(variant.id, { price: e.target.value })} placeholder={form.price || "0"} />
-                  <button type="button" onClick={() => removeVariant(variant.id)}>
-                    Удалить
-                  </button>
+                <div className="variant-row" key={variant.id}>
+                  <div className="variant-row-fields">
+                    <input aria-label="Цвет" value={variant.colorName} onChange={(e) => updateVariant(variant.id, { colorName: e.target.value })} placeholder="Синий" />
+                    <input
+                      aria-label="HEX"
+                      type="color"
+                      value={variant.colorHex || "#2779a7"}
+                      onChange={(e) => updateVariant(variant.id, { colorHex: e.target.value })}
+                    />
+                    <input aria-label="Размер" value={variant.size} onChange={(e) => updateVariant(variant.id, { size: e.target.value })} placeholder="M" />
+                    <input aria-label="Цена" type="number" value={variant.price} onChange={(e) => updateVariant(variant.id, { price: e.target.value })} placeholder={form.price || "0"} />
+                  </div>
+                  <div className="variant-row-actions">
+                    <button type="button" className="btn-icon btn-danger" aria-label="Удалить комбинацию" onClick={() => removeVariant(variant.id)}>
+                      <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.8} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
-            <div>
-              <button type="button" onClick={() => setVariants([...variants, createEmptyVariant()])}>
-                Добавить комбинацию
-              </button>
-            </div>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVariants([...variants, createEmptyVariant()])}>
+              Добавить комбинацию
+            </button>
           </div>
-          <button>Сохранить</button>
+          <button className="btn btn-primary btn-lg">Сохранить</button>
         </>
       )}
-      {aiSuccessVisible && <div role="status">ИИ закончил обработку. Проверьте заполненные поля.</div>}
+      {aiSuccessVisible && (
+        <div className="notice-banner notice-success" role="status">
+          <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} strokeWidth={1.8} />
+          ИИ закончил обработку. Проверьте заполненные поля.
+        </div>
+      )}
     </form>
-  );
-}
-
-function LockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M7 10V8a5 5 0 0 1 10 0v2h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1Zm2 0h6V8a3 3 0 0 0-6 0v2Z" />
-    </svg>
-  );
-}
-
-function MicrophoneIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V21a1 1 0 1 1-2 0v-3.08A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0Z" />
-    </svg>
   );
 }
 

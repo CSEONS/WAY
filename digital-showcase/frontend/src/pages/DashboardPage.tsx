@@ -1,10 +1,34 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  Analytics01Icon,
+  Archive02Icon,
+  CheckmarkCircle02Icon,
+  Clock01Icon,
+  Copy01Icon,
+  Edit02Icon,
+  Exchange01Icon,
+  EyeIcon,
+  Home01Icon,
+  InformationCircleIcon,
+  Link04Icon,
+  Package01Icon,
+  PlusSignIcon,
+  Search01Icon,
+  Settings01Icon,
+  ShoppingBag01Icon,
+  Store01Icon,
+  Delete02Icon
+} from "@hugeicons/core-free-icons";
+import { ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { BulkProductCreator } from "../components/BulkProductCreator";
 import { EmptyState } from "../components/EmptyState";
 import { QrShareButton } from "../components/QrShareButton";
+import { Select } from "../components/Select";
+import { Toast } from "../components/Toast";
 import type { Product, Store } from "../types/models";
 
 type OwnerProductStatus = "published" | "draft" | "archive";
@@ -21,172 +45,6 @@ function formatStoreDate(value?: string | null) {
   })}`;
 }
 
-function StorefrontIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 10.5V20h16v-9.5" />
-      <path d="M5 4h14l1.5 5.5a3 3 0 0 1-5.5 1.7 3 3 0 0 1-6 0 3 3 0 0 1-5.5-1.7L5 4Z" />
-      <path d="M9 20v-6h6v6" />
-    </svg>
-  );
-}
-
-function StoreCardIcon({ type }: { type: "link" | "globe" | "copy" | "bag" | "edit" | "info" | "arrow" | "menu" }) {
-  const paths = {
-    link: (
-      <>
-        <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93" />
-        <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07" />
-      </>
-    ),
-    globe: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18" />
-        <path d="M12 3a14 14 0 0 1 0 18" />
-        <path d="M12 3a14 14 0 0 0 0 18" />
-      </>
-    ),
-    copy: (
-      <>
-        <rect x="8" y="8" width="11" height="11" rx="2" />
-        <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-      </>
-    ),
-    bag: (
-      <>
-        <path d="M6 8h12l-1 12H7L6 8Z" />
-        <path d="M9 8a3 3 0 0 1 6 0" />
-      </>
-    ),
-    edit: (
-      <>
-        <path d="m4 20 4.5-1 10-10a2.12 2.12 0 0 0-3-3l-10 10L4 20Z" />
-        <path d="m13.5 6.5 4 4" />
-      </>
-    ),
-    info: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 10v6" />
-        <path d="M12 7h.01" />
-      </>
-    ),
-    arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
-    menu: (
-      <>
-        <circle cx="12" cy="5" r="1" />
-        <circle cx="12" cy="12" r="1" />
-        <circle cx="12" cy="19" r="1" />
-      </>
-    )
-  };
-
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      {paths[type]}
-    </svg>
-  );
-}
-
-function OwnerIcon({ type }: { type: "home" | "swap" | "plus" | "cube" | "eye" | "clock" | "archive" | "search" | "filter" | "edit" | "menu" | "copy" | "trash" }) {
-  const paths = {
-    home: (
-      <>
-        <path d="m3 11 9-8 9 8" />
-        <path d="M5 10v10h14V10" />
-        <path d="M9 20v-6h6v6" />
-      </>
-    ),
-    swap: (
-      <>
-        <path d="M7 7h11m-3-3 3 3-3 3" />
-        <path d="M17 17H6m3 3-3-3 3-3" />
-      </>
-    ),
-    plus: (
-      <>
-        <path d="M12 5v14" />
-        <path d="M5 12h14" />
-      </>
-    ),
-    cube: (
-      <>
-        <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
-        <path d="m4 7.5 8 4.5 8-4.5" />
-        <path d="M12 12v9" />
-      </>
-    ),
-    eye: (
-      <>
-        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
-        <circle cx="12" cy="12" r="3" />
-      </>
-    ),
-    clock: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </>
-    ),
-    archive: (
-      <>
-        <path d="M4 7h16" />
-        <path d="M6 7v12h12V7" />
-        <path d="M9 11h6" />
-        <path d="M7 4h10l1 3H6l1-3Z" />
-      </>
-    ),
-    search: (
-      <>
-        <circle cx="11" cy="11" r="7" />
-        <path d="m16 16 4 4" />
-      </>
-    ),
-    filter: (
-      <>
-        <path d="M4 7h16" />
-        <path d="M7 12h10" />
-        <path d="M10 17h4" />
-      </>
-    ),
-    edit: (
-      <>
-        <path d="m4 20 4.5-1 10-10a2.12 2.12 0 0 0-3-3l-10 10L4 20Z" />
-        <path d="m13.5 6.5 4 4" />
-      </>
-    ),
-    menu: (
-      <>
-        <circle cx="12" cy="5" r="1" />
-        <circle cx="12" cy="12" r="1" />
-        <circle cx="12" cy="19" r="1" />
-      </>
-    ),
-    copy: (
-      <>
-        <rect x="8" y="8" width="11" height="11" rx="2" />
-        <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-      </>
-    ),
-    trash: (
-      <>
-        <path d="M4 7h16" />
-        <path d="M10 11v6" />
-        <path d="M14 11v6" />
-        <path d="M6 7l1 13h10l1-13" />
-        <path d="M9 7V4h6v3" />
-      </>
-    )
-  };
-
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      {paths[type]}
-    </svg>
-  );
-}
-
 function productOwnerStatus(product: Product): OwnerProductStatus {
   if (product.status === "NOT_AVAILABLE") return "archive";
   return product.isVisible ? "published" : "draft";
@@ -194,6 +52,12 @@ function productOwnerStatus(product: Product): OwnerProductStatus {
 
 function productStatusLabel(status: OwnerProductStatus) {
   return status === "published" ? "Опубликован" : status === "draft" ? "Черновик" : "Архив";
+}
+
+function productStatusBadgeClass(status: OwnerProductStatus) {
+  if (status === "published") return "badge badge-success";
+  if (status === "draft") return "badge badge-warning";
+  return "badge badge-neutral";
 }
 
 function productPrice(product: Product) {
@@ -222,7 +86,11 @@ function formatProductDate(value?: string | null) {
 
 function ProductThumb({ product }: { product: Product }) {
   const image = product.images[0];
-  return image ? <img src={image.url} alt="" /> : <span>{product.title.slice(0, 1)}</span>;
+  return (
+    <span className="product-thumb">
+      {image ? <img src={image.url} alt="" /> : product.title.slice(0, 1)}
+    </span>
+  );
 }
 
 function StoreChoiceCard({ store }: { store: Store }) {
@@ -236,55 +104,50 @@ function StoreChoiceCard({ store }: { store: Store }) {
   }
 
   return (
-    <article>
-      <div>
-        <div>
-          {store.logoUrl ? <img src={store.logoUrl} alt="" /> : <StorefrontIcon />}
+    <article className="store-card">
+      <div className="store-card-head">
+        <div className="store-avatar">
+          {store.logoUrl ? <img src={store.logoUrl} alt="" /> : <HugeiconsIcon icon={Store01Icon} size={20} strokeWidth={1.6} />}
         </div>
-        <div>
+        <div className="store-card-title">
           <h2>{store.name}</h2>
-          <span>
-            <span />
+          <span className="store-status">
+            <span className={`status-dot ${store.isActive ? "is-on" : "is-off"}`} />
             {store.isActive ? "Активен" : "В архиве"}
           </span>
         </div>
-        <button type="button" aria-label={`Операции магазина ${store.name}`}>
-          <StoreCardIcon type="menu" />
-        </button>
       </div>
 
-      <div>
-        <div>
-          <StoreCardIcon type="link" />
+      <div className="store-link-row">
+        <div className="store-link-label">
+          <HugeiconsIcon icon={Link04Icon} size={15} strokeWidth={1.8} />
           <span>Публичная ссылка</span>
         </div>
-        <div>
-          <span>
-            <StoreCardIcon type="globe" />
-          </span>
+        <div className="store-link-value">
           <a href={`/m/${store.slug}`}>{publicUrl}</a>
-          <div>
-            <button type="button" onClick={copyPublicUrl}>
-              <StoreCardIcon type="copy" />
+          <div className="store-link-actions">
+            <button type="button" className="btn btn-neutral btn-sm" onClick={copyPublicUrl}>
+              <HugeiconsIcon icon={Copy01Icon} size={15} strokeWidth={1.8} />
               Копировать
             </button>
             <QrShareButton url={publicUrl} label="QR" />
           </div>
         </div>
-        <p>{isCopied ? "Ссылка скопирована" : "Эта ссылка доступна для всех пользователей"}</p>
-        <div>
-          <Link to={`/dashboard/stores/${store.id}`}>
-            <StoreCardIcon type="bag" />
+        <p className="store-hint">Эта ссылка доступна для всех пользователей</p>
+        {isCopied && <Toast message="Ссылка скопирована" />}
+        <div className="store-card-actions">
+          <Link className="btn btn-primary" to={`/dashboard/stores/${store.id}`}>
+            <HugeiconsIcon icon={ShoppingBag01Icon} size={16} strokeWidth={1.8} />
             <span>Выбрать магазин</span>
-            <StoreCardIcon type="arrow" />
+            <ChevronRight size={16} strokeWidth={2} />
           </Link>
-          <Link to={`/dashboard/stores/${store.id}/settings`}>
-            <StoreCardIcon type="edit" />
+          <Link className="btn btn-secondary" to={`/dashboard/stores/${store.id}/settings`}>
+            <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.8} />
             <span>Реквизиты</span>
           </Link>
         </div>
-        <div>
-          <StoreCardIcon type="info" />
+        <div className="store-meta">
+          <HugeiconsIcon icon={InformationCircleIcon} size={15} strokeWidth={1.8} />
           <span>{formatStoreDate(store.createdAt)}</span>
         </div>
       </div>
@@ -294,6 +157,7 @@ function StoreChoiceCard({ store }: { store: Store }) {
 
 export function DashboardPage() {
   const { storeId } = useParams();
+  const routerLocation = useLocation();
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [analytics, setAnalytics] = useState<StoreAnalytics>({ productCount: 0, storeViews: 0, productViews: 0 });
@@ -403,17 +267,19 @@ export function DashboardPage() {
   if (isLoading) return <section className="page page-dashboard">Загрузка...</section>;
 
   if (!storeId) {
+    if (stores.length === 1 && !(routerLocation.state as { showAll?: boolean } | null)?.showAll) {
+      return <Navigate to={`/dashboard/stores/${stores[0].id}`} replace />;
+    }
+
     return (
       <section className="page page-dashboard">
-        <div>
-          <div>
-            <h1>Кабинет владельца</h1>
-            <p>Сначала выберите магазин, затем добавляйте товары или меняйте реквизиты.</p>
-          </div>
+        <div className="dashboard-intro">
+          <h1>Кабинет владельца</h1>
+          <p>Сначала выберите магазин, затем добавляйте товары или меняйте реквизиты.</p>
         </div>
 
         {stores.length ? (
-          <div>
+          <div className="store-grid">
             {stores.map((store) => (
               <StoreChoiceCard store={store} key={store.id} />
             ))}
@@ -435,7 +301,7 @@ export function DashboardPage() {
           title="Магазин недоступен"
           description="Магазин не найден или больше не привязан к вашему аккаунту."
           action={
-            <Link to="/dashboard">
+            <Link className="btn btn-primary" to="/dashboard" state={{ showAll: true }}>
               Вернуться к выбору магазина
             </Link>
           }
@@ -446,58 +312,63 @@ export function DashboardPage() {
 
   return (
     <section className="page page-dashboard">
-      <div>
-        <Link to="/dashboard" aria-label="К выбору магазина">
-          <OwnerIcon type="home" />
+      <div className="breadcrumbs">
+        <Link to="/dashboard" state={{ showAll: true }} aria-label="К выбору магазина">
+          <HugeiconsIcon icon={Home01Icon} size={16} strokeWidth={1.8} />
         </Link>
-        <span>/</span>
-        <Link to="/dashboard">Магазины</Link>
-        <span>/</span>
-        <span>{selectedStore.name}</span>
+        <ChevronRight size={14} strokeWidth={2} />
+        <Link to="/dashboard" state={{ showAll: true }}>Магазины</Link>
+        <ChevronRight size={14} strokeWidth={2} />
+        <span className="crumb-current">{selectedStore.name}</span>
       </div>
 
-      <div>
-        <div>
-          <div>
-            {selectedStore.logoUrl ? <img src={selectedStore.logoUrl} alt="" /> : <StorefrontIcon />}
-            <span>
-              <span />
-              {selectedStore.isActive ? "Активен" : "В архиве"}
-            </span>
+      <div className="dashboard-hero">
+        <div className="dashboard-hero-top">
+          <div className="dashboard-hero-identity">
+            <div className="dashboard-hero-body">
+              <div className="dashboard-hero-name">
+                <h1>{selectedStore.name}</h1>
+              </div>
+              <span className="store-status">
+                <span className={`status-dot ${selectedStore.isActive ? "is-on" : "is-off"}`} />
+                {selectedStore.isActive ? "Активен" : "В архиве"}
+              </span>
+              <div className="store-link-value">
+                <span>Публичная ссылка:</span>
+                <a href={`/m/${selectedStore.slug}`}>{publicStoreUrl}</a>
+                <div className="store-link-actions">
+                  <button type="button" className="btn btn-neutral btn-sm" onClick={copySelectedStoreUrl}>
+                    <HugeiconsIcon icon={Copy01Icon} size={15} strokeWidth={1.8} />
+                    Копировать
+                  </button>
+                  <QrShareButton url={publicStoreUrl} label="QR" />
+                </div>
+              </div>
+              {copiedPublicUrl && <Toast message="Ссылка скопирована" />}
+            </div>
           </div>
-          <div>
-            <div>
-              <h1>{selectedStore.name}</h1>
-              <Link to={`/dashboard/stores/${selectedStore.id}/settings`} aria-label="Редактировать магазин">
-                <OwnerIcon type="edit" />
+          <div className="dashboard-hero-icon-actions">
+            {stores.length > 1 && (
+              <Link className="btn-icon btn-ghost" to="/dashboard" state={{ showAll: true }} aria-label="Сменить магазин">
+                <HugeiconsIcon icon={Exchange01Icon} size={18} strokeWidth={1.8} />
               </Link>
-            </div>
-            <div>
-              <span>Публичная ссылка:</span>
-              <a href={`/m/${selectedStore.slug}`}>{publicStoreUrl}</a>
-              <button type="button" onClick={copySelectedStoreUrl}>
-                <OwnerIcon type="copy" />
-                Копировать
-              </button>
-              <QrShareButton url={publicStoreUrl} label="QR" />
-            </div>
-            <p>Ссылка скопирована</p>
+            )}
+            <Link className="btn-icon btn-ghost" to={`/dashboard/stores/${selectedStore.id}/settings`} aria-label="Реквизиты магазина">
+              <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={1.8} />
+            </Link>
           </div>
         </div>
-        <div>
-          <Link to="/dashboard">
-            <OwnerIcon type="swap" />
-            Сменить магазин
-          </Link>
-          <Link to={`/dashboard/stores/${selectedStore.id}/settings`}>
-            <OwnerIcon type="edit" />
-            Реквизиты магазина
-          </Link>
-          <Link to={`/dashboard/stores/${selectedStore.id}/products/new`}>
-            <OwnerIcon type="plus" />
+        <div className="dashboard-toolbar">
+          <Link className="btn btn-primary" to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+            <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.8} />
             Добавить товар
           </Link>
-          {Boolean(selectedStore.aiFormEnabled) && <button type="button" onClick={() => setBulkCreatorOpen(true)}><OwnerIcon type="plus" />Добавить много товаров</button>}
+          {Boolean(selectedStore.aiFormEnabled) && (
+            <button type="button" className="btn btn-secondary" onClick={() => setBulkCreatorOpen(true)}>
+              <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.8} />
+              Добавить много товаров
+            </button>
+          )}
         </div>
       </div>
 
@@ -516,12 +387,12 @@ export function DashboardPage() {
       )}
 
       {selectedStore.isActive && !isSubscriptionExpired && isStoreProfileIncomplete && (
-        <div>
-          <div>
+        <div className="setup-card">
+          <div className="setup-card-head">
             <h2>Запустите магазин</h2>
             <p>Закройте базовые шаги, чтобы витрина выглядела готовой для клиентов.</p>
           </div>
-          <ol>
+          <ol className="setup-steps">
             <li>
               <span>1</span>
               Заполните информацию о магазине
@@ -542,147 +413,144 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div>
-        <Link to={`/dashboard/stores/${selectedStore.id}/products`}>Товары</Link>
-        <Link to={`/dashboard/stores/${selectedStore.id}/settings`}>Настройки магазина</Link>
+      <div className="stat-grid">
+        <div className="stat-tile">
+          <span className="stat-tile-icon"><HugeiconsIcon icon={Package01Icon} size={16} strokeWidth={1.8} /></span>
+          <small>Всего товаров</small>
+          <strong>{analytics.productCount || stats.total}</strong>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-tile-icon"><HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} strokeWidth={1.8} /></span>
+          <small>Опубликовано</small>
+          <strong>{stats.published}</strong>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-tile-icon"><HugeiconsIcon icon={Clock01Icon} size={16} strokeWidth={1.8} /></span>
+          <small>Черновики</small>
+          <strong>{stats.draft}</strong>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-tile-icon"><HugeiconsIcon icon={Archive02Icon} size={16} strokeWidth={1.8} /></span>
+          <small>Архив</small>
+          <strong>{stats.archive}</strong>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-tile-icon"><HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.8} /></span>
+          <small>Просмотры магазина</small>
+          <strong>{analytics.storeViews}</strong>
+        </div>
+        <div className="stat-tile">
+          <span className="stat-tile-icon"><HugeiconsIcon icon={Analytics01Icon} size={16} strokeWidth={1.8} /></span>
+          <small>Просмотры товаров</small>
+          <strong>{analytics.productViews}</strong>
+        </div>
       </div>
 
-      <div>
-        <div>
-          <div>
-            <small>Количество товаров</small>
-            <strong>{analytics.productCount || stats.total}</strong>
-          </div>
-          <div>
-            <small>Просмотры магазина</small>
-            <strong>{analytics.storeViews}</strong>
-          </div>
-          <div>
-            <small>Просмотры товаров</small>
-            <strong>{analytics.productViews}</strong>
-          </div>
-        </div>
-        <div>
-          <div>
-            <span><OwnerIcon type="cube" /></span>
-            <div><small>Всего товаров</small><strong>{stats.total}</strong></div>
-          </div>
-          <div>
-            <span><OwnerIcon type="eye" /></span>
-            <div><small>Опубликовано</small><strong>{stats.published}</strong></div>
-          </div>
-          <div>
-            <span><OwnerIcon type="clock" /></span>
-            <div><small>Черновики</small><strong>{stats.draft}</strong></div>
-          </div>
-          <div>
-            <span><OwnerIcon type="archive" /></span>
-            <div><small>Архив</small><strong>{stats.archive}</strong></div>
-          </div>
-        </div>
-
-        <div>
-          <label>
-            <OwnerIcon type="search" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск товара..." />
+      <div className="product-toolbar">
+        <div className="product-toolbar-row">
+          <label className="search-field">
+            <span>Поиск</span>
+            <span className="search-field-input">
+              <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.8} />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск товара..." />
+            </span>
           </label>
           <label>
-            <span>Статус:</span>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | OwnerProductStatus)}>
-              <option value="all">Все</option>
-              <option value="published">Опубликован</option>
-              <option value="draft">Черновик</option>
-              <option value="archive">Архив</option>
-            </select>
-          </label>
-          <label>
-            <span>Категория:</span>
-            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="all">Все</option>
-              {categories.map((category) => <option value={category} key={category}>{category}</option>)}
-            </select>
-          </label>
-          <label>
-            <OwnerIcon type="filter" />
-            <span>Сортировка:</span>
-            <select value={sort} onChange={(event) => setSort(event.target.value)}>
-              <option value="new">Сначала новые</option>
-              <option value="old">Сначала старые</option>
-              <option value="price-asc">Цена по возрастанию</option>
-              <option value="price-desc">Цена по убыванию</option>
-            </select>
-          </label>
-        </div>
-
-        <div>
-          <div>
-            <span>Товар</span>
             <span>Статус</span>
-            <span>Цена</span>
+            <Select
+              ariaLabel="Статус"
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value as "all" | OwnerProductStatus)}
+              options={[
+                { value: "all", label: "Все" },
+                { value: "published", label: "Опубликован" },
+                { value: "draft", label: "Черновик" },
+                { value: "archive", label: "Архив" }
+              ]}
+            />
+          </label>
+          <label>
             <span>Категория</span>
-            <span>Обновлен</span>
-            <span>Действия</span>
-          </div>
-          {filteredProducts.map((product) => {
-            const status = productOwnerStatus(product);
-            return (
-              <div key={product.id}>
-                <div>
-                  <span><ProductThumb product={product} /></span>
-                  <div>
-                    <strong>{product.title}</strong>
-                    <small>{productDetails(product)}</small>
-                  </div>
-                </div>
-                <span>{productStatusLabel(status)}</span>
-                <span>{productPrice(product)}</span>
-                <span>{product.category || "Без категории"}</span>
-                <span>{formatProductDate(product.updatedAt ?? product.createdAt)}</span>
-                <div>
-                  <Link to={`/m/${selectedStore.slug}/p/${product.id}`} aria-label="Открыть товар">
-                    <OwnerIcon type="eye" />
-                  </Link>
-                  <Link to={`/dashboard/stores/${selectedStore.id}/products/${product.id}/edit`} aria-label="Редактировать товар">
-                    <OwnerIcon type="edit" />
-                  </Link>
-                  <button type="button" aria-label="Удалить товар" onClick={() => setProductToDelete(product)}>
-                    <OwnerIcon type="trash" />
-                  </button>
+            <Select
+              ariaLabel="Категория"
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={[{ value: "all", label: "Все" }, ...categories.map((category) => ({ value: category, label: category }))]}
+            />
+          </label>
+          <label>
+            <span>Сортировка</span>
+            <Select
+              ariaLabel="Сортировка"
+              value={sort}
+              onChange={setSort}
+              options={[
+                { value: "new", label: "Сначала новые" },
+                { value: "old", label: "Сначала старые" },
+                { value: "price-asc", label: "Цена по возрастанию" },
+                { value: "price-desc", label: "Цена по убыванию" }
+              ]}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="product-table">
+        <div className="product-table-head">
+          <span>Товар</span>
+          <span>Статус</span>
+          <span>Цена</span>
+          <span>Категория</span>
+          <span>Обновлен</span>
+          <span>Действия</span>
+        </div>
+        {filteredProducts.map((product) => {
+          const status = productOwnerStatus(product);
+          return (
+            <div className="product-row" key={product.id}>
+              <div className="product-row-main">
+                <ProductThumb product={product} />
+                <div className="product-row-title">
+                  <Link to={`/m/${selectedStore.slug}/p/${product.id}`}>{product.title}</Link>
+                  <small>{productDetails(product)}</small>
                 </div>
               </div>
-            );
-          })}
-          {!filteredProducts.length && (
-            <EmptyState
-              title={products.length ? "Товары не найдены" : "Нет товаров"}
-              description={products.length ? "Попробуйте изменить поиск, фильтры или сортировку." : "Добавьте первый товар, чтобы витрина начала наполняться."}
-              action={
-                !products.length && (
-                  <Link to={`/dashboard/stores/${selectedStore.id}/products/new`}>
-                    <OwnerIcon type="plus" />
-                    Добавить товар
-                  </Link>
-                )
-              }
-            />
-          )}
-        </div>
-
-        <div>
-          <span>Показано {filteredProducts.length ? `1-${filteredProducts.length}` : "0"} из {products.length}</span>
-          <div aria-hidden="true">
-            <button type="button">‹</button>
-            <button type="button">1</button>
-            <button type="button">2</button>
-            <button type="button">3</button>
-            <button type="button">›</button>
-          </div>
-          <select defaultValue="10">
-            <option value="10">10 на странице</option>
-            <option value="20">20 на странице</option>
-          </select>
-        </div>
+              <span className="product-row-status"><span className={productStatusBadgeClass(status)}>{productStatusLabel(status)}</span></span>
+              <span className="product-row-price">{productPrice(product)}</span>
+              <span className="product-row-category">{product.category || "Без категории"}</span>
+              <span className="product-row-updated">{formatProductDate(product.updatedAt ?? product.createdAt)}</span>
+              <div className="product-row-actions">
+                <Link className="btn-icon btn-ghost" to={`/dashboard/stores/${selectedStore.id}/products/${product.id}/edit`} aria-label="Редактировать товар">
+                  <HugeiconsIcon icon={Edit02Icon} size={16} strokeWidth={1.8} />
+                </Link>
+                <button type="button" className="btn-icon btn-danger" aria-label="Удалить товар" onClick={() => setProductToDelete(product)}>
+                  <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.8} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {!filteredProducts.length && (
+          <EmptyState
+            title={products.length ? "Товары не найдены" : "Нет товаров"}
+            description={products.length ? "Попробуйте изменить поиск, фильтры или сортировку." : "Добавьте первый товар, чтобы витрина начала наполняться."}
+            action={
+              !products.length && (
+                <Link className="btn btn-primary" to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+                  <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.8} />
+                  Добавить товар
+                </Link>
+              )
+            }
+          />
+        )}
       </div>
+
+      {Boolean(filteredProducts.length) && (
+        <div className="pagination-bar">
+          <span>Показано {filteredProducts.length} из {products.length}</span>
+        </div>
+      )}
       {productToDelete && (
         <ConfirmModal
           title="Удалить товар?"
@@ -697,4 +565,3 @@ export function DashboardPage() {
     </section>
   );
 }
-

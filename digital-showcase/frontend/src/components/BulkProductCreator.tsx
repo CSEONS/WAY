@@ -1,3 +1,5 @@
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Cancel01Icon, CloudUploadIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Product, ProductStatus } from "../types/models";
@@ -86,13 +88,16 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
             <h2>Массовое добавление товаров</h2>
             <p>ИИ сгруппирует фотографии. Перед созданием проверьте предложения.</p>
           </div>
-          <button type="button" aria-label="Закрыть" onClick={onClose} disabled={loading || saving}>×</button>
+          <button type="button" className="btn-icon btn-ghost" aria-label="Закрыть" onClick={onClose} disabled={loading || saving}>
+            <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />
+          </button>
         </div>
 
         {!drafts.length ? (
           <div className="modal-body bulk-step">
             <label>
-              Фотографии товаров (от 2 до 40)
+              <HugeiconsIcon icon={CloudUploadIcon} size={16} strokeWidth={1.8} />
+              {" "}Фотографии товаров (от 2 до 40)
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setImages([...event.target.files ?? []].slice(0, 40))} />
             </label>
             {previews.length > 0 && <div className="bulk-preview-grid">{previews.map((url, index) => <img src={url} alt={`Изображение ${index + 1}`} key={url} />)}</div>}
@@ -104,8 +109,10 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
               Или голосовой файл
               <input type="file" accept="audio/*,video/webm" onChange={(event) => setVoice(event.target.files?.[0] ?? null)} />
             </label>
-            {error && <p>{error}</p>}
-            <button type="button" disabled={images.length < 2 || loading} onClick={groupImages}>{loading && <span />}{loading ? "ИИ группирует изображения..." : "Сгруппировать"}</button>
+            {error && <p className="auth-error">{error}</p>}
+            <button type="button" className="btn btn-primary btn-lg" disabled={images.length < 2 || loading} onClick={groupImages}>
+              {loading ? "ИИ группирует изображения..." : "Сгруппировать"}
+            </button>
           </div>
         ) : (
           <div className="bulk-result-step">
@@ -123,9 +130,14 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
                 </div>
               </article>
             ))}
-            {error && <p>{error}</p>}
+            {error && <p className="auth-error">{error}</p>}
             {progress && <p role="status">{progress}</p>}
-            <div className="modal-actions"><button type="button" onClick={() => setDrafts([])} disabled={saving}>Назад</button><button type="button" onClick={createProducts} disabled={saving || drafts.some((draft) => !draft.title.trim())}>{saving ? "Создаю товары..." : `Создать товары (${drafts.length})`}</button></div>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setDrafts([])} disabled={saving}>Назад</button>
+              <button type="button" className="btn btn-primary" onClick={createProducts} disabled={saving || drafts.some((draft) => !draft.title.trim())}>
+                {saving ? "Создаю товары..." : `Создать товары (${drafts.length})`}
+              </button>
+            </div>
           </div>
         )}
       </div>

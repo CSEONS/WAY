@@ -1,8 +1,11 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { HugeiconsIcon } from "@hugeicons/react";
+import { Search01Icon } from "@hugeicons/core-free-icons";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { ProductCard } from "../components/ProductCard";
+import { Select } from "../components/Select";
 import type { Product, Store } from "../types/models";
 
 export function PublicStorePage() {
@@ -56,54 +59,68 @@ export function PublicStorePage() {
 
   return (
     <section className="page page-storefront">
-      <aside>
-        <div>
+      <aside className="storefront-filters">
+        <div className="storefront-filters-head">
           <strong>Фильтры</strong>
-          <button type="button" onClick={resetFilters}>Сбросить все</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={resetFilters}>Сбросить все</button>
         </div>
-        <label>
+        <label className="search-field">
           <span>Поиск</span>
-          <input placeholder="Поиск по названию" value={draftFilters.q} onChange={(e) => setDraftFilters({ ...draftFilters, q: e.target.value })} />
+          <span className="search-field-input">
+            <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.8} />
+            <input placeholder="Поиск по названию" value={draftFilters.q} onChange={(e) => setDraftFilters({ ...draftFilters, q: e.target.value })} />
+          </span>
         </label>
         <label>
           Категория
-          <select value={draftFilters.category} onChange={(e) => setDraftFilters({ ...draftFilters, category: e.target.value })}>
-            <option value="">Все категории</option>
-            {options.categories.map((v) => <option key={v!}>{v}</option>)}
-          </select>
+          <Select
+            ariaLabel="Категория"
+            value={draftFilters.category}
+            onChange={(value) => setDraftFilters({ ...draftFilters, category: value })}
+            options={[{ value: "", label: "Все категории" }, ...options.categories.map((v) => ({ value: v ?? "", label: v ?? "" }))]}
+          />
         </label>
         <label>
           Размер
-          <select value={draftFilters.size} onChange={(e) => setDraftFilters({ ...draftFilters, size: e.target.value })}>
-            <option value="">Все размеры</option>
-            {options.sizes.map((v) => <option key={v}>{v}</option>)}
-          </select>
+          <Select
+            ariaLabel="Размер"
+            value={draftFilters.size}
+            onChange={(value) => setDraftFilters({ ...draftFilters, size: value })}
+            options={[{ value: "", label: "Все размеры" }, ...options.sizes.map((v) => ({ value: v, label: v }))]}
+          />
         </label>
         <label>
           Цвет
-          <select value={draftFilters.color} onChange={(e) => setDraftFilters({ ...draftFilters, color: e.target.value })}>
-            <option value="">Все цвета</option>
-            {options.colors.map((v) => <option key={v}>{v}</option>)}
-          </select>
+          <Select
+            ariaLabel="Цвет"
+            value={draftFilters.color}
+            onChange={(value) => setDraftFilters({ ...draftFilters, color: value })}
+            options={[{ value: "", label: "Все цвета" }, ...options.colors.map((v) => ({ value: v, label: v }))]}
+          />
         </label>
-        <button type="button" onClick={() => setFilters(draftFilters)}>Применить</button>
+        <button type="button" className="btn btn-primary" onClick={() => setFilters(draftFilters)}>Применить</button>
       </aside>
-      <div>
-        <div>
+      <div className="storefront-main">
+        <div className="storefront-head">
           <div>
             <h1>{store.name}</h1>
             {store.description && <p>{store.description}</p>}
           </div>
-          <label>
+          <label className="storefront-sort">
             <span>Сортировка</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="new">Сортировка: Новые</option>
-              <option value="price-asc">Цена: сначала ниже</option>
-              <option value="price-desc">Цена: сначала выше</option>
-            </select>
+            <Select
+              ariaLabel="Сортировка"
+              value={sort}
+              onChange={setSort}
+              options={[
+                { value: "new", label: "Сортировка: Новые" },
+                { value: "price-asc", label: "Цена: сначала ниже" },
+                { value: "price-desc", label: "Цена: сначала выше" }
+              ]}
+            />
           </label>
         </div>
-        <div>
+        <div className="product-grid">
           {visibleProducts.map((product) => <ProductCard key={product.id} product={product} slug={storeSlug} />)}
         </div>
         {!visibleProducts.length && (

@@ -6,8 +6,8 @@ import { api } from "../api/client";
 import type { User } from "../types/models";
 
 export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
-  const [login, setLogin] = useState("admin@example.com");
-  const [password, setPassword] = useState("123456");
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 

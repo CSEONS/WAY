@@ -14,7 +14,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import { Select } from "./Select";
 import type { Product, ProductStatus } from "../types/models";
 
 interface VariantFormRow {
@@ -23,6 +22,15 @@ interface VariantFormRow {
   colorHex: string;
   size: string;
   price: string;
+}
+
+interface ColorHistoryItem {
+  name: string;
+  hex: string;
+}
+
+interface VariantModalState {
+  type: "color" | "size" | "price" | "all-colors" | "all-sizes" | "all-prices";
 }
 
 interface ProductFormState {
@@ -85,8 +93,62 @@ function createId(): string {
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function createEmptyVariant(): VariantFormRow {
-  return { id: createId(), colorName: "", colorHex: "#2779a7", size: "", price: "" };
+function normalizeHex(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "#2779A7";
+  const withHash = raw.startsWith("#") ? raw : `#${raw}`;
+  return /^#[0-9a-fA-F]{6}$/.test(withHash) ? withHash.toUpperCase() : "#2779A7";
+}
+
+function normalizeSize(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+function uniqueColorHistory(source: VariantFormRow[]): ColorHistoryItem[] {
+  const map = new Map<string, ColorHistoryItem>();
+  for (const variant of source) {
+    const name = variant.colorName.trim();
+    if (!name) continue;
+    const hex = normalizeHex(variant.colorHex);
+    if (!map.has(name.toLowerCase())) map.set(name.toLowerCase(), { name, hex });
+  }
+
+  return [...map.values()];
+}
+
+function initialColorHistory(initial?: Product, savedDraft?: SavedProductFormDraft | null): ColorHistoryItem[] {
+  const fromDraft = savedDraft?.variants?.length ? savedDraft.variants : [];
+  const fromInitial = initialVariants(initial);
+  const merged = uniqueColorHistory([...fromDraft, ...fromInitial]);
+  return merged.length
+    ? merged
+    : [
+        { name: "#1A1A1A", hex: "#1A1A1A" },
+        { name: "#E5533D", hex: "#E5533D" },
+        { name: "#2D8CF0", hex: "#2D8CF0" },
+        { name: "#16A34A", hex: "#16A34A" }
+      ];
+}
+
+function initialSizeHistory(initial?: Product, savedDraft?: SavedProductFormDraft | null): string[] {
+  const values = [...(savedDraft?.variants ?? []), ...initialVariants(initial)]
+    .map((variant) => normalizeSize(variant.size))
+    .filter(Boolean);
+  return [...new Set(values)].length ? [...new Set(values)] : ["S", "M", "L", "XL"];
+}
+
+function initialPriceHistory(initial?: Product, savedDraft?: SavedProductFormDraft | null): string[] {
+  const values = [...(savedDraft?.variants ?? []), ...initialVariants(initial)]
+    .map((variant) => variant.price.trim())
+    .filter(Boolean);
+  if (savedDraft?.form.price?.trim()) values.unshift(savedDraft.form.price.trim());
+  if (initial?.price != null) values.unshift(String(initial.price));
+  return [...new Set(values)].length ? [...new Set(values)] : ["990", "1990", "2990"];
+}
+
+function formatPrice(value: string): string {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? `${amount.toLocaleString("ru-RU")} ₽` : `${value} ₽`;
 }
 
 function initialVariants(initial?: Product): VariantFormRow[] {
@@ -114,7 +176,7 @@ function initialVariants(initial?: Product): VariantFormRow[] {
     );
   }
 
-  return [createEmptyVariant()];
+  return [];
 }
 
 function initialImages(initial?: Product): ProductFormImage[] {
@@ -176,7 +238,7 @@ export function ProductForm({
     }
   );
   const [priceMode, setPriceMode] = useState<"number" | "ask">(savedDraft?.priceMode ?? initialPriceMode);
-  const [aiMode, setAiMode] = useState(() => aiFormEnabled && !initial);
+  const [aiMode, setAiMode] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -190,10 +252,22 @@ export function ProductForm({
   const [aiDraftApplied, setAiDraftApplied] = useState(false);
   const [aiSuccessVisible, setAiSuccessVisible] = useState(false);
   const [variants, setVariants] = useState<VariantFormRow[]>(() => savedDraft?.variants?.length ? savedDraft.variants : initialVariants(initial));
+  const [colorHistory, setColorHistory] = useState<ColorHistoryItem[]>(() => initialColorHistory(initial, savedDraft));
+  const [sizeHistory, setSizeHistory] = useState<string[]>(() => initialSizeHistory(initial, savedDraft));
+  const [priceHistory, setPriceHistory] = useState<string[]>(() => initialPriceHistory(initial, savedDraft));
+  const [selectedColorName, setSelectedColorName] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedPrice, setSelectedPrice] = useState<string | null>(null);
+  const [variantModal, setVariantModal] = useState<VariantModalState | null>(null);
+  const [draftColorHex, setDraftColorHex] = useState("#94A3B8");
+  const [draftSize, setDraftSize] = useState("");
+  const [draftPrice, setDraftPrice] = useState("");
   const [images, setImages] = useState<ProductFormImage[]>(() => initialImages(initial));
   const [previewImageId, setPreviewImageId] = useState<string | null>(() => initial?.images[0]?.id ?? null);
   const [isDraftNoticeVisible, setIsDraftNoticeVisible] = useState(Boolean(savedDraft));
   const previewImage = images.find((image) => image.id === previewImageId) ?? images[0];
+  const selectedColor = selectedColorName ? colorHistory.find((color) => color.name === selectedColorName) ?? null : null;
+  const canAddVariant = Boolean(selectedColor && selectedSize && (priceMode === "ask" || (selectedPrice ?? "").trim()));
 
   useEffect(() => {
     if (!recordingStartedAt) return;
@@ -217,9 +291,56 @@ export function ProductForm({
     return () => window.clearTimeout(timer);
   }, [aiSuccessVisible]);
 
+  useEffect(() => {
+    if (priceMode === "ask") setSelectedPrice(null);
+  }, [priceMode]);
+
+  useEffect(() => {
+    if (!variantModal) return;
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") closeVariantModal();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [variantModal]);
+
   function clearSavedDraft() {
     if (draftKey) localStorage.removeItem(draftKey);
     setIsDraftNoticeVisible(false);
+  }
+
+  function rememberColor(color: ColorHistoryItem) {
+    const normalized = { name: color.name.trim(), hex: normalizeHex(color.hex) };
+    if (!normalized.name) return;
+    setColorHistory((current) => {
+      const next = [normalized, ...current.filter((item) => item.name.toLowerCase() !== normalized.name.toLowerCase())];
+      return next;
+    });
+  }
+
+  function rememberSize(value: string) {
+    const normalized = normalizeSize(value);
+    if (!normalized) return;
+    setSizeHistory((current) => [normalized, ...current.filter((item) => item !== normalized)]);
+  }
+
+  function rememberPrice(value: string) {
+    const normalized = value.trim();
+    if (!normalized) return;
+    setPriceHistory((current) => [normalized, ...current.filter((item) => item !== normalized)]);
+  }
+
+  function openVariantModal(type: VariantModalState["type"]) {
+    setVariantModal({ type });
+    if (type === "color") {
+      setDraftColorHex("#94A3B8");
+    }
+    if (type === "size") setDraftSize("");
+    if (type === "price") setDraftPrice("");
+  }
+
+  function closeVariantModal() {
+    setVariantModal(null);
   }
 
   function updateVariant(id: string, patch: Partial<VariantFormRow>) {
@@ -227,7 +348,57 @@ export function ProductForm({
   }
 
   function removeVariant(id: string) {
-    setVariants((current) => (current.length > 1 ? current.filter((variant) => variant.id !== id) : [createEmptyVariant()]));
+    setVariants((current) => current.filter((variant) => variant.id !== id));
+  }
+
+  function addVariantFromSelection() {
+    if (!selectedColor || !selectedSize) return;
+    const nextPrice = priceMode === "number" ? (selectedPrice ?? "").trim() : "";
+    const variantPayload = {
+      colorName: selectedColor.name,
+      colorHex: normalizeHex(selectedColor.hex),
+      size: selectedSize,
+      price: nextPrice
+    };
+
+    setVariants((current) => {
+      const existing = current.findIndex((variant) => variant.colorName === variantPayload.colorName && normalizeSize(variant.size) === variantPayload.size);
+      if (existing >= 0) {
+        return current.map((variant, index) => (index === existing ? { ...variant, ...variantPayload } : variant));
+      }
+
+      return [...current, { id: createId(), ...variantPayload }];
+    });
+
+    rememberColor(selectedColor);
+    rememberSize(selectedSize);
+    if (nextPrice) rememberPrice(nextPrice);
+    setSelectedSize(null);
+    setSelectedPrice(null);
+  }
+
+  function submitNewColor() {
+    const hex = normalizeHex(draftColorHex);
+    const color = { name: hex, hex };
+    rememberColor(color);
+    setSelectedColorName(color.name);
+    closeVariantModal();
+  }
+
+  function submitNewSize() {
+    const value = normalizeSize(draftSize);
+    if (!value) return;
+    rememberSize(value);
+    setSelectedSize(value);
+    closeVariantModal();
+  }
+
+  function submitNewPrice() {
+    const value = draftPrice.trim();
+    if (!value) return;
+    rememberPrice(value);
+    setSelectedPrice(value);
+    closeVariantModal();
   }
 
   function addImages(files: FileList | null) {
@@ -259,15 +430,23 @@ export function ProductForm({
     }));
     setPriceMode(draft.priceText === "Уточнить у продавца" || draft.price == null ? "ask" : "number");
     if (draft.variants?.length) {
-      setVariants(
-        draft.variants.map((variant) => ({
-          id: createId(),
-          colorName: variant.colorName,
-          colorHex: variant.colorHex ?? "#2779a7",
-          size: variant.size,
-          price: variant.price?.toString() ?? ""
-        }))
-      );
+      const nextVariants = draft.variants.map((variant) => ({
+        id: createId(),
+        colorName: variant.colorName,
+        colorHex: variant.colorHex ?? "#2779a7",
+        size: variant.size,
+        price: variant.price?.toString() ?? ""
+      }));
+      setVariants(nextVariants);
+      setColorHistory((current) => {
+        const merged = uniqueColorHistory([
+          ...nextVariants,
+          ...current.map((color) => ({ id: createId(), colorName: color.name, colorHex: color.hex, size: "", price: "" }))
+        ]);
+        return merged.length ? merged : current;
+      });
+      setSizeHistory((current) => [...new Set([...nextVariants.map((variant) => normalizeSize(variant.size)).filter(Boolean), ...current])]);
+      setPriceHistory((current) => [...new Set([...nextVariants.map((variant) => variant.price.trim()).filter(Boolean), ...current])]);
     }
   }
 
@@ -543,7 +722,10 @@ export function ProductForm({
             </div>
           </>
         ) : (
-          <div className="image-manager-empty">Картинки еще не выбраны</div>
+          <label className="image-manager-empty">
+            Картинки еще не выбраны
+            <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(e) => addImages(e.target.files)} hidden />
+          </label>
         )}
       </div>
 
@@ -564,19 +746,6 @@ export function ProductForm({
           </div>
           <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
           <div className="inline-fields">
-            <label>
-              Наличие
-              <Select
-                ariaLabel="Наличие"
-                value={form.status}
-                onChange={(value) => setForm({ ...form, status: value as ProductStatus })}
-                options={[
-                  { value: "AVAILABLE", label: "В наличии" },
-                  { value: "CHECK_IN_STORE", label: "Уточнить в магазине" },
-                  { value: "NOT_AVAILABLE", label: "Нет в наличии" }
-                ]}
-              />
-            </label>
             <label className="inline-field">
               <input
                 type="checkbox"
@@ -590,37 +759,103 @@ export function ProductForm({
             <div className="form-section-head">
               <h2>Комбинации товара</h2>
             </div>
-            <div className="variant-table">
-              <div className="variant-table-head" aria-hidden="true">
-                <span>Цвет</span>
-                <span>HEX</span>
-                <span>Размер</span>
-                <span>Цена</span>
+            <p className="form-section-hint variant-builder-hint">
+              {priceMode === "ask"
+                ? "Выберите цвет и размер, затем добавьте комбинацию. Цена будет уточняться у продавца."
+                : "Выберите цвет, размер и цену, затем добавьте комбинацию. Если цена не указана, используйте цену товара выше."}
+            </p>
+            <div className="variant-builder-block">
+              <span className="variant-builder-label">Цвет</span>
+              <div className="variant-chip-row">
+                {colorHistory.map((color) => (
+                  <button
+                    key={`${color.name}-${color.hex}`}
+                    type="button"
+                    className={`variant-color-chip${selectedColorName === color.name ? " is-selected" : ""}`}
+                    onClick={() => setSelectedColorName((current) => (current === color.name ? null : color.name))}
+                    title={color.name}
+                  >
+                    <span className="variant-color-chip-swatch" style={{ background: color.hex }} />
+                  </button>
+                ))}
+                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("color")} aria-label="Новый цвет">+</button>
+                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-colors")}>Все</button>
               </div>
-              {variants.map((variant) => (
-                <div className="variant-row" key={variant.id}>
-                  <div className="variant-row-fields">
-                    <input aria-label="Цвет" value={variant.colorName} onChange={(e) => updateVariant(variant.id, { colorName: e.target.value })} placeholder="Синий" />
-                    <input
-                      aria-label="HEX"
-                      type="color"
-                      value={variant.colorHex || "#2779a7"}
-                      onChange={(e) => updateVariant(variant.id, { colorHex: e.target.value })}
-                    />
-                    <input aria-label="Размер" value={variant.size} onChange={(e) => updateVariant(variant.id, { size: e.target.value })} placeholder="M" />
-                    <input aria-label="Цена" type="number" value={variant.price} onChange={(e) => updateVariant(variant.id, { price: e.target.value })} placeholder={form.price || "0"} />
-                  </div>
-                  <div className="variant-row-actions">
-                    <button type="button" className="btn-icon btn-danger" aria-label="Удалить комбинацию" onClick={() => removeVariant(variant.id)}>
+            </div>
+            <div className="variant-builder-block">
+              <span className="variant-builder-label">Размер</span>
+              <div className="variant-chip-row">
+                {sizeHistory.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    className={`variant-size-chip${selectedSize === size ? " is-selected" : ""}`}
+                    onClick={() => setSelectedSize((current) => (current === size ? null : size))}
+                  >
+                    {size}
+                  </button>
+                ))}
+                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("size")} aria-label="Новый размер">+</button>
+                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-sizes")}>Все</button>
+              </div>
+            </div>
+            {priceMode === "number" && (
+              <div className="variant-builder-block">
+                <span className="variant-builder-label">Цена</span>
+                <div className="variant-chip-row">
+                  {priceHistory.map((price) => (
+                    <button
+                      key={price}
+                      type="button"
+                      className={`variant-price-chip${selectedPrice === price ? " is-selected" : ""}`}
+                      onClick={() => setSelectedPrice((current) => (current === price ? null : price))}
+                    >
+                      {formatPrice(price)}
+                    </button>
+                  ))}
+                  <button type="button" className="variant-action-chip" onClick={() => openVariantModal("price")} aria-label="Новая цена">+</button>
+                  <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-prices")}>Все</button>
+                </div>
+              </div>
+            )}
+            <button type="button" className="btn btn-primary variant-add-btn" disabled={!canAddVariant} onClick={addVariantFromSelection}>
+              Добавить комбинацию
+            </button>
+            <div className="variant-table-header">
+              <span className="variant-builder-label">Добавленные комбинации</span>
+              <span className="variant-table-count">
+                {variants.length ? `${variants.length} ${variants.length === 1 ? "комбинация" : variants.length < 5 ? "комбинации" : "комбинаций"}` : ""}
+              </span>
+            </div>
+            <div className="variant-table">
+              {variants.length ? (
+                variants.map((variant, index) => (
+                  <div className="variant-list-row" key={variant.id}>
+                    <div className="variant-list-name">
+                      <span className="variant-color-chip-swatch" style={{ background: normalizeHex(variant.colorHex) }} title={variant.colorName} />
+                      <span>{normalizeSize(variant.size)}</span>
+                    </div>
+                    {priceMode === "number" ? (
+                      <input
+                        className="variant-list-price"
+                        type="number"
+                        value={variant.price}
+                        onChange={(e) => updateVariant(variant.id, { price: e.target.value })}
+                        placeholder={form.price || "Цена"}
+                        aria-label={`Цена комбинации ${index + 1}`}
+                      />
+                    ) : (
+                      <span className="variant-list-note">у продавца</span>
+                    )}
+                    <button type="button" className="btn-icon btn-danger" aria-label={`Удалить комбинацию ${index + 1}`} onClick={() => removeVariant(variant.id)}>
                       <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.8} />
                     </button>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="variant-empty">Комбинации еще не добавлены</div>
+              )}
             </div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVariants([...variants, createEmptyVariant()])}>
-              Добавить комбинацию
-            </button>
           </div>
           <button className="btn btn-primary btn-lg">Сохранить</button>
         </>
@@ -629,6 +864,93 @@ export function ProductForm({
         <div className="notice-banner notice-success" role="status">
           <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} strokeWidth={1.8} />
           ИИ закончил обработку. Проверьте заполненные поля.
+        </div>
+      )}
+      {variantModal && (
+        <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) closeVariantModal(); }}>
+          <div className="modal variant-modal">
+            <div className="modal-head">
+              <div className="modal-title">
+                <h2>
+                  {variantModal.type === "color" && "Новый цвет"}
+                  {variantModal.type === "size" && "Новый размер"}
+                  {variantModal.type === "price" && "Новая цена"}
+                  {variantModal.type === "all-colors" && "Все цвета"}
+                  {variantModal.type === "all-sizes" && "Все размеры"}
+                  {variantModal.type === "all-prices" && "Все цены"}
+                </h2>
+              </div>
+              <button type="button" className="btn-icon btn-ghost" onClick={closeVariantModal} aria-label="Закрыть">
+                <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.8} />
+              </button>
+            </div>
+            {variantModal.type === "color" && (
+              <div className="variant-modal-form">
+                <label>
+                  Цвет
+                  <div className="variant-color-input">
+                    <input type="color" value={normalizeHex(draftColorHex)} onChange={(e) => setDraftColorHex(e.target.value)} />
+                    <input value={normalizeHex(draftColorHex)} onChange={(e) => setDraftColorHex(e.target.value.toUpperCase())} placeholder="#2779A7" />
+                  </div>
+                </label>
+                <button type="button" className="btn btn-primary" onClick={submitNewColor}>Добавить</button>
+              </div>
+            )}
+            {variantModal.type === "size" && (
+              <div className="variant-modal-form">
+                <label>
+                  Размер
+                  <input value={draftSize} onChange={(e) => setDraftSize(e.target.value)} placeholder="Например, M или 42" />
+                </label>
+                <button type="button" className="btn btn-primary" onClick={submitNewSize}>Добавить</button>
+              </div>
+            )}
+            {variantModal.type === "price" && (
+              <div className="variant-modal-form">
+                <label>
+                  Цена
+                  <input type="number" value={draftPrice} onChange={(e) => setDraftPrice(e.target.value)} placeholder="Например, 1990" />
+                </label>
+                <button type="button" className="btn btn-primary" onClick={submitNewPrice}>Добавить</button>
+              </div>
+            )}
+            {variantModal.type === "all-colors" && (
+              <div className="variant-modal-grid">
+                {colorHistory.map((color) => (
+                  <button
+                    key={`${color.name}-${color.hex}-all`}
+                    type="button"
+                    className="variant-color-chip"
+                    title={color.name}
+                    onClick={() => {
+                      setSelectedColorName(color.name);
+                      closeVariantModal();
+                    }}
+                  >
+                    <span className="variant-color-chip-swatch" style={{ background: color.hex }} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {variantModal.type === "all-sizes" && (
+              <div className="variant-modal-grid">
+                {sizeHistory.map((size) => (
+                  <button key={`${size}-all`} type="button" className="variant-size-chip" onClick={() => { setSelectedSize(size); closeVariantModal(); }}>
+                    {size}
+                  </button>
+                ))}
+              </div>
+            )}
+            {variantModal.type === "all-prices" && (
+              <div className="variant-modal-grid">
+                {priceHistory.map((price) => (
+                  <button key={`${price}-all`} type="button" className="variant-price-chip" onClick={() => { setSelectedPrice(price); closeVariantModal(); }}>
+                    {formatPrice(price)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </form>
@@ -640,4 +962,3 @@ function formatDuration(totalSeconds: number) {
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
-

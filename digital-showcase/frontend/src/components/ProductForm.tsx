@@ -226,6 +226,18 @@ function readSavedDraft(draftKey?: string): SavedProductFormDraft | null {
   }
 }
 
+function readStoredList<T>(key?: string): T[] | null {
+  if (!key) return null;
+  try {
+    const value = localStorage.getItem(key);
+    if (!value) return null;
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 function hasDraftContent(draft: SavedProductFormDraft) {
   return (
     draft.form.title.trim() ||
@@ -250,6 +262,9 @@ export function ProductForm({
   onSubmit: (payload: ProductPayload, imageSelection: ProductImageSelection) => Promise<void>;
 }) {
   const savedDraft = useMemo(() => readSavedDraft(draftKey), [draftKey]);
+  const colorHistoryKey = draftKey ? `${draftKey}:colors` : undefined;
+  const sizeHistoryKey = draftKey ? `${draftKey}:sizes` : undefined;
+  const priceHistoryKey = draftKey ? `${draftKey}:prices` : undefined;
   const [form, setForm] = useState<ProductFormState>(
     savedDraft?.form ?? {
       title: initial?.title ?? "",
@@ -273,9 +288,15 @@ export function ProductForm({
   const [aiDraftApplied, setAiDraftApplied] = useState(false);
   const [aiSuccessVisible, setAiSuccessVisible] = useState(false);
   const [variants, setVariants] = useState<VariantFormRow[]>(() => savedDraft?.variants?.length ? savedDraft.variants : initialVariants(initial));
-  const [colorHistory, setColorHistory] = useState<ColorHistoryItem[]>(() => initialColorHistory(initial, savedDraft));
-  const [sizeHistory, setSizeHistory] = useState<string[]>(() => initialSizeHistory(initial, savedDraft));
-  const [priceHistory, setPriceHistory] = useState<string[]>(() => initialPriceHistory(initial, savedDraft));
+  const [colorHistory, setColorHistory] = useState<ColorHistoryItem[]>(
+    () => readStoredList<ColorHistoryItem>(colorHistoryKey) ?? initialColorHistory(initial, savedDraft)
+  );
+  const [sizeHistory, setSizeHistory] = useState<string[]>(
+    () => readStoredList<string>(sizeHistoryKey) ?? initialSizeHistory(initial, savedDraft)
+  );
+  const [priceHistory, setPriceHistory] = useState<string[]>(
+    () => readStoredList<string>(priceHistoryKey) ?? initialPriceHistory(initial, savedDraft)
+  );
   const [selectedColorName, setSelectedColorName] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<string | null>(null);
@@ -316,6 +337,21 @@ export function ProductForm({
     }
     localStorage.setItem(draftKey, JSON.stringify(draft));
   }, [aiPrompt, draftKey, form, variants]);
+
+  useEffect(() => {
+    if (!colorHistoryKey) return;
+    localStorage.setItem(colorHistoryKey, JSON.stringify(colorHistory));
+  }, [colorHistory, colorHistoryKey]);
+
+  useEffect(() => {
+    if (!sizeHistoryKey) return;
+    localStorage.setItem(sizeHistoryKey, JSON.stringify(sizeHistory));
+  }, [sizeHistory, sizeHistoryKey]);
+
+  useEffect(() => {
+    if (!priceHistoryKey) return;
+    localStorage.setItem(priceHistoryKey, JSON.stringify(priceHistory));
+  }, [priceHistory, priceHistoryKey]);
 
   useEffect(() => {
     if (!aiSuccessVisible) return;

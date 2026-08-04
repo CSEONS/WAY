@@ -38,11 +38,11 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
           <form className="auth-form" onSubmit={submit}>
             <label>
               Почта или телефон
-              <input value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" />
+              <input value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" placeholder="Логин" />
             </label>
             <label>
               Пароль
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Пароль" />
             </label>
             {error && (
               <p className="auth-error">

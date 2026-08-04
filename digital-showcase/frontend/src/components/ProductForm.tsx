@@ -4,6 +4,7 @@ import {
   Alert02Icon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
+  ColorPickerIcon,
   Delete02Icon,
   Edit02Icon,
   ImageAdd01Icon,
@@ -36,7 +37,6 @@ interface VariantModalState {
 interface ProductFormState {
   title: string;
   description: string;
-  price: string;
   category: string;
   status: ProductStatus;
   isVisible: number;
@@ -44,7 +44,6 @@ interface ProductFormState {
 
 interface SavedProductFormDraft {
   form: ProductFormState;
-  priceMode: "number" | "ask";
   aiPrompt: string;
   variants: VariantFormRow[];
 }
@@ -77,6 +76,8 @@ export interface ProductImageSelection {
   previewImageId: string | null;
 }
 
+const ASK_SELLER = "Уточнить у продавца";
+
 const voiceQuestions = [
   "Что это за товар и как он называется?",
   "Какие цвета доступны?",
@@ -108,7 +109,7 @@ function uniqueColorHistory(source: VariantFormRow[]): ColorHistoryItem[] {
   const map = new Map<string, ColorHistoryItem>();
   for (const variant of source) {
     const name = variant.colorName.trim();
-    if (!name) continue;
+    if (!name || name === ASK_SELLER) continue;
     const hex = normalizeHex(variant.colorHex);
     if (!map.has(name.toLowerCase())) map.set(name.toLowerCase(), { name, hex });
   }
@@ -132,21 +133,21 @@ function initialColorHistory(initial?: Product, savedDraft?: SavedProductFormDra
 
 function initialSizeHistory(initial?: Product, savedDraft?: SavedProductFormDraft | null): string[] {
   const values = [...(savedDraft?.variants ?? []), ...initialVariants(initial)]
-    .map((variant) => normalizeSize(variant.size))
-    .filter(Boolean);
+    .filter((variant) => variant.size.trim() && variant.size.trim() !== ASK_SELLER)
+    .map((variant) => normalizeSize(variant.size));
   return [...new Set(values)].length ? [...new Set(values)] : ["S", "M", "L", "XL"];
 }
 
 function initialPriceHistory(initial?: Product, savedDraft?: SavedProductFormDraft | null): string[] {
   const values = [...(savedDraft?.variants ?? []), ...initialVariants(initial)]
     .map((variant) => variant.price.trim())
-    .filter(Boolean);
-  if (savedDraft?.form.price?.trim()) values.unshift(savedDraft.form.price.trim());
+    .filter((price) => price && price !== ASK_SELLER);
   if (initial?.price != null) values.unshift(String(initial.price));
   return [...new Set(values)].length ? [...new Set(values)] : ["990", "1990", "2990"];
 }
 
 function formatPrice(value: string): string {
+  if (value === ASK_SELLER) return ASK_SELLER;
   const amount = Number(value);
   return Number.isFinite(amount) ? `${amount.toLocaleString("ru-RU")} ₽` : `${value} ₽`;
 }
@@ -205,7 +206,6 @@ function hasDraftContent(draft: SavedProductFormDraft) {
   return (
     draft.form.title.trim() ||
     draft.form.description.trim() ||
-    draft.form.price.trim() ||
     draft.form.category.trim() ||
     draft.aiPrompt.trim() ||
     draft.variants.some((variant) => variant.colorName.trim() || variant.size.trim() || variant.price.trim())
@@ -226,18 +226,15 @@ export function ProductForm({
   onSubmit: (payload: ProductPayload, imageSelection: ProductImageSelection) => Promise<void>;
 }) {
   const savedDraft = useMemo(() => readSavedDraft(draftKey), [draftKey]);
-  const initialPriceMode = initial?.priceText === "Уточнить у продавца" ? "ask" : "number";
   const [form, setForm] = useState<ProductFormState>(
     savedDraft?.form ?? {
       title: initial?.title ?? "",
       description: initial?.description ?? "",
-      price: initial?.price?.toString() ?? "",
       category: initial?.category ?? "",
       status: initial?.status ?? "AVAILABLE",
       isVisible: initial?.isVisible ?? 1
     }
   );
-  const [priceMode, setPriceMode] = useState<"number" | "ask">(savedDraft?.priceMode ?? initialPriceMode);
   const [aiMode, setAiMode] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
   const [aiError, setAiError] = useState("");
@@ -265,9 +262,17 @@ export function ProductForm({
   const [images, setImages] = useState<ProductFormImage[]>(() => initialImages(initial));
   const [previewImageId, setPreviewImageId] = useState<string | null>(() => initial?.images[0]?.id ?? null);
   const [isDraftNoticeVisible, setIsDraftNoticeVisible] = useState(Boolean(savedDraft));
+  const [pipetteImageId, setPipetteImageId] = useState<string | null>(null);
   const previewImage = images.find((image) => image.id === previewImageId) ?? images[0];
-  const selectedColor = selectedColorName ? colorHistory.find((color) => color.name === selectedColorName) ?? null : null;
-  const canAddVariant = Boolean(selectedColor && selectedSize && (priceMode === "ask" || (selectedPrice ?? "").trim()));
+  const pipetteImage = images.find((image) => image.id === pipetteImageId) ?? images[0];
+  const selectedColor =
+    selectedColorName === ASK_SELLER
+      ? { name: ASK_SELLER, hex: "" }
+      : selectedColorName
+        ? colorHistory.find((color) => color.name === selectedColorName) ?? null
+        : null;
+  const canAddVariant = Boolean(selectedColor && selectedSize && (selectedPrice ?? "").trim());
+  const eyeDropperSupported = typeof window !== "undefined" && "EyeDropper" in window;
 
   useEffect(() => {
     if (!recordingStartedAt) return;
@@ -277,23 +282,19 @@ export function ProductForm({
 
   useEffect(() => {
     if (!draftKey) return;
-    const draft: SavedProductFormDraft = { form, priceMode, aiPrompt, variants };
+    const draft: SavedProductFormDraft = { form, aiPrompt, variants };
     if (!hasDraftContent(draft)) {
       localStorage.removeItem(draftKey);
       return;
     }
     localStorage.setItem(draftKey, JSON.stringify(draft));
-  }, [aiPrompt, draftKey, form, priceMode, variants]);
+  }, [aiPrompt, draftKey, form, variants]);
 
   useEffect(() => {
     if (!aiSuccessVisible) return;
     const timer = window.setTimeout(() => setAiSuccessVisible(false), 3500);
     return () => window.clearTimeout(timer);
   }, [aiSuccessVisible]);
-
-  useEffect(() => {
-    if (priceMode === "ask") setSelectedPrice(null);
-  }, [priceMode]);
 
   useEffect(() => {
     if (!variantModal) return;
@@ -334,6 +335,7 @@ export function ProductForm({
     setVariantModal({ type });
     if (type === "color") {
       setDraftColorHex("#94A3B8");
+      setPipetteImageId((current) => current ?? previewImageId ?? images[0]?.id ?? null);
     }
     if (type === "size") setDraftSize("");
     if (type === "price") setDraftPrice("");
@@ -353,16 +355,16 @@ export function ProductForm({
 
   function addVariantFromSelection() {
     if (!selectedColor || !selectedSize) return;
-    const nextPrice = priceMode === "number" ? (selectedPrice ?? "").trim() : "";
+    const nextPrice = (selectedPrice ?? "").trim();
     const variantPayload = {
       colorName: selectedColor.name,
-      colorHex: normalizeHex(selectedColor.hex),
+      colorHex: selectedColor.name === ASK_SELLER ? "" : normalizeHex(selectedColor.hex),
       size: selectedSize,
       price: nextPrice
     };
 
     setVariants((current) => {
-      const existing = current.findIndex((variant) => variant.colorName === variantPayload.colorName && normalizeSize(variant.size) === variantPayload.size);
+      const existing = current.findIndex((variant) => variant.colorName === variantPayload.colorName && variant.size === variantPayload.size);
       if (existing >= 0) {
         return current.map((variant, index) => (index === existing ? { ...variant, ...variantPayload } : variant));
       }
@@ -370,11 +372,22 @@ export function ProductForm({
       return [...current, { id: createId(), ...variantPayload }];
     });
 
-    rememberColor(selectedColor);
-    rememberSize(selectedSize);
-    if (nextPrice) rememberPrice(nextPrice);
+    if (selectedColor.name !== ASK_SELLER) rememberColor(selectedColor);
+    if (selectedSize !== ASK_SELLER) rememberSize(selectedSize);
+    if (nextPrice && nextPrice !== ASK_SELLER) rememberPrice(nextPrice);
     setSelectedSize(null);
     setSelectedPrice(null);
+  }
+
+  async function pickColorFromImage() {
+    const EyeDropperCtor = (window as any).EyeDropper;
+    if (!EyeDropperCtor) return;
+    try {
+      const result = await new EyeDropperCtor().open();
+      if (result?.sRGBHex) setDraftColorHex(normalizeHex(result.sRGBHex));
+    } catch {
+      // Пользователь отменил выбор цвета пипеткой — ничего не делаем
+    }
   }
 
   function submitNewColor() {
@@ -423,12 +436,10 @@ export function ProductForm({
       ...current,
       title: draft.title ?? current.title,
       description: draft.description ?? current.description,
-      price: draft.price?.toString() ?? current.price,
       category: draft.category ?? current.category,
       status: draft.status ?? current.status,
       isVisible: draft.isVisible ?? current.isVisible
     }));
-    setPriceMode(draft.priceText === "Уточнить у продавца" || draft.price == null ? "ask" : "number");
     if (draft.variants?.length) {
       const nextVariants = draft.variants.map((variant) => ({
         id: createId(),
@@ -541,7 +552,7 @@ export function ProductForm({
         colorName: variant.colorName.trim(),
         colorHex: variant.colorHex.trim() || null,
         size: variant.size.trim(),
-        price: variant.price ? Number(variant.price) : null
+        price: variant.price && variant.price !== ASK_SELLER ? Number(variant.price) : null
       }))
       .filter((variant) => variant.colorName && variant.size);
     const sizes = [...new Set(normalizedVariants.map((variant) => variant.size))];
@@ -554,8 +565,8 @@ export function ProductForm({
       {
         title: form.title,
         description: form.description || null,
-        price: priceMode === "number" && form.price ? Number(form.price) : null,
-        priceText: priceMode === "ask" ? "Уточнить у продавца" : null,
+        price: initial?.price ?? null,
+        priceText: initial?.priceText ?? null,
         category: form.category || null,
         status: form.status as ProductStatus,
         isVisible: Number(form.isVisible),
@@ -733,40 +744,24 @@ export function ProductForm({
         <>
           <label>Название<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></label>
           <label>Описание<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <div className="form-section">
-            <div className="segmented segmented-sm">
-              <button type="button" className={priceMode === "number" ? "is-active" : ""} onClick={() => setPriceMode("number")}>Цена</button>
-              <button type="button" className={priceMode === "ask" ? "is-active" : ""} onClick={() => setPriceMode("ask")}>Уточнить у продавца</button>
-            </div>
-            {priceMode === "number" ? (
-              <label>Цена<input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
-            ) : (
-              <label>Цена<input value="Уточнить у продавца" disabled /></label>
-            )}
-          </div>
           <label>Категория<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
-          <div className="inline-fields">
-            <label className="inline-field">
-              <input
-                type="checkbox"
-                checked={Boolean(form.isVisible)}
-                onChange={(e) => setForm({ ...form, isVisible: e.target.checked ? 1 : 0 })}
-              />
-              Показывать в витрине
-            </label>
-          </div>
           <div className="form-section">
             <div className="form-section-head">
               <h2>Комбинации товара</h2>
             </div>
             <p className="form-section-hint variant-builder-hint">
-              {priceMode === "ask"
-                ? "Выберите цвет и размер, затем добавьте комбинацию. Цена будет уточняться у продавца."
-                : "Выберите цвет, размер и цену, затем добавьте комбинацию. Если цена не указана, используйте цену товара выше."}
+              Выберите цвет, размер и цену, затем добавьте комбинацию. Для любого параметра можно выбрать «Уточнить у продавца», если он неизвестен заранее.
             </p>
             <div className="variant-builder-block">
               <span className="variant-builder-label">Цвет</span>
               <div className="variant-chip-row">
+                <button
+                  type="button"
+                  className={`variant-color-chip variant-ask-chip${selectedColorName === ASK_SELLER ? " is-selected" : ""}`}
+                  onClick={() => setSelectedColorName((current) => (current === ASK_SELLER ? null : ASK_SELLER))}
+                >
+                  Уточнить у продавца
+                </button>
                 {colorHistory.map((color) => (
                   <button
                     key={`${color.name}-${color.hex}`}
@@ -785,6 +780,13 @@ export function ProductForm({
             <div className="variant-builder-block">
               <span className="variant-builder-label">Размер</span>
               <div className="variant-chip-row">
+                <button
+                  type="button"
+                  className={`variant-size-chip variant-ask-chip${selectedSize === ASK_SELLER ? " is-selected" : ""}`}
+                  onClick={() => setSelectedSize((current) => (current === ASK_SELLER ? null : ASK_SELLER))}
+                >
+                  Уточнить у продавца
+                </button>
                 {sizeHistory.map((size) => (
                   <button
                     key={size}
@@ -799,25 +801,30 @@ export function ProductForm({
                 <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-sizes")}>Все</button>
               </div>
             </div>
-            {priceMode === "number" && (
-              <div className="variant-builder-block">
-                <span className="variant-builder-label">Цена</span>
-                <div className="variant-chip-row">
-                  {priceHistory.map((price) => (
-                    <button
-                      key={price}
-                      type="button"
-                      className={`variant-price-chip${selectedPrice === price ? " is-selected" : ""}`}
-                      onClick={() => setSelectedPrice((current) => (current === price ? null : price))}
-                    >
-                      {formatPrice(price)}
-                    </button>
-                  ))}
-                  <button type="button" className="variant-action-chip" onClick={() => openVariantModal("price")} aria-label="Новая цена">+</button>
-                  <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-prices")}>Все</button>
-                </div>
+            <div className="variant-builder-block">
+              <span className="variant-builder-label">Цена</span>
+              <div className="variant-chip-row">
+                <button
+                  type="button"
+                  className={`variant-price-chip variant-ask-chip${selectedPrice === ASK_SELLER ? " is-selected" : ""}`}
+                  onClick={() => setSelectedPrice((current) => (current === ASK_SELLER ? null : ASK_SELLER))}
+                >
+                  Уточнить у продавца
+                </button>
+                {priceHistory.map((price) => (
+                  <button
+                    key={price}
+                    type="button"
+                    className={`variant-price-chip${selectedPrice === price ? " is-selected" : ""}`}
+                    onClick={() => setSelectedPrice((current) => (current === price ? null : price))}
+                  >
+                    {formatPrice(price)}
+                  </button>
+                ))}
+                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("price")} aria-label="Новая цена">+</button>
+                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-prices")}>Все</button>
               </div>
-            )}
+            </div>
             <button type="button" className="btn btn-primary variant-add-btn" disabled={!canAddVariant} onClick={addVariantFromSelection}>
               Добавить комбинацию
             </button>
@@ -832,20 +839,24 @@ export function ProductForm({
                 variants.map((variant, index) => (
                   <div className="variant-list-row" key={variant.id}>
                     <div className="variant-list-name">
-                      <span className="variant-color-chip-swatch" style={{ background: normalizeHex(variant.colorHex) }} title={variant.colorName} />
-                      <span>{normalizeSize(variant.size)}</span>
+                      {variant.colorName === ASK_SELLER ? (
+                        <span className="variant-list-note">Цвет: у продавца</span>
+                      ) : (
+                        <span className="variant-color-chip-swatch" style={{ background: normalizeHex(variant.colorHex) }} title={variant.colorName} />
+                      )}
+                      <span>{variant.size === ASK_SELLER ? "у продавца" : normalizeSize(variant.size)}</span>
                     </div>
-                    {priceMode === "number" ? (
+                    {variant.price === ASK_SELLER ? (
+                      <span className="variant-list-note">у продавца</span>
+                    ) : (
                       <input
                         className="variant-list-price"
                         type="number"
                         value={variant.price}
                         onChange={(e) => updateVariant(variant.id, { price: e.target.value })}
-                        placeholder={form.price || "Цена"}
+                        placeholder="Цена"
                         aria-label={`Цена комбинации ${index + 1}`}
                       />
-                    ) : (
-                      <span className="variant-list-note">у продавца</span>
                     )}
                     <button type="button" className="btn-icon btn-danger" aria-label={`Удалить комбинацию ${index + 1}`} onClick={() => removeVariant(variant.id)}>
                       <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.8} />
@@ -891,8 +902,45 @@ export function ProductForm({
                   <div className="variant-color-input">
                     <input type="color" value={normalizeHex(draftColorHex)} onChange={(e) => setDraftColorHex(e.target.value)} />
                     <input value={normalizeHex(draftColorHex)} onChange={(e) => setDraftColorHex(e.target.value.toUpperCase())} placeholder="#2779A7" />
+                    {eyeDropperSupported && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={pickColorFromImage}
+                        disabled={images.length === 0}
+                        title={images.length === 0 ? "Сначала добавьте картинку товара" : "Взять цвет с картинки товара"}
+                      >
+                        <HugeiconsIcon icon={ColorPickerIcon} size={16} strokeWidth={1.8} />
+                        Пипетка
+                      </button>
+                    )}
                   </div>
                 </label>
+                {eyeDropperSupported && images.length > 0 && (
+                  <div className="pipette-image-picker">
+                    <span className="variant-builder-label">Картинка для пипетки</span>
+                    {images.length > 1 && (
+                      <div className="pipette-image-grid">
+                        {images.map((image) => (
+                          <button
+                            key={image.id}
+                            type="button"
+                            className={`pipette-image-thumb${image.id === pipetteImage?.id ? " is-selected" : ""}`}
+                            onClick={() => setPipetteImageId(image.id)}
+                            aria-label={`Использовать ${image.name} для пипетки`}
+                          >
+                            <img src={image.url} alt={image.name} />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {pipetteImage && (
+                      <div className="pipette-image-preview">
+                        <img src={pipetteImage.url} alt={pipetteImage.name} />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button type="button" className="btn btn-primary" onClick={submitNewColor}>Добавить</button>
               </div>
             )}

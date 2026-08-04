@@ -1,5 +1,6 @@
 ﻿import { HugeiconsIcon } from "@hugeicons/react";
 import {
+  Add01Icon,
   AiMagicIcon,
   Alert02Icon,
   Cancel01Icon,
@@ -7,13 +8,15 @@ import {
   ColorPickerIcon,
   Delete02Icon,
   Edit02Icon,
+  GridViewIcon,
+  HelpCircleIcon,
   ImageAdd01Icon,
   InformationCircleIcon,
   LockKeyIcon,
   Mic01Icon,
   TextFontIcon
 } from "@hugeicons/core-free-icons";
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { Product, ProductStatus } from "../types/models";
 
@@ -77,6 +80,20 @@ export interface ProductImageSelection {
 }
 
 const ASK_SELLER = "Уточнить у продавца";
+const LONG_PRESS_MS = 550;
+
+const COLOR_PRESETS = [
+  "#1A1A1A",
+  "#FFFFFF",
+  "#DC2626",
+  "#EA580C",
+  "#F59E0B",
+  "#16A34A",
+  "#2563EB",
+  "#7C3AED",
+  "#EC4899",
+  "#78716C"
+];
 
 const voiceQuestions = [
   "Что это за товар и как он называется?",
@@ -99,6 +116,13 @@ function normalizeHex(value: string | null | undefined): string {
   if (!raw) return "#2779A7";
   const withHash = raw.startsWith("#") ? raw : `#${raw}`;
   return /^#[0-9a-fA-F]{6}$/.test(withHash) ? withHash.toUpperCase() : "#2779A7";
+}
+
+function isValidHex(value: string): boolean {
+  const raw = value.trim();
+  if (!raw) return false;
+  const withHash = raw.startsWith("#") ? raw : `#${raw}`;
+  return /^#[0-9a-fA-F]{6}$/.test(withHash);
 }
 
 function normalizeSize(value: string): string {
@@ -263,6 +287,9 @@ export function ProductForm({
   const [previewImageId, setPreviewImageId] = useState<string | null>(() => initial?.images[0]?.id ?? null);
   const [isDraftNoticeVisible, setIsDraftNoticeVisible] = useState(Boolean(savedDraft));
   const [pipetteImageId, setPipetteImageId] = useState<string | null>(null);
+  const [pressingKey, setPressingKey] = useState<string | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
   const previewImage = images.find((image) => image.id === previewImageId) ?? images[0];
   const pipetteImage = images.find((image) => image.id === pipetteImageId) ?? images[0];
   const selectedColor =
@@ -305,6 +332,12 @@ export function ProductForm({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [variantModal]);
 
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
+
   function clearSavedDraft() {
     if (draftKey) localStorage.removeItem(draftKey);
     setIsDraftNoticeVisible(false);
@@ -329,6 +362,45 @@ export function ProductForm({
     const normalized = value.trim();
     if (!normalized) return;
     setPriceHistory((current) => [normalized, ...current.filter((item) => item !== normalized)]);
+  }
+
+  function deleteColorFromHistory(name: string) {
+    setColorHistory((current) => current.filter((color) => color.name !== name));
+    setSelectedColorName((current) => (current === name ? null : current));
+  }
+
+  function deleteSizeFromHistory(value: string) {
+    setSizeHistory((current) => current.filter((size) => size !== value));
+    setSelectedSize((current) => (current === value ? null : current));
+  }
+
+  function deletePriceFromHistory(value: string) {
+    setPriceHistory((current) => current.filter((price) => price !== value));
+    setSelectedPrice((current) => (current === value ? null : current));
+  }
+
+  function beginLongPress(key: string, onLongPress: () => void) {
+    setPressingKey(key);
+    longPressFiredRef.current = false;
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      setPressingKey(null);
+      onLongPress();
+    }, LONG_PRESS_MS);
+  }
+
+  function cancelLongPress() {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    setPressingKey(null);
+  }
+
+  function endLongPress(onClick: () => void) {
+    const firedDuringPress = longPressFiredRef.current;
+    cancelLongPress();
+    if (!firedDuringPress) onClick();
   }
 
   function openVariantModal(type: VariantModalState["type"]) {
@@ -757,24 +829,48 @@ export function ProductForm({
               <div className="variant-chip-row">
                 <button
                   type="button"
-                  className={`variant-color-chip variant-ask-chip${selectedColorName === ASK_SELLER ? " is-selected" : ""}`}
+                  className={`variant-color-chip variant-ask-chip variant-ask-chip-icon${selectedColorName === ASK_SELLER ? " is-selected" : ""}`}
                   onClick={() => setSelectedColorName((current) => (current === ASK_SELLER ? null : ASK_SELLER))}
+                  title="Уточнить у продавца"
+                  aria-label="Уточнить у продавца"
                 >
-                  Уточнить у продавца
+                  <HugeiconsIcon icon={HelpCircleIcon} size={16} strokeWidth={1.8} />
                 </button>
-                {colorHistory.map((color) => (
-                  <button
-                    key={`${color.name}-${color.hex}`}
-                    type="button"
-                    className={`variant-color-chip${selectedColorName === color.name ? " is-selected" : ""}`}
-                    onClick={() => setSelectedColorName((current) => (current === color.name ? null : color.name))}
-                    title={color.name}
-                  >
-                    <span className="variant-color-chip-swatch" style={{ background: color.hex }} />
-                  </button>
-                ))}
-                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("color")} aria-label="Новый цвет">+</button>
-                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-colors")}>Все</button>
+                <button
+                  type="button"
+                  className="variant-color-chip variant-ask-chip variant-ask-chip-icon"
+                  onClick={() => openVariantModal("color")}
+                  title="Добавить значение"
+                  aria-label="Добавить значение"
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  className="variant-color-chip variant-ask-chip variant-ask-chip-icon"
+                  onClick={() => openVariantModal("all-colors")}
+                  title="Просмотреть все значения"
+                  aria-label="Просмотреть все значения"
+                >
+                  <HugeiconsIcon icon={GridViewIcon} size={16} strokeWidth={1.8} />
+                </button>
+              </div>
+              <div className="variant-chip-row">
+                {selectedColorName === ASK_SELLER ? (
+                  <span className="variant-chip-row-note">Уточнить у продавца</span>
+                ) : (
+                  colorHistory.map((color) => (
+                    <button
+                      key={`${color.name}-${color.hex}`}
+                      type="button"
+                      className={`variant-color-chip${selectedColorName === color.name ? " is-selected" : ""}`}
+                      onClick={() => setSelectedColorName((current) => (current === color.name ? null : color.name))}
+                      title={color.name}
+                    >
+                      <span className="variant-color-chip-swatch" style={{ background: color.hex }} />
+                    </button>
+                  ))
+                )}
               </div>
             </div>
             <div className="variant-builder-block">
@@ -782,23 +878,47 @@ export function ProductForm({
               <div className="variant-chip-row">
                 <button
                   type="button"
-                  className={`variant-size-chip variant-ask-chip${selectedSize === ASK_SELLER ? " is-selected" : ""}`}
+                  className={`variant-size-chip variant-ask-chip variant-ask-chip-icon${selectedSize === ASK_SELLER ? " is-selected" : ""}`}
                   onClick={() => setSelectedSize((current) => (current === ASK_SELLER ? null : ASK_SELLER))}
+                  title="Уточнить у продавца"
+                  aria-label="Уточнить у продавца"
                 >
-                  Уточнить у продавца
+                  <HugeiconsIcon icon={HelpCircleIcon} size={16} strokeWidth={1.8} />
                 </button>
-                {sizeHistory.map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    className={`variant-size-chip${selectedSize === size ? " is-selected" : ""}`}
-                    onClick={() => setSelectedSize((current) => (current === size ? null : size))}
-                  >
-                    {size}
-                  </button>
-                ))}
-                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("size")} aria-label="Новый размер">+</button>
-                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-sizes")}>Все</button>
+                <button
+                  type="button"
+                  className="variant-size-chip variant-ask-chip variant-ask-chip-icon"
+                  onClick={() => openVariantModal("size")}
+                  title="Добавить значение"
+                  aria-label="Добавить значение"
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  className="variant-size-chip variant-ask-chip variant-ask-chip-icon"
+                  onClick={() => openVariantModal("all-sizes")}
+                  title="Просмотреть все значения"
+                  aria-label="Просмотреть все значения"
+                >
+                  <HugeiconsIcon icon={GridViewIcon} size={16} strokeWidth={1.8} />
+                </button>
+              </div>
+              <div className="variant-chip-row">
+                {selectedSize === ASK_SELLER ? (
+                  <span className="variant-chip-row-note">Уточнить у продавца</span>
+                ) : (
+                  sizeHistory.map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      className={`variant-size-chip${selectedSize === size ? " is-selected" : ""}`}
+                      onClick={() => setSelectedSize((current) => (current === size ? null : size))}
+                    >
+                      {size}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
             <div className="variant-builder-block">
@@ -806,23 +926,47 @@ export function ProductForm({
               <div className="variant-chip-row">
                 <button
                   type="button"
-                  className={`variant-price-chip variant-ask-chip${selectedPrice === ASK_SELLER ? " is-selected" : ""}`}
+                  className={`variant-price-chip variant-ask-chip variant-ask-chip-icon${selectedPrice === ASK_SELLER ? " is-selected" : ""}`}
                   onClick={() => setSelectedPrice((current) => (current === ASK_SELLER ? null : ASK_SELLER))}
+                  title="Уточнить у продавца"
+                  aria-label="Уточнить у продавца"
                 >
-                  Уточнить у продавца
+                  <HugeiconsIcon icon={HelpCircleIcon} size={16} strokeWidth={1.8} />
                 </button>
-                {priceHistory.map((price) => (
-                  <button
-                    key={price}
-                    type="button"
-                    className={`variant-price-chip${selectedPrice === price ? " is-selected" : ""}`}
-                    onClick={() => setSelectedPrice((current) => (current === price ? null : price))}
-                  >
-                    {formatPrice(price)}
-                  </button>
-                ))}
-                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("price")} aria-label="Новая цена">+</button>
-                <button type="button" className="variant-action-chip" onClick={() => openVariantModal("all-prices")}>Все</button>
+                <button
+                  type="button"
+                  className="variant-price-chip variant-ask-chip variant-ask-chip-icon"
+                  onClick={() => openVariantModal("price")}
+                  title="Добавить значение"
+                  aria-label="Добавить значение"
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  className="variant-price-chip variant-ask-chip variant-ask-chip-icon"
+                  onClick={() => openVariantModal("all-prices")}
+                  title="Просмотреть все значения"
+                  aria-label="Просмотреть все значения"
+                >
+                  <HugeiconsIcon icon={GridViewIcon} size={16} strokeWidth={1.8} />
+                </button>
+              </div>
+              <div className="variant-chip-row">
+                {selectedPrice === ASK_SELLER ? (
+                  <span className="variant-chip-row-note">Уточнить у продавца</span>
+                ) : (
+                  priceHistory.map((price) => (
+                    <button
+                      key={price}
+                      type="button"
+                      className={`variant-price-chip${selectedPrice === price ? " is-selected" : ""}`}
+                      onClick={() => setSelectedPrice((current) => (current === price ? null : price))}
+                    >
+                      {formatPrice(price)}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
             <button type="button" className="btn btn-primary variant-add-btn" disabled={!canAddVariant} onClick={addVariantFromSelection}>
@@ -897,25 +1041,53 @@ export function ProductForm({
             </div>
             {variantModal.type === "color" && (
               <div className="variant-modal-form">
-                <label>
-                  Цвет
-                  <div className="variant-color-input">
-                    <input type="color" value={normalizeHex(draftColorHex)} onChange={(e) => setDraftColorHex(e.target.value)} />
-                    <input value={normalizeHex(draftColorHex)} onChange={(e) => setDraftColorHex(e.target.value.toUpperCase())} placeholder="#2779A7" />
-                    {eyeDropperSupported && (
+                <div className="color-modal-head">
+                  <span className="color-modal-preview" style={{ background: normalizeHex(draftColorHex) }} />
+                  <label>
+                    Цвет
+                    <div className="variant-color-input">
+                      <input type="color" value={normalizeHex(draftColorHex)} onChange={(e) => setDraftColorHex(e.target.value)} />
+                      <input
+                        value={draftColorHex}
+                        onChange={(e) => setDraftColorHex(e.target.value)}
+                        onBlur={() => setDraftColorHex((current) => normalizeHex(current))}
+                        placeholder="#2779A7"
+                        maxLength={7}
+                      />
+                      {eyeDropperSupported && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={pickColorFromImage}
+                          disabled={images.length === 0}
+                          title={images.length === 0 ? "Сначала добавьте картинку товара" : "Взять цвет с картинки товара"}
+                        >
+                          <HugeiconsIcon icon={ColorPickerIcon} size={16} strokeWidth={1.8} />
+                          Пипетка
+                        </button>
+                      )}
+                    </div>
+                  </label>
+                </div>
+                {draftColorHex.trim() && !isValidHex(draftColorHex) && (
+                  <p className="form-section-hint color-modal-hint-error">Введите корректный HEX-код, например 2779A7 или #2779A7</p>
+                )}
+                <div className="color-preset-row">
+                  <span className="variant-builder-label">Быстрый выбор</span>
+                  <div className="variant-chip-row">
+                    {COLOR_PRESETS.map((preset) => (
                       <button
+                        key={preset}
                         type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={pickColorFromImage}
-                        disabled={images.length === 0}
-                        title={images.length === 0 ? "Сначала добавьте картинку товара" : "Взять цвет с картинки товара"}
-                      >
-                        <HugeiconsIcon icon={ColorPickerIcon} size={16} strokeWidth={1.8} />
-                        Пипетка
-                      </button>
-                    )}
+                        className={`variant-color-chip${normalizeHex(draftColorHex) === preset ? " is-selected" : ""}`}
+                        style={{ background: preset }}
+                        onClick={() => setDraftColorHex(preset)}
+                        title={preset}
+                        aria-label={`Выбрать цвет ${preset}`}
+                      />
+                    ))}
                   </div>
-                </label>
+                </div>
                 {eyeDropperSupported && images.length > 0 && (
                   <div className="pipette-image-picker">
                     <span className="variant-builder-label">Картинка для пипетки</span>
@@ -963,39 +1135,76 @@ export function ProductForm({
               </div>
             )}
             {variantModal.type === "all-colors" && (
-              <div className="variant-modal-grid">
-                {colorHistory.map((color) => (
-                  <button
-                    key={`${color.name}-${color.hex}-all`}
-                    type="button"
-                    className="variant-color-chip"
-                    title={color.name}
-                    onClick={() => {
-                      setSelectedColorName(color.name);
-                      closeVariantModal();
-                    }}
-                  >
-                    <span className="variant-color-chip-swatch" style={{ background: color.hex }} />
-                  </button>
-                ))}
+              <div className="variant-modal-form">
+                <p className="form-section-hint">Зажмите значение, чтобы удалить его.</p>
+                <div className="variant-modal-grid">
+                  {colorHistory.map((color) => {
+                    const key = `color-${color.name}`;
+                    return (
+                      <button
+                        key={`${color.name}-${color.hex}-all`}
+                        type="button"
+                        className={`variant-color-chip${pressingKey === key ? " is-holding" : ""}`}
+                        title={color.name}
+                        onPointerDown={() => beginLongPress(key, () => deleteColorFromHistory(color.name))}
+                        onPointerUp={() => endLongPress(() => { setSelectedColorName(color.name); closeVariantModal(); })}
+                        onPointerLeave={cancelLongPress}
+                        onContextMenu={(event) => event.preventDefault()}
+                      >
+                        <span className="variant-color-chip-swatch" style={{ background: color.hex }} />
+                      </button>
+                    );
+                  })}
+                  {!colorHistory.length && <span className="variant-list-note">Значений пока нет</span>}
+                </div>
               </div>
             )}
             {variantModal.type === "all-sizes" && (
-              <div className="variant-modal-grid">
-                {sizeHistory.map((size) => (
-                  <button key={`${size}-all`} type="button" className="variant-size-chip" onClick={() => { setSelectedSize(size); closeVariantModal(); }}>
-                    {size}
-                  </button>
-                ))}
+              <div className="variant-modal-form">
+                <p className="form-section-hint">Зажмите значение, чтобы удалить его.</p>
+                <div className="variant-modal-grid">
+                  {sizeHistory.map((size) => {
+                    const key = `size-${size}`;
+                    return (
+                      <button
+                        key={`${size}-all`}
+                        type="button"
+                        className={`variant-size-chip${pressingKey === key ? " is-holding" : ""}`}
+                        onPointerDown={() => beginLongPress(key, () => deleteSizeFromHistory(size))}
+                        onPointerUp={() => endLongPress(() => { setSelectedSize(size); closeVariantModal(); })}
+                        onPointerLeave={cancelLongPress}
+                        onContextMenu={(event) => event.preventDefault()}
+                      >
+                        {size}
+                      </button>
+                    );
+                  })}
+                  {!sizeHistory.length && <span className="variant-list-note">Значений пока нет</span>}
+                </div>
               </div>
             )}
             {variantModal.type === "all-prices" && (
-              <div className="variant-modal-grid">
-                {priceHistory.map((price) => (
-                  <button key={`${price}-all`} type="button" className="variant-price-chip" onClick={() => { setSelectedPrice(price); closeVariantModal(); }}>
-                    {formatPrice(price)}
-                  </button>
-                ))}
+              <div className="variant-modal-form">
+                <p className="form-section-hint">Зажмите значение, чтобы удалить его.</p>
+                <div className="variant-modal-grid">
+                  {priceHistory.map((price) => {
+                    const key = `price-${price}`;
+                    return (
+                      <button
+                        key={`${price}-all`}
+                        type="button"
+                        className={`variant-price-chip${pressingKey === key ? " is-holding" : ""}`}
+                        onPointerDown={() => beginLongPress(key, () => deletePriceFromHistory(price))}
+                        onPointerUp={() => endLongPress(() => { setSelectedPrice(price); closeVariantModal(); })}
+                        onPointerLeave={cancelLongPress}
+                        onContextMenu={(event) => event.preventDefault()}
+                      >
+                        {formatPrice(price)}
+                      </button>
+                    );
+                  })}
+                  {!priceHistory.length && <span className="variant-list-note">Значений пока нет</span>}
+                </div>
               </div>
             )}
           </div>

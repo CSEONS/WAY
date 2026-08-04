@@ -2494,14 +2494,16 @@ a.contact-option:hover {
 
 .variant-color-chip,
 .variant-size-chip,
-.variant-price-chip,
-.variant-action-chip {
-  min-height: auto;
+.variant-price-chip {
+  height: 36px;
+  min-height: 36px;
+  box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  padding: 8px 12px;
+  padding: 0 12px;
   font-size: 13px;
+  line-height: 1;
   font-weight: 600;
   color: var(--color-ink);
 }
@@ -2520,25 +2522,24 @@ a.contact-option:hover {
   flex-shrink: 0;
 }
 
+.variant-color-chip:not(.variant-ask-chip) {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+.variant-color-chip:not(.variant-ask-chip) .variant-color-chip-swatch {
+  width: 100%;
+  height: 100%;
+}
+
 .variant-size-chip {
   text-transform: uppercase;
 }
 
 .variant-price-chip {
   border-style: dashed;
-}
-
-.variant-action-chip {
-  width: 34px;
-  min-width: 34px;
-  padding: 8px 0;
-  justify-content: center;
-}
-
-.variant-action-chip:last-child {
-  width: auto;
-  min-width: 0;
-  padding-inline: 12px;
 }
 
 .variant-color-chip.is-selected,
@@ -2552,7 +2553,37 @@ a.contact-option:hover {
 .variant-ask-chip {
   border-style: dashed;
   font-style: italic;
+  text-transform: none;
   color: var(--color-ink-subtle);
+}
+
+.variant-ask-chip-icon {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+.variant-chip-row-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--color-ink-subtle);
+}
+
+@keyframes chip-hold-progress {
+  from {
+    box-shadow: inset 0 0 0 0 var(--color-danger);
+  }
+  to {
+    box-shadow: inset 0 0 0 3px var(--color-danger);
+  }
+}
+
+.variant-modal-grid button.is-holding {
+  animation: chip-hold-progress 550ms linear forwards;
 }
 
 .variant-add-btn {
@@ -2625,6 +2656,35 @@ a.contact-option:hover {
 .variant-modal-form {
   display: grid;
   gap: var(--space-3);
+}
+
+.color-modal-head {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.color-modal-head label {
+  min-width: 0;
+}
+
+.color-modal-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(19, 19, 22, 0.08);
+  flex-shrink: 0;
+}
+
+.color-modal-hint-error {
+  color: var(--color-danger);
+  margin: 0;
+}
+
+.color-preset-row {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .variant-color-input {

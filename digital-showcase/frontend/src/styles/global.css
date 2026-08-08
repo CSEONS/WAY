@@ -2557,11 +2557,19 @@ a.contact-option:hover {
   color: var(--color-ink-subtle);
 }
 
-.variant-ask-chip-icon {
+.variant-color-chip.variant-ask-chip-icon {
   width: 36px;
   min-width: 36px;
   padding: 0;
   justify-content: center;
+}
+
+.variant-size-chip.variant-ask-chip-icon,
+.variant-price-chip.variant-ask-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
 }
 
 .variant-chip-row-note {

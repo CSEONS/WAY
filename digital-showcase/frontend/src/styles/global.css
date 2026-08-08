@@ -1347,9 +1347,6 @@ hr {
 }
 
 .storefront-filters {
-  position: sticky;
-  top: 76px;
-  z-index: 3;
   display: grid;
   gap: var(--space-4);
   align-content: start;
@@ -1369,6 +1366,25 @@ hr {
 
 .storefront-filters-head strong {
   font-size: 15px;
+}
+
+.storefront-filters-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.storefront-filters-toggle svg {
+  transition: transform 160ms ease;
+}
+
+.storefront-filters-toggle svg.is-open {
+  transform: rotate(180deg);
 }
 
 .storefront-main {

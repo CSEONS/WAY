@@ -1,5 +1,6 @@
 ﻿import { HugeiconsIcon } from "@hugeicons/react";
 import { Search01Icon } from "@hugeicons/core-free-icons";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -16,6 +17,7 @@ export function PublicStorePage() {
   const [filters, setFilters] = useState({ q: "", category: "", size: "", color: "" });
   const [draftFilters, setDraftFilters] = useState({ q: "", category: "", size: "", color: "" });
   const [sort, setSort] = useState("new");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     api.get(`/public/stores/${storeSlug}`).then((res) => setStore(res.data)).catch((err) => setError(err.response?.data?.message ?? "Магазин недоступен"));
@@ -61,44 +63,66 @@ export function PublicStorePage() {
     <section className="page page-storefront">
       <aside className="storefront-filters">
         <div className="storefront-filters-head">
-          <strong>Фильтры</strong>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={resetFilters}>Сбросить все</button>
+          <button
+            type="button"
+            className="storefront-filters-toggle"
+            onClick={() => setFiltersOpen((current) => !current)}
+            aria-expanded={filtersOpen}
+          >
+            <strong>Фильтры</strong>
+            <ChevronDown size={16} strokeWidth={2} className={filtersOpen ? "is-open" : ""} />
+          </button>
+          {filtersOpen && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={resetFilters}>Сбросить все</button>
+          )}
         </div>
         <label className="search-field">
           <span>Поиск</span>
           <span className="search-field-input">
             <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.8} />
-            <input placeholder="Поиск по названию" value={draftFilters.q} onChange={(e) => setDraftFilters({ ...draftFilters, q: e.target.value })} />
+            <input
+              placeholder="Поиск по названию"
+              value={draftFilters.q}
+              onChange={(e) => {
+                const next = { ...draftFilters, q: e.target.value };
+                setDraftFilters(next);
+                setFilters(next);
+              }}
+            />
           </span>
         </label>
-        <label>
-          Категория
-          <Select
-            ariaLabel="Категория"
-            value={draftFilters.category}
-            onChange={(value) => setDraftFilters({ ...draftFilters, category: value })}
-            options={[{ value: "", label: "Все категории" }, ...options.categories.map((v) => ({ value: v ?? "", label: v ?? "" }))]}
-          />
-        </label>
-        <label>
-          Размер
-          <Select
-            ariaLabel="Размер"
-            value={draftFilters.size}
-            onChange={(value) => setDraftFilters({ ...draftFilters, size: value })}
-            options={[{ value: "", label: "Все размеры" }, ...options.sizes.map((v) => ({ value: v, label: v }))]}
-          />
-        </label>
-        <label>
-          Цвет
-          <Select
-            ariaLabel="Цвет"
-            value={draftFilters.color}
-            onChange={(value) => setDraftFilters({ ...draftFilters, color: value })}
-            options={[{ value: "", label: "Все цвета" }, ...options.colors.map((v) => ({ value: v, label: v }))]}
-          />
-        </label>
-        <button type="button" className="btn btn-primary" onClick={() => setFilters(draftFilters)}>Применить</button>
+        {filtersOpen && (
+          <>
+            <label>
+              Категория
+              <Select
+                ariaLabel="Категория"
+                value={draftFilters.category}
+                onChange={(value) => setDraftFilters({ ...draftFilters, category: value })}
+                options={[{ value: "", label: "Все категории" }, ...options.categories.map((v) => ({ value: v ?? "", label: v ?? "" }))]}
+              />
+            </label>
+            <label>
+              Размер
+              <Select
+                ariaLabel="Размер"
+                value={draftFilters.size}
+                onChange={(value) => setDraftFilters({ ...draftFilters, size: value })}
+                options={[{ value: "", label: "Все размеры" }, ...options.sizes.map((v) => ({ value: v, label: v }))]}
+              />
+            </label>
+            <label>
+              Цвет
+              <Select
+                ariaLabel="Цвет"
+                value={draftFilters.color}
+                onChange={(value) => setDraftFilters({ ...draftFilters, color: value })}
+                options={[{ value: "", label: "Все цвета" }, ...options.colors.map((v) => ({ value: v, label: v }))]}
+              />
+            </label>
+            <button type="button" className="btn btn-primary" onClick={() => setFilters(draftFilters)}>Применить</button>
+          </>
+        )}
       </aside>
       <div className="storefront-main">
         <div className="storefront-head">

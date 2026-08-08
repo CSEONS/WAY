@@ -1348,49 +1348,130 @@ hr {
 
 .storefront-filters {
   display: grid;
-  gap: var(--space-4);
-  align-content: start;
+  gap: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
+  padding: var(--space-3);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
 
-.storefront-filters-head {
+.search-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
 }
 
-.storefront-filters-head strong {
-  font-size: 15px;
-}
-
-.storefront-filters-toggle {
+.search {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.search svg {
+  position: absolute;
+  left: 14px;
+  color: var(--color-ink-subtle);
+  pointer-events: none;
+}
+
+.search input {
+  min-height: 46px;
   border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  color: inherit;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+  padding-left: 40px;
 }
 
-.storefront-filters-toggle svg {
-  transition: transform 160ms ease;
+.filter-button {
+  position: relative;
+  min-height: 46px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-ink);
+  flex-shrink: 0;
 }
 
-.storefront-filters-toggle svg.is-open {
-  transform: rotate(180deg);
+.filter-button:hover {
+  background: var(--color-surface-hover);
 }
 
-.storefront-main {
+.filter-button[aria-expanded="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+
+.filter-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
   display: grid;
-  gap: var(--space-5);
-  align-content: start;
+  place-items: center;
+}
+
+.chips {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip:hover {
+  background: var(--color-surface-hover);
+}
+
+.chip.active {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.chip-chevron {
+  margin-left: -2px;
+}
+
+.filters-panel {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.filters-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .storefront-head {
@@ -1407,7 +1488,25 @@ hr {
 }
 
 .storefront-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   min-width: 200px;
+}
+
+.storefront-sort .select-root {
+  flex: 1;
+  min-width: 140px;
+}
+
+.storefront-sort-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
 }
 
 .product-grid {
@@ -2797,6 +2896,23 @@ a.contact-option:hover {
   }
 }
 
+@media (max-width: 640px) {
+  .filter-button-label {
+    display: none;
+  }
+
+  .storefront-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .storefront-sort {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* ===================================================================
    Modal component classes (BulkProductCreator + ConfirmModal + QrShareButton)
    =================================================================== */
@@ -3009,13 +3125,8 @@ a.contact-option:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .page-storefront {
-    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-    align-items: start;
-  }
-
   .product-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .page-product-detail {

@@ -1,5 +1,5 @@
 ﻿import { HugeiconsIcon } from "@hugeicons/react";
-import { PaintBoardIcon, PreferenceHorizontalIcon, RulerIcon, Search01Icon, Tag01Icon } from "@hugeicons/core-free-icons";
+import { PreferenceHorizontalIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -56,8 +56,8 @@ export function PublicStorePage() {
     setFilters(emptyFilters);
   }
 
-  function openFilters() {
-    setFiltersOpen(true);
+  function toggleFilters() {
+    setFiltersOpen((current) => !current);
   }
 
   if (error) {
@@ -88,34 +88,12 @@ export function PublicStorePage() {
               }}
             />
           </label>
-          <button
-            type="button"
-            className="filter-button"
-            onClick={() => setFiltersOpen((current) => !current)}
-            aria-expanded={filtersOpen}
-          >
-            <HugeiconsIcon icon={PreferenceHorizontalIcon} size={18} strokeWidth={1.8} />
-            <span className="filter-button-label">Фильтры</span>
-            <span className="filter-count">{activeFilterCount}</span>
-          </button>
         </div>
         <div className="chips">
-          <button type="button" className={`chip${activeFilterCount ? "" : " active"}`} onClick={resetFilters}>
-            Все
-          </button>
-          <button type="button" className={`chip${filters.category ? " active" : ""}`} onClick={openFilters}>
-            <HugeiconsIcon icon={Tag01Icon} size={15} strokeWidth={1.8} />
-            Категория
-            <ChevronDown size={14} strokeWidth={2} className="chip-chevron" />
-          </button>
-          <button type="button" className={`chip${filters.size ? " active" : ""}`} onClick={openFilters}>
-            <HugeiconsIcon icon={RulerIcon} size={15} strokeWidth={1.8} />
-            Размер
-            <ChevronDown size={14} strokeWidth={2} className="chip-chevron" />
-          </button>
-          <button type="button" className={`chip${filters.color ? " active" : ""}`} onClick={openFilters}>
-            <HugeiconsIcon icon={PaintBoardIcon} size={15} strokeWidth={1.8} />
-            Цвет
+          <button type="button" className={`chip${activeFilterCount ? " active" : ""}`} onClick={toggleFilters} aria-expanded={filtersOpen}>
+            <HugeiconsIcon icon={PreferenceHorizontalIcon} size={15} strokeWidth={1.8} />
+            Фильтры
+            {activeFilterCount > 0 && <span className="chip-count">{activeFilterCount}</span>}
             <ChevronDown size={14} strokeWidth={2} className="chip-chevron" />
           </button>
         </div>
@@ -167,7 +145,7 @@ export function PublicStorePage() {
             )}
             <div className="filters-panel-actions">
               <button type="button" className="btn btn-ghost btn-sm" onClick={resetFilters}>Сбросить все</button>
-              <button type="button" className="btn btn-primary" onClick={() => setFilters(draftFilters)}>Применить</button>
+              <button type="button" className="btn btn-primary" onClick={() => { setFilters(draftFilters); setFiltersOpen(false); }}>Применить</button>
             </div>
           </div>
         )}

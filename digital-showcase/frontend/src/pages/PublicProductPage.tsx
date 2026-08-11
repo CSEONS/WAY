@@ -3,7 +3,9 @@ import type { IconSvgElement } from "@hugeicons/react";
 import {
   Call02Icon,
   Cancel01Icon,
+  CancelCircleIcon,
   CheckmarkCircle02Icon,
+  HelpCircleIcon,
   Image01Icon,
   TelegramIcon,
   WhatsappIcon
@@ -12,6 +14,12 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Product, Store } from "../types/models";
+
+const AVAILABILITY_CONFIG: Record<Product["status"], { icon: IconSvgElement; label: string; tone: string }> = {
+  AVAILABLE: { icon: CheckmarkCircle02Icon, label: "в наличии", tone: "is-available" },
+  NOT_AVAILABLE: { icon: CancelCircleIcon, label: "нет в наличии", tone: "is-unavailable" },
+  CHECK_IN_STORE: { icon: HelpCircleIcon, label: "уточнить в магазине", tone: "is-unclear" }
+};
 
 export function PublicProductPage() {
   const { storeSlug = "", productId = "" } = useParams();
@@ -42,11 +50,14 @@ export function PublicProductPage() {
   const selectedVariant = variants.find((variant) => variant.colorName === selectedColor && variant.size === selectedSize);
   const displayedPrice = selectedVariant?.price ?? product.price;
   const displayedPriceText = selectedVariant?.price != null ? `${selectedVariant.price.toLocaleString("ru-RU")} ₽` : product.priceText || (displayedPrice != null ? `${displayedPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине");
-  const colorOptions = uniqueBy(
-    variants.filter((variant) => !selectedSize || firstChoice !== "size" || variant.size === selectedSize),
-    (variant) => variant.colorName
+  const colorOptions = uniqueBy(variants, (variant) => variant.colorName);
+  const sizeOptions = [...new Set(variants.map((variant) => variant.size))];
+  const availableColorNames = new Set(
+    variants.filter((variant) => !selectedSize || variant.size === selectedSize).map((variant) => variant.colorName)
   );
-  const sizeOptions = [...new Set(variants.filter((variant) => !selectedColor || firstChoice !== "color" || variant.colorName === selectedColor).map((variant) => variant.size))];
+  const availableSizes = new Set(
+    variants.filter((variant) => !selectedColor || variant.colorName === selectedColor).map((variant) => variant.size)
+  );
 
   function chooseColor(colorName: string) {
     const nextFirstChoice = firstChoice ?? "color";
@@ -101,18 +112,18 @@ export function PublicProductPage() {
             <div className="variant-group">
               <div className="variant-group-head">
                 <strong>Цвет</strong>
-                {firstChoice === "color" && <small>выбран первым</small>}
               </div>
-              <div className="variant-options">
+              <div className="variant-chip-row">
                 {colorOptions.map((color) => (
                   <button
                     type="button"
                     key={color.colorName}
-                    className={`variant-chip${color.colorName === selectedColor ? " is-selected" : ""}`}
+                    className={`variant-color-chip${color.colorName === selectedColor ? " is-selected" : ""}`}
                     onClick={() => chooseColor(color.colorName)}
+                    disabled={Boolean(selectedSize) && !availableColorNames.has(color.colorName)}
+                    title={color.colorName}
                   >
-                    {color.colorHex && <span className="swatch" style={{ background: color.colorHex }} />}
-                    {color.colorName}
+                    <span className="variant-color-chip-swatch" style={{ background: color.colorHex ?? "#d8e5e8" }} />
                   </button>
                 ))}
               </div>
@@ -120,15 +131,15 @@ export function PublicProductPage() {
             <div className="variant-group">
               <div className="variant-group-head">
                 <strong>Размер</strong>
-                {firstChoice === "size" && <small>выбран первым</small>}
               </div>
-              <div className="variant-options">
+              <div className="variant-chip-row">
                 {sizeOptions.map((size) => (
                   <button
                     type="button"
                     key={size}
-                    className={`variant-chip${size === selectedSize ? " is-selected" : ""}`}
+                    className={`variant-size-chip${size === selectedSize ? " is-selected" : ""}`}
                     onClick={() => chooseSize(size)}
+                    disabled={Boolean(selectedColor) && !availableSizes.has(size)}
                   >
                     {size}
                   </button>
@@ -151,9 +162,9 @@ export function PublicProductPage() {
             ))}
           </div>
         )}
-        <p className="product-availability">
-          <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} strokeWidth={1.8} />
-          <strong>Наличие:</strong> {product.status === "AVAILABLE" ? "в наличии" : product.status === "NOT_AVAILABLE" ? "нет в наличии" : "уточнить в магазине"}
+        <p className={`product-availability ${AVAILABILITY_CONFIG[product.status].tone}`}>
+          <HugeiconsIcon icon={AVAILABILITY_CONFIG[product.status].icon} size={16} strokeWidth={1.8} />
+          <strong>Наличие:</strong> {AVAILABILITY_CONFIG[product.status].label}
         </p>
         <div className="store-contact-panel">
           <h2>{store.name}</h2>

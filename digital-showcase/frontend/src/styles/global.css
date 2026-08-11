@@ -7,6 +7,10 @@
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   /* Spacing / radius — 4px grid */
+  /* --space-0-5 is a half-step exception for hairline gaps (tight text
+     stacks, segmented-control gutters) that are intentionally smaller
+     than the smallest full grid step. See STYLE_GUIDE.md. */
+  --space-0-5: 2px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -177,21 +181,21 @@ button:disabled {
 }
 
 /* Primary action heuristics for pages that don't opt into .btn classes yet */
-button:first-child:last-child:not(.btn):not(.btn-icon):not(.select-trigger),
-form > button:last-child:not(.btn):not(.btn-icon):not(.select-trigger),
-section > button:not(.btn):not(.btn-icon):not(.select-trigger),
-article > button:not(.btn):not(.btn-icon):not(.select-trigger),
-nav + button:not(.btn):not(.btn-icon):not(.select-trigger) {
+button:first-child:last-child:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip),
+form > button:last-child:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip),
+section > button:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip),
+article > button:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip),
+nav + button:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip) {
   color: var(--color-accent-ink);
   background: var(--color-accent);
   border-color: var(--color-accent);
 }
 
-button:first-child:last-child:not(.btn):not(.btn-icon):not(.select-trigger):hover,
-form > button:last-child:not(.btn):not(.btn-icon):not(.select-trigger):hover,
-section > button:not(.btn):not(.btn-icon):not(.select-trigger):hover,
-article > button:not(.btn):not(.btn-icon):not(.select-trigger):hover,
-nav + button:not(.btn):not(.btn-icon):not(.select-trigger):hover {
+button:first-child:last-child:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip):hover,
+form > button:last-child:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip):hover,
+section > button:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip):hover,
+article > button:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip):hover,
+nav + button:not(.btn):not(.btn-icon):not(.select-trigger):not(.chip):hover {
   background: var(--color-accent-strong);
   border-color: var(--color-accent-strong);
 }
@@ -338,7 +342,7 @@ select {
   min-height: 44px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  padding: 10px 12px;
+  padding: var(--space-3);
   color: var(--color-ink);
   background: var(--color-surface-muted);
   outline: none;
@@ -360,7 +364,7 @@ select:focus {
 select {
   appearance: none;
   -webkit-appearance: none;
-  padding-right: 36px;
+  padding-right: var(--space-10);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b6b74' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
@@ -389,7 +393,7 @@ select:disabled {
   min-height: 44px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  padding: 10px 12px;
+  padding: var(--space-3);
   color: var(--color-ink);
   background: var(--color-surface-muted);
   font-weight: 400;
@@ -430,7 +434,7 @@ select:disabled {
   max-height: 260px;
   overflow: auto;
   margin: 0;
-  padding: 6px;
+  padding: var(--space-2);
   list-style: none;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -444,7 +448,7 @@ select:disabled {
   justify-content: space-between;
   gap: var(--space-2);
   min-height: 38px;
-  padding: 0 10px;
+  padding: 0 var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-ink);
   font-size: 14px;
@@ -714,7 +718,7 @@ a:has(h3):not(.product-card) > span {
   position: absolute;
   margin: var(--space-3);
   border-radius: var(--radius-sm);
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   color: #fff;
   background: rgba(19, 19, 22, 0.72);
   font-size: 12px;
@@ -867,7 +871,7 @@ input[type="checkbox"] {
 input[type="color"] {
   width: 52px;
   height: 44px;
-  padding: 4px;
+  padding: var(--space-1);
 }
 
 input[type="file"] {
@@ -884,7 +888,7 @@ input[type="file"]::file-selector-button {
   margin-right: var(--space-3);
   border: none;
   border-radius: var(--radius-md);
-  padding: 10px var(--space-4);
+  padding: var(--space-3) var(--space-4);
   background: var(--color-surface-muted);
   color: var(--color-ink);
   font-family: inherit;
@@ -1153,7 +1157,7 @@ hr {
   align-items: center;
   gap: var(--space-1);
   border-radius: var(--radius-sm);
-  padding: 3px 8px;
+  padding: var(--space-1) var(--space-2);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
@@ -1381,43 +1385,7 @@ hr {
   border: none;
   background: var(--color-surface-muted);
   border-radius: var(--radius-md);
-  padding-left: 40px;
-}
-
-.filter-button {
-  position: relative;
-  min-height: 46px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-3);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-ink);
-  flex-shrink: 0;
-}
-
-.filter-button:hover {
-  background: var(--color-surface-hover);
-}
-
-.filter-button[aria-expanded="true"] {
-  border-color: var(--color-accent);
-  color: var(--color-accent-strong);
-}
-
-.filter-count {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
+  padding-left: var(--space-10);
 }
 
 .chips {
@@ -1443,7 +1411,7 @@ hr {
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .chip:hover {
@@ -1456,15 +1424,43 @@ hr {
   border-color: var(--color-accent);
 }
 
+.chip[aria-expanded="true"] {
+  border-color: var(--color-accent);
+}
+
+.chip-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
 .chip-chevron {
-  margin-left: -2px;
+  margin-left: calc(-1 * var(--space-0-5));
+  transition: transform 160ms ease;
+}
+
+.chip[aria-expanded="true"] .chip-chevron {
+  transform: rotate(180deg);
 }
 
 .filters-panel {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
+}
+
+.filters-panel > label,
+.filters-panel .variant-builder-block {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: 0;
 }
 
 .filters-panel-actions {
@@ -1502,7 +1498,7 @@ hr {
 .storefront-sort-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   font-size: 13px;
   font-weight: 600;
   color: var(--color-ink-muted);
@@ -1592,7 +1588,7 @@ hr {
 
 .swatch-row {
   display: inline-flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .swatch {
@@ -1701,6 +1697,18 @@ hr {
   color: var(--color-ink);
 }
 
+.product-availability.is-available {
+  color: var(--color-success);
+}
+
+.product-availability.is-unavailable {
+  color: var(--color-danger);
+}
+
+.product-availability.is-unclear {
+  color: var(--color-warning);
+}
+
 .variant-group {
   display: grid;
   gap: var(--space-2);
@@ -1719,35 +1727,6 @@ hr {
   letter-spacing: 0.02em;
 }
 
-.variant-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.variant-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 38px;
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-3);
-  background: var(--color-surface-muted);
-  color: var(--color-ink);
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.variant-chip.is-selected {
-  background: var(--color-ink);
-  color: var(--color-surface);
-}
-
-.variant-chip .swatch {
-  width: 12px;
-  height: 12px;
-}
-
 .static-attrs {
   display: flex;
   flex-wrap: wrap;
@@ -1757,7 +1736,7 @@ hr {
 .store-contact-panel {
   display: grid;
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  margin-top: var(--space-4);
   padding: var(--space-4);
   border-radius: var(--radius-md);
   background: var(--color-surface-muted);
@@ -1865,7 +1844,7 @@ a.contact-option:hover {
 
 .store-card-title {
   display: grid;
-  gap: 2px;
+  gap: var(--space-0-5);
   flex: 1;
   min-width: 0;
 }
@@ -1931,7 +1910,7 @@ a.contact-option:hover {
   left: 50%;
   bottom: calc(24px + var(--safe-bottom));
   z-index: 80;
-  padding: 10px 18px;
+  padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-pill);
   background: var(--color-ink);
   color: var(--color-surface);
@@ -2169,7 +2148,7 @@ a.contact-option:hover {
 }
 
 .search-field-input input {
-  padding-left: 36px;
+  padding-left: var(--space-10);
 }
 
 .inline-field {
@@ -2256,7 +2235,7 @@ a.contact-option:hover {
 
 .product-row-title {
   display: grid;
-  gap: 2px;
+  gap: var(--space-0-5);
   min-width: 0;
 }
 
@@ -2277,6 +2256,8 @@ a.contact-option:hover {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
+  /* 44px = .product-thumb width, not a spacing step; keeps text aligned
+     under the thumbnail. See STYLE_GUIDE.md "Exceptions". */
   padding-left: calc(44px + var(--space-3));
   color: var(--color-ink-muted);
   font-size: 13px;
@@ -2329,8 +2310,8 @@ a.contact-option:hover {
   display: inline-flex;
   flex-wrap: wrap;
   justify-self: start;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--space-0-5);
+  padding: var(--space-1);
   border-radius: var(--radius-md);
   background: var(--color-surface-muted);
 }
@@ -2462,7 +2443,7 @@ a.contact-option:hover {
 
 .recording-dots {
   display: inline-flex;
-  gap: 3px;
+  gap: var(--space-1);
   margin-left: auto;
 }
 
@@ -2616,7 +2597,7 @@ a.contact-option:hover {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  padding: 0 12px;
+  padding: 0 var(--space-3);
   font-size: 13px;
   line-height: 1;
   font-weight: 600;
@@ -2626,13 +2607,13 @@ a.contact-option:hover {
 .variant-color-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .variant-color-chip-swatch {
   width: 14px;
   height: 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: inset 0 0 0 1px rgba(19, 19, 22, 0.08);
   flex-shrink: 0;
 }
@@ -2741,7 +2722,7 @@ a.contact-option:hover {
 .variant-list-name {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
   font-size: 14px;
   font-weight: 600;
@@ -2795,7 +2776,7 @@ a.contact-option:hover {
 .color-modal-preview {
   width: 56px;
   height: 56px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: inset 0 0 0 1px rgba(19, 19, 22, 0.08);
   flex-shrink: 0;
 }
@@ -2835,7 +2816,7 @@ a.contact-option:hover {
   width: 56px;
   min-width: 56px;
   height: 44px;
-  padding: 4px;
+  padding: var(--space-1);
 }
 
 .pipette-image-picker {
@@ -2897,10 +2878,6 @@ a.contact-option:hover {
 }
 
 @media (max-width: 640px) {
-  .filter-button-label {
-    display: none;
-  }
-
   .storefront-head {
     align-items: flex-start;
     flex-direction: column;

@@ -1,0 +1,20 @@
+This directory exists so `nginx/paid-cert/` is present after `git clone`/`git pull`.
+
+Place the purchased certificate here manually on each server — these files
+are gitignored and never committed:
+
+  nginx/paid-cert/waytuk.ru.crt   — the certificate, WITH the intermediate
+                                     chain appended (leaf cert first, then
+                                     any intermediate CA certs, all in one
+                                     file, in that order)
+  nginx/paid-cert/waytuk.ru.key   — the private key, unencrypted (no
+                                     passphrase)
+
+Both are plain PEM text (-----BEGIN CERTIFICATE----- / -----BEGIN PRIVATE
+KEY----- blocks). Get them from the Timeweb Cloud panel: "Домены и SSL" →
+"SSL-сертификаты" → click the certificate → copy the CRT and Private Key
+fields into these two files.
+
+nginx.conf expects exactly these two filenames for the waytuk.ru server
+block. If you ever swap in a differently-named certificate, update
+nginx/nginx.conf to match.

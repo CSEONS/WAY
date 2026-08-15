@@ -5,3 +5,7 @@ data/
 uploads/
 *.sqlite
 *.sqlite-*
+
+# Purchased SSL certificate/key — placed manually on each server, never committed.
+nginx/paid-cert/*
+!nginx/paid-cert/.gitkeep

@@ -14,6 +14,7 @@ export function Layout({ user, onLogout }: Props) {
   const isLoginPage = location.pathname === "/login";
   const isInDashboard = location.pathname.startsWith("/dashboard");
   const isInAdmin = location.pathname.startsWith("/admin");
+  const storeSlug = location.pathname.match(/^\/m\/([^/]+)/)?.[1];
   function logout() {
     localStorage.removeItem("token");
     onLogout();
@@ -23,8 +24,8 @@ export function Layout({ user, onLogout }: Props) {
   return (
     <>
       <header className="site-header">
-        <Link to="/" className="brand">
-          Витрины
+        <Link to={storeSlug ? `/m/${storeSlug}` : "/"} className="brand">
+          {storeSlug ? "Главная" : "Витрины"}
         </Link>
         {!hidePublicStoreNav && (
           <nav>

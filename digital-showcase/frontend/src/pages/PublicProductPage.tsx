@@ -48,8 +48,19 @@ export function PublicProductPage() {
   const selectedImage = product.images.find((image) => image.id === selectedImageId) ?? product.images[0];
   const variants = product.variants ?? [];
   const selectedVariant = variants.find((variant) => variant.colorName === selectedColor && variant.size === selectedSize);
+  const variantPrices = variants.map((variant) => variant.price).filter((price): price is number => price != null);
+  const minVariantPrice = variantPrices.length ? Math.min(...variantPrices) : null;
+  const maxVariantPrice = variantPrices.length ? Math.max(...variantPrices) : null;
+  const priceRangeText =
+    minVariantPrice != null && maxVariantPrice != null
+      ? minVariantPrice === maxVariantPrice
+        ? `${minVariantPrice.toLocaleString("ru-RU")} ₽`
+        : `${minVariantPrice.toLocaleString("ru-RU")}–${maxVariantPrice.toLocaleString("ru-RU")} ₽`
+      : null;
   const displayedPrice = selectedVariant?.price ?? product.price;
-  const displayedPriceText = selectedVariant?.price != null ? `${selectedVariant.price.toLocaleString("ru-RU")} ₽` : product.priceText || (displayedPrice != null ? `${displayedPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине");
+  const displayedPriceText = selectedVariant?.price != null
+    ? `${selectedVariant.price.toLocaleString("ru-RU")} ₽`
+    : priceRangeText || product.priceText || (displayedPrice != null ? `${displayedPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине");
   const colorOptions = uniqueBy(variants, (variant) => variant.colorName);
   const sizeOptions = [...new Set(variants.map((variant) => variant.size))];
   const availableColorNames = new Set(

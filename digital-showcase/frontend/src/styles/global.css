@@ -1733,19 +1733,6 @@ hr {
   gap: var(--space-2);
 }
 
-.store-contact-panel {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
-}
-
-.store-contact-panel h2 {
-  font-size: 16px;
-}
-
 .contact-option {
   display: flex;
   align-items: center;
@@ -2904,6 +2891,12 @@ a.contact-option:hover {
   background: rgba(19, 19, 22, 0.4);
 }
 
+/* Lock page scroll behind any open modal — applies to every .modal-backdrop
+   in the app automatically, no per-modal wiring needed. */
+body:has(.modal-backdrop) {
+  overflow: hidden;
+}
+
 .modal {
   width: min(100%, 520px);
   max-height: min(88dvh, 760px);
@@ -2961,6 +2954,11 @@ a.contact-option:hover {
 
 .modal-title p {
   margin: 0;
+}
+
+.modal-subtitle-muted {
+  color: var(--color-ink-muted);
+  font-size: 13px;
 }
 
 .modal-body,

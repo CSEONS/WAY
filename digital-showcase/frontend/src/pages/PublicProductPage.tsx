@@ -177,11 +177,7 @@ export function PublicProductPage() {
           <HugeiconsIcon icon={AVAILABILITY_CONFIG[product.status].icon} size={16} strokeWidth={1.8} />
           <strong>Наличие:</strong> {AVAILABILITY_CONFIG[product.status].label}
         </p>
-        <div className="store-contact-panel">
-          <h2>{store.name}</h2>
-          <p>{[store.address, store.phone, store.whatsapp, store.telegram].filter(Boolean).join(" · ")}</p>
-          <button type="button" className="btn btn-primary" onClick={() => setContactModalOpen(true)}>Связаться с магазином</button>
-        </div>
+        <button type="button" className="btn btn-primary" onClick={() => setContactModalOpen(true)}>Связаться с магазином</button>
       </article>
       {contactModalOpen && (
         <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setContactModalOpen(false)}>
@@ -190,6 +186,7 @@ export function PublicProductPage() {
               <div className="modal-title">
                 <h2>Выберите способ связи</h2>
                 <p>{store.name}</p>
+                {store.address && <p className="modal-subtitle-muted">{store.address}</p>}
               </div>
               <button type="button" className="btn-icon btn-ghost" aria-label="Закрыть" onClick={() => setContactModalOpen(false)}>
                 <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />

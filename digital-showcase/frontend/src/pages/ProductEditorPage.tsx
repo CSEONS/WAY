@@ -40,9 +40,10 @@ export function ProductEditorPage() {
     };
   }, [storeId, id]);
 
-  async function save(payload: ProductPayload, imageSelection: ProductImageSelection) {
+  async function save(payload: ProductPayload, imageSelection: ProductImageSelection, onProgress: (status: string) => void) {
     if (!storeId) return;
     const basePath = `/owner/stores/${storeId}/products`;
+    onProgress("Сохраняем товар…");
     const { data } = id ? await api.patch<Product>(`${basePath}/${id}`, payload) : await api.post<Product>(basePath, payload);
     const orderedImages = [...imageSelection.images].sort((left, right) => {
       if (left.id === imageSelection.previewImageId) return -1;
@@ -51,18 +52,23 @@ export function ProductEditorPage() {
     });
     const keptExistingIds = new Set(imageSelection.images.map((image) => image.existingId).filter(Boolean));
     const initialImageIds = product?.images.map((image) => image.id) ?? [];
+    const imagesToDelete = initialImageIds.filter((imageId) => !keptExistingIds.has(imageId));
 
-    for (const imageId of initialImageIds) {
-      if (!keptExistingIds.has(imageId)) await api.delete(`${basePath}/${data.id}/images/${imageId}`);
+    for (const [index, imageId] of imagesToDelete.entries()) {
+      if (imagesToDelete.length > 1) onProgress(`Удаляем старые фото… (${index + 1}/${imagesToDelete.length})`);
+      await api.delete(`${basePath}/${data.id}/images/${imageId}`);
     }
 
     const uploadedIds = new Map<string, string>();
     const knownImageIds = new Set([...initialImageIds].filter((imageId) => keptExistingIds.has(imageId)));
+    const imagesToUpload = orderedImages.filter((image) => image.file);
 
-    for (const image of orderedImages) {
-      if (!image.file) continue;
+    for (const [index, image] of imagesToUpload.entries()) {
+      onProgress(
+        imagesToUpload.length > 1 ? `Загружаем фото ${index + 1} из ${imagesToUpload.length}…` : "Загружаем фото…"
+      );
       const formData = new FormData();
-      formData.append("image", image.file);
+      formData.append("image", image.file as File);
       const response = await api.post<Product>(`${basePath}/${data.id}/images`, formData);
       const uploaded = response.data.images.find((item) => !knownImageIds.has(item.id));
       if (uploaded) {
@@ -74,7 +80,10 @@ export function ProductEditorPage() {
     const imageIds = orderedImages
       .map((image) => image.existingId ?? uploadedIds.get(image.id))
       .filter((imageId): imageId is string => Boolean(imageId));
-    if (imageIds.length) await api.patch(`${basePath}/${data.id}/images/order`, { imageIds });
+    if (imageIds.length) {
+      onProgress("Сохраняем порядок фото…");
+      await api.patch(`${basePath}/${data.id}/images/order`, { imageIds });
+    }
 
     navigate(`/dashboard/stores/${storeId}`);
   }

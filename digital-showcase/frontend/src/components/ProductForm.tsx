@@ -259,7 +259,7 @@ export function ProductForm({
   aiDraftPath?: string;
   aiFormEnabled: boolean;
   draftKey?: string;
-  onSubmit: (payload: ProductPayload, imageSelection: ProductImageSelection) => Promise<void>;
+  onSubmit: (payload: ProductPayload, imageSelection: ProductImageSelection, onProgress: (status: string) => void) => Promise<void>;
 }) {
   const savedDraft = useMemo(() => readSavedDraft(draftKey), [draftKey]);
   const colorHistoryKey = draftKey ? `${draftKey}:colors` : undefined;
@@ -274,6 +274,8 @@ export function ProductForm({
       isVisible: initial?.isVisible ?? 1
     }
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState("");
   const [aiMode, setAiMode] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
   const [aiError, setAiError] = useState("");
@@ -655,6 +657,7 @@ export function ProductForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (isSubmitting) return;
     const normalizedVariants = variants
       .map((variant) => ({
         colorName: variant.colorName.trim(),
@@ -669,22 +672,30 @@ export function ProductForm({
       if (!colorsByName.has(variant.colorName)) colorsByName.set(variant.colorName, { name: variant.colorName, hex: variant.colorHex });
     }
 
-    await onSubmit(
-      {
-        title: form.title,
-        description: form.description || null,
-        price: initial?.price ?? null,
-        priceText: initial?.priceText ?? null,
-        category: form.category || null,
-        status: form.status as ProductStatus,
-        isVisible: Number(form.isVisible),
-        sizes,
-        colors: [...colorsByName.values()],
-        variants: normalizedVariants
-      },
-      { images, previewImageId }
-    );
-    clearSavedDraft();
+    setIsSubmitting(true);
+    setSubmitStatus("Сохраняем товар…");
+    try {
+      await onSubmit(
+        {
+          title: form.title,
+          description: form.description || null,
+          price: initial?.price ?? null,
+          priceText: initial?.priceText ?? null,
+          category: form.category || null,
+          status: form.status as ProductStatus,
+          isVisible: Number(form.isVisible),
+          sizes,
+          colors: [...colorsByName.values()],
+          variants: normalizedVariants
+        },
+        { images, previewImageId },
+        setSubmitStatus
+      );
+      clearSavedDraft();
+    } finally {
+      setIsSubmitting(false);
+      setSubmitStatus("");
+    }
   }
 
   return (
@@ -1048,7 +1059,9 @@ export function ProductForm({
               )}
             </div>
           </div>
-          <button className="btn btn-primary btn-lg">Сохранить</button>
+          <button type="submit" className="btn btn-primary btn-lg" disabled={isSubmitting} aria-busy={isSubmitting}>
+            {isSubmitting ? submitStatus || "Сохраняем…" : "Сохранить"}
+          </button>
         </>
       )}
       {aiSuccessVisible && (

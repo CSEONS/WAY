@@ -1,16 +1,22 @@
-﻿import { ArrowLeft } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductForm, type ProductImageSelection, type ProductPayload } from "../components/ProductForm";
+import { useBackgroundJobs } from "../state/backgroundJobs";
 import type { Product, Store } from "../types/models";
 
 export function ProductEditorPage() {
   const { storeId, id } = useParams();
   const navigate = useNavigate();
+  const { queueProductSave } = useBackgroundJobs();
   const [store, setStore] = useState<Store>();
   const [product, setProduct] = useState<Product>();
   const [isLoading, setIsLoading] = useState(Boolean(storeId));
+  const [stage, setStage] = useState<"form" | "queued">("form");
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     if (!storeId) return;
@@ -40,51 +46,32 @@ export function ProductEditorPage() {
     };
   }, [storeId, id]);
 
-  async function save(payload: ProductPayload, imageSelection: ProductImageSelection, onProgress: (status: string) => void) {
+  function handleSubmit(payload: ProductPayload, imageSelection: ProductImageSelection) {
     if (!storeId) return;
-    const basePath = `/owner/stores/${storeId}/products`;
-    onProgress("Сохраняем товар…");
-    const { data } = id ? await api.patch<Product>(`${basePath}/${id}`, payload) : await api.post<Product>(basePath, payload);
-    const orderedImages = [...imageSelection.images].sort((left, right) => {
-      if (left.id === imageSelection.previewImageId) return -1;
-      if (right.id === imageSelection.previewImageId) return 1;
-      return 0;
+    queueProductSave({
+      storeId,
+      productId: id,
+      payload,
+      imageSelection,
+      existingImageIds: product?.images.map((image) => image.id) ?? []
     });
-    const keptExistingIds = new Set(imageSelection.images.map((image) => image.existingId).filter(Boolean));
-    const initialImageIds = product?.images.map((image) => image.id) ?? [];
-    const imagesToDelete = initialImageIds.filter((imageId) => !keptExistingIds.has(imageId));
+    setStage("queued");
+  }
 
-    for (const [index, imageId] of imagesToDelete.entries()) {
-      if (imagesToDelete.length > 1) onProgress(`Удаляем старые фото… (${index + 1}/${imagesToDelete.length})`);
-      await api.delete(`${basePath}/${data.id}/images/${imageId}`);
+  function createAnother() {
+    if (id) {
+      // Editing an existing product: hop to the "new product" route, which
+      // remounts this page with a clean slate.
+      navigate(`/dashboard/stores/${storeId}/products/new`);
+      return;
     }
+    // Already on the "new product" route — just reset locally, no navigation
+    // needed (and none would remount the same route anyway).
+    setStage("form");
+    setFormKey((key) => key + 1);
+  }
 
-    const uploadedIds = new Map<string, string>();
-    const knownImageIds = new Set([...initialImageIds].filter((imageId) => keptExistingIds.has(imageId)));
-    const imagesToUpload = orderedImages.filter((image) => image.file);
-
-    for (const [index, image] of imagesToUpload.entries()) {
-      onProgress(
-        imagesToUpload.length > 1 ? `Загружаем фото ${index + 1} из ${imagesToUpload.length}…` : "Загружаем фото…"
-      );
-      const formData = new FormData();
-      formData.append("image", image.file as File);
-      const response = await api.post<Product>(`${basePath}/${data.id}/images`, formData);
-      const uploaded = response.data.images.find((item) => !knownImageIds.has(item.id));
-      if (uploaded) {
-        uploadedIds.set(image.id, uploaded.id);
-        knownImageIds.add(uploaded.id);
-      }
-    }
-
-    const imageIds = orderedImages
-      .map((image) => image.existingId ?? uploadedIds.get(image.id))
-      .filter((imageId): imageId is string => Boolean(imageId));
-    if (imageIds.length) {
-      onProgress("Сохраняем порядок фото…");
-      await api.patch(`${basePath}/${data.id}/images/order`, { imageIds });
-    }
-
+  function goToList() {
     navigate(`/dashboard/stores/${storeId}`);
   }
 
@@ -110,14 +97,34 @@ export function ProductEditorPage() {
         Вернуться назад
       </Link>
       <h1>{id ? "Редактировать товар" : "Новый товар"}</h1>
-      <ProductForm
-        initial={product}
-        aiDraftPath={`/owner/stores/${storeId}/products/ai-draft`}
-        aiFormEnabled={Boolean(store?.aiFormEnabled)}
-        draftKey={`product-form-draft:${storeId}:${id ?? "new"}`}
-        onSubmit={save}
-      />
+      {stage === "queued" ? (
+        <>
+          <div className="notice-banner notice-success" role="status">
+            <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} strokeWidth={1.8} />
+            <div>
+              <strong>Товар сохраняется в фоне</strong>
+              <span>Прогресс и результат можно посмотреть в любой момент — в правом нижнем углу экрана.</span>
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-primary" onClick={createAnother}>
+              Создать ещё один товар
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={goToList}>
+              К списку товаров
+            </button>
+          </div>
+        </>
+      ) : (
+        <ProductForm
+          key={formKey}
+          initial={product}
+          aiDraftPath={`/owner/stores/${storeId}/products/ai-draft`}
+          aiFormEnabled={Boolean(store?.aiFormEnabled)}
+          draftKey={`product-form-draft:${storeId}:${id ?? "new"}`}
+          onSubmit={handleSubmit}
+        />
+      )}
     </section>
   );
 }
-

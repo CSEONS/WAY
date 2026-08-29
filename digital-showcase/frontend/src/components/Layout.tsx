@@ -1,5 +1,6 @@
 ﻿import { LogOut } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
 import type { User } from "../types/models";
 
 interface Props {
@@ -42,6 +43,7 @@ export function Layout({ user, onLogout }: Props) {
           </nav>
         )}
       </header>
+      <BackgroundJobsWidget />
     </>
   );
 }

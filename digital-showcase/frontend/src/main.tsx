@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { api } from "./api/client";
 import { Layout } from "./components/Layout";
 import { AppRoutes } from "./routes/AppRoutes";
+import { BackgroundJobsProvider } from "./state/backgroundJobs";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
@@ -35,8 +36,10 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Layout user={user} onLogout={() => setUser(null)} />
-      <AppRoutes user={user} isAuthLoading={isAuthLoading} onLogin={setUser} />
+      <BackgroundJobsProvider>
+        <Layout user={user} onLogout={() => setUser(null)} />
+        <AppRoutes user={user} isAuthLoading={isAuthLoading} onLogin={setUser} />
+      </BackgroundJobsProvider>
     </BrowserRouter>
   );
 }

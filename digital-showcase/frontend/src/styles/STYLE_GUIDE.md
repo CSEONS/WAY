@@ -16,6 +16,24 @@ rule and the code disagree, the code is wrong — fix the code, not the rule
 The catalog of every kit component and state is at **`/dev/ui`** (dev server
 only; it is not in the production bundle). Check a change there first.
 
+### Automatic checks
+
+`npm run lint:css` (stylelint, config in `frontend/stylelint.config.mjs`)
+checks every `.css` file under `src/`:
+
+- no hex, named or `rgb()/hsl()` colors — use `--color-*` tokens;
+- `font-size` only `var(--font-size-*)` (or `inherit`);
+- no `px` in margin, padding, gap, inset or border-radius — use
+  `--space-*` / `--radius-*`;
+- `z-index` only `var(--z-*)` (or 0, 1, -1, auto);
+- no `!important` (except the reduced-motion rule in `global.css`);
+- unknown properties, units, pseudo-classes and at-rules, empty blocks.
+
+`tokens.css` is the only file exempt from the value rules. Run the check
+before every commit; fix the code rather than adding
+`stylelint-disable` comments. If a rule is genuinely wrong for a case, change
+the rule here and in the config, in the same commit.
+
 ### How the cascade is ordered
 
 1. `global.css` is in `@layer base`, so every CSS Module (unlayered) beats it.
@@ -155,12 +173,13 @@ fine as-is (it's not a missing token, it's "no radius").
   would visibly double the gap, so this half-step token exists instead of
   forcing a bad round. Don't reach for it for anything else — if you think
   you need it, first check whether `--space-1` actually looks fine.
-- **`calc(44px + var(--space-3))`** in `DashboardPage.module.css`
-  (`.cellStatus`, `.cellUpdated`, `.rowActions` on phones). The `44px` mirrors
-  `.thumb`'s fixed `width: 44px`, so the second line of a product row starts
-  under the title. It's a component-size offset, not a spacing choice — don't
-  round it to a space token, and if `.thumb`'s size ever changes, update this
-  value to match.
+- **Offsets derived from a component size.** When a spacing value has to
+  follow the size of an element (e.g. a product row's second line starts
+  under the title, after a 44px thumbnail), don't write `calc(44px + …)` in
+  a margin. Declare the size once as a local custom property and derive the
+  offset from it — see `--thumb-size` / `--under-title` on `.row` in
+  `DashboardPage.module.css`. The size itself is a dimension (width/height),
+  not spacing.
 
 ### Adding a new token
 

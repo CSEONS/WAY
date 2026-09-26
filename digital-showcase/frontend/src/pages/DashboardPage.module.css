@@ -264,6 +264,11 @@
 /* On phones a row wraps: title on top, then status/price/category/date,
    actions on the right. From 720px it becomes a 6-column table row. */
 .row {
+  /* The second line of a phone row starts under the title, i.e. after the
+     thumbnail and the gap next to it. */
+  --thumb-size: 44px;
+  --under-title: calc(var(--thumb-size) + var(--space-3));
+
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -290,8 +295,8 @@
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
   overflow: hidden;
   border-radius: var(--radius-sm);
   color: var(--color-ink-subtle);
@@ -338,21 +343,19 @@
   font-size: var(--font-size-sm);
 }
 
-/* 44px mirrors .thumb's width so the second line starts under the title.
-   See STYLE_GUIDE.md "Exceptions". */
 .cellStatus {
-  margin-left: calc(44px + var(--space-3));
+  margin-left: var(--under-title);
 }
 
 .cellUpdated {
   flex-basis: 100%;
-  padding-left: calc(44px + var(--space-3));
+  padding-left: var(--under-title);
 }
 
 .rowActions {
   display: flex;
   gap: var(--space-2);
-  margin-left: calc(44px + var(--space-3));
+  margin-left: var(--under-title);
 }
 
 .count {

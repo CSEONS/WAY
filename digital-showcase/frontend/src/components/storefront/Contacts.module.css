@@ -1,0 +1,83 @@
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Main button on its own line, the rest share the line under it. */
+.stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stack > * {
+  min-width: 0;
+}
+
+.stack > .main {
+  grid-column: 1 / -1;
+}
+
+/* A lone secondary button under the main one stretches too. */
+.stack > :last-child:nth-child(2) {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 720px) {
+  .adaptive {
+    display: flex;
+  }
+}
+
+/* Same specificity as the kit's .primary:hover so the green wins. */
+.whatsapp,
+.whatsapp:hover:not(:disabled) {
+  color: var(--color-accent-ink);
+  background: var(--color-whatsapp);
+}
+
+.whatsapp:hover:not(:disabled),
+.whatsapp:active:not(:disabled) {
+  background: var(--color-whatsapp-strong);
+}
+
+.callButton {
+  flex-shrink: 0;
+  width: var(--control-lg);
+  padding: 0;
+}
+
+/* Phone-only bottom bar */
+
+.bar,
+.barSpacer {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .bar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + var(--safe-bottom));
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-bar);
+  }
+
+  /* Keeps the end of the page reachable above the bar. */
+  .barSpacer {
+    display: block;
+    height: var(--control-lg);
+  }
+}
+
+@media print {
+  .bar {
+    display: none;
+  }
+}

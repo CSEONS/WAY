@@ -25,6 +25,7 @@ import {
   ButtonLink,
   Card,
   CardHeader,
+  Checkbox,
   Chip,
   ChipGroup,
   ColorSwatch,
@@ -92,6 +93,7 @@ export default function DevUiPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [isAgreed, setIsAgreed] = useState(false);
   const [selectedSizes, setSelectedSizes] = useState<string[]>(["M"]);
   const [selectedColor, setSelectedColor] = useState("Синий");
   const [mode, setMode] = useState<"text" | "voice">("text");
@@ -200,6 +202,8 @@ export default function DevUiPage() {
           description={isVisible ? "Покупатели видят товар" : "Товар скрыт от покупателей"}
         />
         <Switch checked={false} onChange={() => undefined} label="Недоступный переключатель" disabled />
+        <Checkbox checked={isAgreed} onChange={setIsAgreed} label="Согласен на обработку персональных данных" />
+        <Checkbox checked={false} onChange={() => undefined} label="Флажок с ошибкой" invalid />
       </Section>
 
       <Section title="Чипы, цвета, режимы">

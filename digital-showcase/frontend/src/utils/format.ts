@@ -19,3 +19,11 @@ export function plural(count: number, [one, few, many]: [string, string, string]
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
   return many;
 }
+
+const NEW_PRODUCT_DAYS = 7;
+
+/** Added to the storefront within the last week: gets a «Новинка» badge. */
+export function isNewProduct(createdAt: string) {
+  const age = Date.now() - Date.parse(createdAt);
+  return age >= 0 && age < NEW_PRODUCT_DAYS * 24 * 60 * 60 * 1000;
+}

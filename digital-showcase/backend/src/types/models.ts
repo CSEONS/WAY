@@ -23,6 +23,8 @@ export interface Store {
   whatsapp: string | null;
   telegram: string | null;
   logoUrl: string | null;
+  /** Free text, e.g. «Пн–Сб 10:00–19:00». */
+  workingHours: string | null;
   isActive: number;
   aiFormEnabled: number;
   subscriptionEndsAt: string | null;
@@ -79,6 +81,19 @@ export interface ProductFull extends Product {
   sizes: ProductSize[];
   colors: ProductColor[];
   variants: ProductVariant[];
+}
+
+export type LeadStatus = "NEW" | "DONE";
+
+export interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  storeName: string | null;
+  city: string | null;
+  comment: string | null;
+  status: LeadStatus;
+  createdAt: string;
 }
 
 export interface JwtPayload {

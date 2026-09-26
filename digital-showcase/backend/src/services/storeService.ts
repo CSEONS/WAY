@@ -43,8 +43,8 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   await db.run(
-    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, isActive, aiFormEnabled, subscriptionEndsAt, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, workingHours, isActive, aiFormEnabled, subscriptionEndsAt, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.ownerId,
     input.name,
@@ -55,6 +55,7 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
     input.whatsapp ?? null,
     input.telegram ?? null,
     input.logoUrl ?? null,
+    input.workingHours ?? null,
     input.isActive ?? 1,
     input.aiFormEnabled ?? 0,
     input.subscriptionEndsAt ?? null,
@@ -70,7 +71,7 @@ export async function updateStore(id: string, input: Partial<Store>) {
   const db = await getDb();
   await db.run(
     `UPDATE stores SET ownerId = ?, name = ?, slug = ?, description = ?, address = ?, phone = ?, whatsapp = ?, telegram = ?,
-     logoUrl = ?, isActive = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, updatedAt = ? WHERE id = ?`,
+     logoUrl = ?, workingHours = ?, isActive = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, updatedAt = ? WHERE id = ?`,
     input.ownerId ?? current.ownerId,
     input.name ?? current.name,
     input.slug ?? current.slug,
@@ -80,6 +81,7 @@ export async function updateStore(id: string, input: Partial<Store>) {
     field(input, "whatsapp", current.whatsapp),
     field(input, "telegram", current.telegram),
     field(input, "logoUrl", current.logoUrl),
+    field(input, "workingHours", current.workingHours),
     input.isActive ?? current.isActive,
     input.aiFormEnabled ?? current.aiFormEnabled,
     field(input, "subscriptionEndsAt", current.subscriptionEndsAt),

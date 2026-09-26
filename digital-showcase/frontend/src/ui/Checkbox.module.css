@@ -1,0 +1,63 @@
+.checkbox {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-snug);
+  cursor: pointer;
+}
+
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Visually hidden, still focusable and announced as a checkbox. */
+.input {
+  position: absolute;
+  width: 1px;
+  min-width: 0;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.box {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-xs);
+  color: transparent;
+  background: var(--color-surface);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.invalid {
+  border-color: var(--color-danger);
+}
+
+.input:checked + .box {
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  background: var(--color-accent);
+}
+
+.input:focus-visible + .box {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.label a {
+  color: var(--color-accent-strong);
+}

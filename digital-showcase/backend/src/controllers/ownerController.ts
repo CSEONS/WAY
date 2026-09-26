@@ -44,8 +44,8 @@ export const getStore = asyncHandler(async (req, res) => {
 
 export const updateStore = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
-  const { name, description, address, phone, whatsapp, telegram } = req.body;
-  res.json(await storeService.updateStore(store.id, { name, description, address, phone, whatsapp, telegram, ownerId: store.ownerId }));
+  const { name, description, address, phone, whatsapp, telegram, workingHours } = req.body;
+  res.json(await storeService.updateStore(store.id, { name, description, address, phone, whatsapp, telegram, workingHours, ownerId: store.ownerId }));
 });
 
 export const updateStoreLogo = asyncHandler(async (req, res) => {
@@ -61,9 +61,8 @@ export const listProducts = asyncHandler(async (req, res) => {
 
 export const getAnalytics = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
-  const products = await productService.listProducts(store.id);
-  const analytics = await analyticsService.getStoreAnalytics(store.id);
-  res.json({ productCount: products.length, ...analytics });
+  const [productCount, analytics] = await Promise.all([productService.countProducts(store.id), analyticsService.getStoreAnalytics(store.id)]);
+  res.json({ productCount, ...analytics });
 });
 
 export const getProduct = asyncHandler(async (req, res) => {

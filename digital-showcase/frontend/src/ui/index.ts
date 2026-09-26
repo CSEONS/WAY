@@ -3,6 +3,7 @@
 
 export { Badge, StatusDot, type BadgeProps, type Tone } from "./Badge";
 export { Button, ButtonLink, FileButton, IconButton, IconButtonLink, type FileButtonProps, type ButtonProps, type ButtonLinkProps, type ButtonSize, type ButtonVariant, type IconButtonProps } from "./Button";
+export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { Chip, ChipGroup, ColorSwatch, type ChipProps, type ColorSwatchProps } from "./Chip";
 export { cx } from "./cx";
 export { Field, useFieldControl, type FieldProps } from "./Field";

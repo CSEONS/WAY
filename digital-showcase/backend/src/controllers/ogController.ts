@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { asyncHandler } from "../utils/http.js";
+import { asyncHandler, requestOrigin } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
 
@@ -23,11 +23,7 @@ function truncate(value: string, max: number) {
   return trimmed.length > max ? `${trimmed.slice(0, max - 1).trimEnd()}…` : trimmed;
 }
 
-function originFrom(req: Request) {
-  const proto = req.get("x-forwarded-proto") ?? req.protocol;
-  const host = req.get("x-forwarded-host") ?? req.get("host");
-  return `${proto}://${host}`;
-}
+const originFrom = requestOrigin;
 
 function renderOgPage({
   title,

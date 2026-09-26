@@ -1,0 +1,89 @@
+.header {
+  gap: var(--space-4);
+}
+
+.identity {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.logo {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--space-16);
+  height: var(--space-16);
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.text {
+  display: grid;
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
+.description {
+  max-width: 64ch;
+  margin: 0;
+  color: var(--color-ink-muted);
+  white-space: pre-line;
+}
+
+.share {
+  flex-shrink: 0;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-md);
+}
+
+.facts li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.facts svg {
+  flex-shrink: 0;
+  margin-top: var(--space-0-5);
+}
+
+.facts a {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-strong);
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .logo {
+    width: var(--space-12);
+    height: var(--space-12);
+    font-size: var(--font-size-xl);
+  }
+}

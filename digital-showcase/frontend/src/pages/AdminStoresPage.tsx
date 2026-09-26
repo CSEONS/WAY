@@ -19,6 +19,7 @@ interface StoreFormState {
   slug: string;
   description: string;
   address: string;
+  workingHours: string;
   phone: string;
   whatsapp: string;
   telegram: string;
@@ -31,6 +32,7 @@ const emptyStoreForm: StoreFormState = {
   slug: "",
   description: "",
   address: "",
+  workingHours: "",
   phone: "",
   whatsapp: "",
   telegram: "",
@@ -58,6 +60,7 @@ function storePayload(form: StoreFormState) {
     slug: form.slug,
     description: form.description || null,
     address: form.address || null,
+    workingHours: form.workingHours || null,
     phone: form.phone || null,
     whatsapp: form.whatsapp || null,
     telegram: form.telegram || null,
@@ -125,6 +128,7 @@ export function AdminStoresPage() {
       slug: store.slug,
       description: store.description ?? "",
       address: store.address ?? "",
+      workingHours: store.workingHours ?? "",
       phone: store.phone ?? "",
       whatsapp: store.whatsapp ?? "",
       telegram: store.telegram ?? "",
@@ -281,6 +285,9 @@ export function AdminStoresPage() {
           </Field>
           <Field label="Адрес">
             <Input {...field("address")} />
+          </Field>
+          <Field label="Часы работы">
+            <Input placeholder="Ежедневно 10:00–20:00" {...field("workingHours")} />
           </Field>
           <Field label="Телефон">
             <Input type="tel" placeholder="+79280123456" {...field("phone")} />

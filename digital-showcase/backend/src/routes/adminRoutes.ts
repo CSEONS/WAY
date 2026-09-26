@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as controller from "../controllers/adminController.js";
+import * as leadController from "../controllers/leadController.js";
 import { adminOnly, authMiddleware } from "../middleware/authMiddleware.js";
 
 export const adminRoutes = Router();
@@ -22,3 +23,5 @@ adminRoutes.post("/stores/:id/archive", controller.archiveStore);
 adminRoutes.post("/stores/:id/restore", controller.restoreStore);
 adminRoutes.post("/stores/:id/enable-ai-form", controller.enableAiForm);
 adminRoutes.post("/stores/:id/disable-ai-form", controller.disableAiForm);
+adminRoutes.get("/leads", leadController.listLeads);
+adminRoutes.patch("/leads/:id", leadController.updateLead);

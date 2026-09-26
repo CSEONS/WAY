@@ -2,6 +2,7 @@ import { Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free
 import { useState } from "react";
 import type { Product } from "../../types/models";
 import { Card, CardHeader, FileButton, Icon, cx } from "../../ui";
+import { ProductPhoto } from "../ProductPhoto";
 import { createId, initialImages } from "./helpers";
 import type { ProductFormImage } from "./types";
 import styles from "./ProductForm.module.css";
@@ -65,7 +66,7 @@ export function ImageManager({ manager }: { manager: ImageManagerState }) {
                   aria-pressed={image.id === previewImage.id}
                   onClick={() => setPreviewImageId(image.id)}
                 >
-                  <img src={image.url} alt="" />
+                  <ProductPhoto src={image.url} sizes="96px" />
                 </button>
                 <button type="button" className={styles.imageRemove} aria-label={`Удалить ${image.name}`} title="Удалить" onClick={() => removeImage(image.id)}>
                   <Icon icon={Cancel01Icon} size="xs" strokeWidth={2} />

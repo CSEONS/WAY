@@ -43,13 +43,28 @@ export const getStore = asyncHandler(async (req, res) => {
 
 export const createStore = asyncHandler(async (req, res) => {
   requireFields(req.body, ["ownerId", "name", "slug"]);
-  const { ownerId, name, slug, description, address, phone, whatsapp, telegram, isActive, aiFormEnabled, subscriptionEndsAt } = req.body;
-  res.status(201).json(await storeService.createStore({ ownerId, name, slug, description, address, phone, whatsapp, telegram, isActive, aiFormEnabled, subscriptionEndsAt }));
+  const { ownerId, name, slug, description, address, phone, whatsapp, telegram, workingHours, isActive, aiFormEnabled, subscriptionEndsAt } = req.body;
+  res
+    .status(201)
+    .json(await storeService.createStore({ ownerId, name, slug, description, address, phone, whatsapp, telegram, workingHours, isActive, aiFormEnabled, subscriptionEndsAt }));
 });
 
 export const updateStore = asyncHandler(async (req, res) => {
-  const { ownerId, name, slug, description, address, phone, whatsapp, telegram, isActive, aiFormEnabled, subscriptionEndsAt } = req.body;
-  const store = await storeService.updateStore(String(req.params.id), { ownerId, name, slug, description, address, phone, whatsapp, telegram, isActive, aiFormEnabled, subscriptionEndsAt });
+  const { ownerId, name, slug, description, address, phone, whatsapp, telegram, workingHours, isActive, aiFormEnabled, subscriptionEndsAt } = req.body;
+  const store = await storeService.updateStore(String(req.params.id), {
+    ownerId,
+    name,
+    slug,
+    description,
+    address,
+    phone,
+    whatsapp,
+    telegram,
+    workingHours,
+    isActive,
+    aiFormEnabled,
+    subscriptionEndsAt
+  });
   if (!store) throw new HttpError(404, "Магазин не найден");
   res.json(store);
 });

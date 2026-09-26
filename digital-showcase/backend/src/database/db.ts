@@ -33,6 +33,7 @@ export async function getDb() {
     fs.mkdirSync(path.dirname(dbFile), { recursive: true });
     const SQL = await initSqlJs();
     sqlDb = fs.existsSync(dbFile) ? new SQL.Database(fs.readFileSync(dbFile)) : new SQL.Database();
+    configureConnection();
     client = {
       async exec(sql: string) {
         sqlDb.exec(sql);
@@ -50,9 +51,20 @@ export async function getDb() {
         return select<T>(sql, params);
       }
     };
-    await client.exec("PRAGMA foreign_keys = ON");
   }
   return client;
+}
+
+/**
+ * Per-connection settings. sql.js closes and reopens the database on every
+ * export() (i.e. every save), which silently resets them — so this runs after
+ * each save too. Before this fix foreign keys were effectively off and
+ * ON DELETE CASCADE never fired.
+ */
+function configureConnection() {
+  sqlDb.exec("PRAGMA foreign_keys = ON");
+  // SQLite's LOWER() only lowers ASCII; search needs Cyrillic too.
+  sqlDb.create_function("ulower", (value: unknown) => (value == null ? null : String(value).toLowerCase()));
 }
 
 function normalizeParams(params: unknown[]) {
@@ -70,6 +82,40 @@ function select<T>(sql: string, params: unknown[]) {
 
 function save() {
   fs.writeFileSync(dbFile, Buffer.from(sqlDb.export()));
+  configureConnection();
+}
+
+/**
+ * Rows left behind while cascades did not work (see configureConnection):
+ * stores of deleted owners, products of deleted stores and so on. Removed
+ * once so foreign keys can be enforced; every removal is logged.
+ */
+async function removeOrphans(database: DatabaseClient) {
+  const checks: [label: string, count: string, fix: string][] = [
+    ["stores of deleted owners", "SELECT COUNT(*) as count FROM stores WHERE ownerId NOT IN (SELECT id FROM users)", "DELETE FROM stores WHERE ownerId NOT IN (SELECT id FROM users)"],
+    ["products of deleted stores", "SELECT COUNT(*) as count FROM products WHERE storeId NOT IN (SELECT id FROM stores)", "DELETE FROM products WHERE storeId NOT IN (SELECT id FROM stores)"],
+    ...["product_images", "product_sizes", "product_colors", "product_variants"].map(
+      (table): [string, string, string] => [
+        `${table} of deleted products`,
+        `SELECT COUNT(*) as count FROM ${table} WHERE productId NOT IN (SELECT id FROM products)`,
+        `DELETE FROM ${table} WHERE productId NOT IN (SELECT id FROM products)`
+      ]
+    ),
+    ["analytics of deleted stores", "SELECT COUNT(*) as count FROM analytics_events WHERE storeId NOT IN (SELECT id FROM stores)", "DELETE FROM analytics_events WHERE storeId NOT IN (SELECT id FROM stores)"],
+    // Keep the store's view counts; only drop the link to the deleted product.
+    [
+      "analytics links to deleted products",
+      "SELECT COUNT(*) as count FROM analytics_events WHERE productId IS NOT NULL AND productId NOT IN (SELECT id FROM products)",
+      "UPDATE analytics_events SET productId = NULL WHERE productId IS NOT NULL AND productId NOT IN (SELECT id FROM products)"
+    ]
+  ];
+  for (const [label, countSql, fixSql] of checks) {
+    const row = await database.get<{ count: number }>(countSql);
+    if (row?.count) {
+      await database.exec(fixSql);
+      console.log(`Cleaned up ${row.count} ${label}`);
+    }
+  }
 }
 
 export async function syncAdminUser(database: Pick<DatabaseClient, "get" | "run">, env: NodeJS.ProcessEnv = process.env) {
@@ -137,6 +183,7 @@ export async function initDatabase() {
       whatsapp TEXT,
       telegram TEXT,
       logoUrl TEXT,
+      workingHours TEXT,
       isActive INTEGER NOT NULL DEFAULT 1,
       aiFormEnabled INTEGER NOT NULL DEFAULT 0,
       subscriptionEndsAt TEXT,
@@ -186,7 +233,18 @@ export async function initDatabase() {
       id TEXT PRIMARY KEY,
       storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
       productId TEXT REFERENCES products(id) ON DELETE CASCADE,
-      type TEXT NOT NULL CHECK(type IN ('STORE_VIEW', 'PRODUCT_VIEW')),
+      type TEXT NOT NULL CHECK(type IN ('STORE_VIEW', 'PRODUCT_VIEW', 'CONTACT_CLICK')),
+      channel TEXT,
+      createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS leads (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      storeName TEXT,
+      city TEXT,
+      comment TEXT,
+      status TEXT NOT NULL DEFAULT 'NEW' CHECK(status IN ('NEW', 'DONE')),
       createdAt TEXT NOT NULL
     );
   `);
@@ -197,6 +255,36 @@ export async function initDatabase() {
   }
   if (storeColumns.some((column) => column.name === "coverUrl")) {
     await database.exec("ALTER TABLE stores DROP COLUMN coverUrl");
+  }
+  if (!storeColumns.some((column) => column.name === "workingHours")) {
+    await database.exec("ALTER TABLE stores ADD COLUMN workingHours TEXT");
+  }
+
+  await removeOrphans(database);
+
+  // SQLite can't alter a CHECK constraint: rebuild analytics_events to allow
+  // CONTACT_CLICK (a buyer tapped WhatsApp/Telegram/call) and add `channel`.
+  // Foreign keys are off only for this one exec (the documented rebuild recipe).
+  const analyticsTable = await database.get<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'analytics_events'");
+  if (analyticsTable && !analyticsTable.sql.includes("CONTACT_CLICK")) {
+    await database.exec(`
+      PRAGMA foreign_keys = OFF;
+      BEGIN;
+      CREATE TABLE analytics_events_new (
+        id TEXT PRIMARY KEY,
+        storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        productId TEXT REFERENCES products(id) ON DELETE CASCADE,
+        type TEXT NOT NULL CHECK(type IN ('STORE_VIEW', 'PRODUCT_VIEW', 'CONTACT_CLICK')),
+        channel TEXT,
+        createdAt TEXT NOT NULL
+      );
+      INSERT INTO analytics_events_new (id, storeId, productId, type, createdAt)
+        SELECT id, storeId, productId, type, createdAt FROM analytics_events;
+      DROP TABLE analytics_events;
+      ALTER TABLE analytics_events_new RENAME TO analytics_events;
+      COMMIT;
+      PRAGMA foreign_keys = ON;
+    `);
   }
 
   const existing = await database.get<{ count: number }>("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");

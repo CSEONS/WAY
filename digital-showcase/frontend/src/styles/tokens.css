@@ -23,6 +23,8 @@
   --space-12: 48px;
   --space-16: 64px;
 
+  /* Small square controls: checkbox. */
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -100,14 +102,23 @@
   --color-warning: #b45309;
   --color-warning-soft: #fdf1df;
 
+  /* WhatsApp buttons on the storefront: buyers look for the familiar green. */
+  --color-whatsapp: #167f3f;
+  --color-whatsapp-strong: #11672f;
+  /* Favorite heart. */
+  --color-favorite: #e0245e;
+
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: none;
   /* Lift on hover for clickable cards (product tiles). */
   --shadow-hover: 0 8px 24px rgba(19, 19, 22, 0.1);
+  /* Bars pinned to the bottom of the screen (buyer contact bar). */
+  --shadow-bar: 0 -6px 20px rgba(19, 19, 22, 0.08);
   --focus-ring: 0 0 0 3px var(--color-accent-soft);
 
   /* Stacking order */
+  --z-sticky: 15;
   --z-header: 20;
   --z-dropdown: 30;
   --z-modal: 60;

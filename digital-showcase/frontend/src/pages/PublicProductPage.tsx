@@ -1,18 +1,24 @@
 import {
-  Call02Icon,
   CancelCircleIcon,
   CheckmarkCircle02Icon,
+  Clock01Icon,
   HelpCircleIcon,
   Image01Icon,
-  TelegramIcon,
-  WhatsappIcon
+  Location01Icon,
+  Store01Icon
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { ProductPhoto } from "../components/ProductPhoto";
+import { ContactButtons, FavoriteButton, MobileContactBar, ShareButton } from "../components/storefront";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { useFavorites } from "../hooks/useFavorites";
 import type { Product, Store } from "../types/models";
-import { sortSizes } from "../utils/format";
+import { hasContacts, mapsUrl } from "../utils/contact";
+import { isNewProduct, sortSizes } from "../utils/format";
 import {
+  BackLink,
   Badge,
   Button,
   Card,
@@ -22,7 +28,7 @@ import {
   EmptyState,
   Icon,
   LoadingState,
-  Modal,
+  Notice,
   Page,
   SectionLabel,
   cx,
@@ -44,7 +50,9 @@ export function PublicProductPage() {
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedImageId, setSelectedImageId] = useState("");
-  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const favorites = useFavorites(storeSlug);
+
+  useDocumentMeta(data ? `${data.product.title} — ${data.store.name}` : null, data?.product.description);
 
   useEffect(() => {
     api
@@ -97,6 +105,16 @@ export function PublicProductPage() {
     variants.filter((variant) => !selectedColor || variant.colorName === selectedColor).map((variant) => variant.size)
   );
   const availability = AVAILABILITY_CONFIG[product.status];
+  const productUrl = `${window.location.origin}/m/${storeSlug}/p/${product.id}`;
+  const askMessage = [
+    `Здравствуйте! Интересует «${product.title}»`,
+    [selectedColor && `цвет: ${selectedColor}`, selectedSize && `размер: ${selectedSize}`].filter(Boolean).join(", "),
+    "Есть в наличии?",
+    productUrl
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const isFavorite = favorites.has(product.id);
 
   function chooseColor(colorName: string) {
     const nextFirstChoice = firstChoice ?? "color";
@@ -122,11 +140,14 @@ export function PublicProductPage() {
 
   return (
     <Page className={styles.page}>
+      <div className={styles.back}>
+        <BackLink to={`/m/${storeSlug}`}>{store.name}</BackLink>
+      </div>
       <div className={styles.gallery}>
         {selectedImage ? (
           <>
             <div className={styles.galleryMain}>
-              <img src={selectedImage.url} alt={product.title} />
+              <ProductPhoto src={selectedImage.url} sizes="(min-width: 720px) 55vw, 100vw" alt={product.title} loading="eager" />
             </div>
             {product.images.length > 1 && (
               <div className={styles.thumbs}>
@@ -139,7 +160,7 @@ export function PublicProductPage() {
                     aria-pressed={image.id === selectedImage.id}
                     onClick={() => setSelectedImageId(image.id)}
                   >
-                    <img src={image.url} alt="" />
+                    <ProductPhoto src={image.url} sizes="96px" />
                   </button>
                 ))}
               </div>
@@ -152,7 +173,20 @@ export function PublicProductPage() {
         )}
       </div>
       <Card as="article" padding="lg" className={styles.info}>
-        <h1 className={styles.title}>{product.title}</h1>
+        <div className={styles.titleRow}>
+          <div className={styles.titleText}>
+            {isNewProduct(product.createdAt) && product.status !== "NOT_AVAILABLE" && (
+              <Badge tone="accent" className={styles.newBadge}>
+                Новинка
+              </Badge>
+            )}
+            <h1 className={styles.title}>{product.title}</h1>
+          </div>
+          <div className={styles.titleActions}>
+            <FavoriteButton active={isFavorite} onToggle={() => favorites.toggle(product.id)} />
+            <ShareButton url={productUrl} title={product.title} variant="neutral" className={styles.share} />
+          </div>
+        </div>
         <p className={styles.price}>{product.priceText ? `Цена: ${displayedPriceText}` : displayedPriceText}</p>
         {product.description && <p className={styles.description}>{product.description}</p>}
         {variants.length ? (
@@ -208,58 +242,39 @@ export function PublicProductPage() {
           <Icon icon={availability.icon} size="sm" />
           <strong>Наличие:</strong> {availability.label}
         </p>
-        <Button variant="primary" size="lg" block onClick={() => setContactModalOpen(true)}>
-          Связаться с магазином
-        </Button>
+        {hasContacts(store) ? (
+          <ContactButtons
+            layout="stack"
+            store={store}
+            storeSlug={storeSlug}
+            productId={product.id}
+            message={askMessage}
+            whatsappLabel="Спросить в WhatsApp"
+          />
+        ) : (
+          <Notice tone="neutral">Магазин не указал контакты — загляните к ним лично{store.address ? ` по адресу: ${store.address}` : ""}.</Notice>
+        )}
+        <div className={styles.store}>
+          <Link to={`/m/${storeSlug}`} className={styles.storeName}>
+            <Icon icon={Store01Icon} size="sm" />
+            {store.name}
+          </Link>
+          {store.address && (
+            <a href={mapsUrl(store.address)} target="_blank" rel="noreferrer" className={styles.storeFact}>
+              <Icon icon={Location01Icon} size="sm" />
+              {store.address}
+            </a>
+          )}
+          {store.workingHours && (
+            <span className={styles.storeFact}>
+              <Icon icon={Clock01Icon} size="sm" />
+              {store.workingHours}
+            </span>
+          )}
+        </div>
       </Card>
-      {contactModalOpen && (
-        <Modal
-          title="Выберите способ связи"
-          description={[store.name, store.address].filter(Boolean).join(" · ")}
-          onClose={() => setContactModalOpen(false)}
-        >
-          <ContactOption icon={Call02Icon} label="Позвонить" value={store.phone} href={store.phone ? `tel:${store.phone}` : undefined} />
-          <ContactOption
-            icon={WhatsappIcon}
-            label="WhatsApp"
-            value={store.whatsapp}
-            href={store.whatsapp ? `https://wa.me/${store.whatsapp.replace(/\D/g, "")}` : undefined}
-          />
-          <ContactOption
-            icon={TelegramIcon}
-            label="Telegram"
-            value={store.telegram}
-            href={store.telegram ? (store.telegram.startsWith("http") ? store.telegram : `https://t.me/${store.telegram.replace("@", "")}`) : undefined}
-          />
-        </Modal>
-      )}
+      <MobileContactBar store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} whatsappLabel="Спросить в WhatsApp" />
     </Page>
-  );
-}
-
-function ContactOption({ icon, label, value, href }: { icon: IconSvgElement; label: string; value?: string | null; href?: string }) {
-  const content = (
-    <>
-      <span className={styles.contactIcon}>
-        <Icon icon={icon} size="md" />
-      </span>
-      <span className={styles.contactText}>
-        <strong>{label}</strong>
-        <small>{href ? value : "Не указан владельцем"}</small>
-      </span>
-    </>
-  );
-  if (!href) {
-    return (
-      <span className={cx(styles.contact, styles.contactDisabled)} aria-disabled="true">
-        {content}
-      </span>
-    );
-  }
-  return (
-    <a className={styles.contact} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
-      {content}
-    </a>
   );
 }
 

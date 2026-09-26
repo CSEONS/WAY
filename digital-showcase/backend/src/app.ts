@@ -7,12 +7,13 @@ import { authRoutes } from "./routes/authRoutes.js";
 import { ogRoutes } from "./routes/ogRoutes.js";
 import { ownerRoutes } from "./routes/ownerRoutes.js";
 import { publicRoutes } from "./routes/publicRoutes.js";
+import { seoRoutes } from "./routes/seoRoutes.js";
 import { HttpError } from "./utils/http.js";
 
 export const app = express();
 app.set("trust proxy", true);
 
-app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost", credentials: true }));
+app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost", credentials: true, exposedHeaders: ["X-Total-Count"] }));
 app.use(express.json({ limit: "1mb" }));
 app.use("/uploads", express.static(process.env.UPLOAD_DIR ?? path.resolve("uploads")));
 
@@ -21,6 +22,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/owner", ownerRoutes);
 app.use("/api/public", publicRoutes);
+app.use(seoRoutes);
 // Bot-only OG-tag preview shell for /m/:slug and /m/:slug/p/:productId —
 // nginx only routes known crawler user agents here (see nginx.conf); real
 // visitors hit the SPA on the frontend service directly.

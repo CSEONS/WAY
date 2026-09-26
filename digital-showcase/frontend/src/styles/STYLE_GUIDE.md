@@ -57,6 +57,7 @@ the rule here and in the config, in the same commit.
 | An icon | `Icon` with `size="xs" | "sm" | "md" | "lg"` — never `HugeiconsIcon` directly, never another icon library |
 | Form field with label/hint/error | `Field` wrapping `Input`, `Textarea`, `Select` |
 | On/off setting | `Switch` |
+| Agree / confirm checkbox (consent to data processing) | `Checkbox` |
 | Size / filter / category toggles | `Chip` inside `ChipGroup` |
 | A color | `ColorSwatch` (static, or a toggle with `onClick`) |
 | 2–3 mutually exclusive modes | `SegmentedControl` |
@@ -102,6 +103,7 @@ Semantic tokens only — no hex values outside `tokens.css`.
 | Lines | `--color-border`, `--color-border-strong` |
 | Accent | `--color-accent`, `-strong` (hover), `-active`, `-soft` (tinted background), `-soft-hover`, `-ink` (text on accent) |
 | Status | `--color-success/-soft`, `--color-warning/-soft`, `--color-danger/-strong/-soft/-soft-hover` |
+| Storefront | `--color-whatsapp/-strong` (WhatsApp buttons), `--color-favorite` (favorite heart) |
 | Other | `--color-overlay` (modal backdrop), `--focus-ring` |
 
 ## Sizes, layers, motion
@@ -110,12 +112,14 @@ Semantic tokens only — no hex values outside `tokens.css`.
   `--control-lg` 46, `--control-input` 44. To make the whole UI more
   finger-friendly, change these tokens, not components.
 - Icon sizes: `--icon-xs` 14, `--icon-sm` 16, `--icon-md` 20, `--icon-lg` 24.
-- Stacking: `--z-header` < `--z-dropdown` < `--z-modal` < `--z-jobs` <
-  `--z-toast`. Modals and toasts also use the browser top layer.
+- Stacking: `--z-sticky` (bottom contact bar) < `--z-header` <
+  `--z-dropdown` < `--z-modal` < `--z-jobs` < `--z-toast`. Modals and toasts
+  also use the browser top layer.
 - Motion: `--duration-fast` (hover), `--duration-base` (toasts),
   `--duration-slow` (sheets), `--ease-standard`. Reduced motion is handled
   globally in `global.css`.
-- Shadows: `--shadow-hover` for clickable tiles and floating panels.
+- Shadows: `--shadow-hover` for clickable tiles and floating panels,
+  `--shadow-bar` for bars pinned to the bottom of the screen.
 
 ## Spacing & radius
 
@@ -151,6 +155,7 @@ transform/animation values.
 
 | Token | Value | Use for |
 |---|---|---|
+| `--radius-xs` | 4px | Tiny square controls — the checkbox box. |
 | `--radius-sm` | 8px | Small elements — badges, thumbnails, popup list items. |
 | `--radius-md` | 12px | Default control radius — inputs, buttons, chips, cards. |
 | `--radius-lg` | 16px | Panels, cards, larger containers. |

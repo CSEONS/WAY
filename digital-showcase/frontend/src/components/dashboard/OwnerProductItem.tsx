@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Product } from "../../types/models";
 import { Badge, Menu, Switch, useToast } from "../../ui";
+import { ProductPhoto } from "../ProductPhoto";
 import { availabilityLabels, availabilityTones, productPrice } from "./productLabels";
 import styles from "./OwnerProductItem.module.css";
 
@@ -41,7 +42,7 @@ export function OwnerProductItem({ product, storeId, storeSlug, onUpdated, onEdi
   return (
     <article className={styles.item}>
       <Link to={editUrl} className={styles.photo} aria-label={`Редактировать «${product.title}»`}>
-        {image ? <img src={image.url} alt="" loading="lazy" /> : <span>{product.title.slice(0, 1)}</span>}
+        {image ? <ProductPhoto src={image.url} sizes="72px" /> : <span>{product.title.slice(0, 1)}</span>}
       </Link>
       <div className={styles.body}>
         <Link to={editUrl} className={styles.title}>

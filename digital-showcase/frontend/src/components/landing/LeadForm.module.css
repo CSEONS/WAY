@@ -1,0 +1,69 @@
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.row {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 560px) {
+  .row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Off-screen, not display:none — some bots skip hidden fields. */
+.trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.consent {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.consentError {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.done {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+
+.doneIcon {
+  display: grid;
+  place-items: center;
+  width: var(--space-16);
+  height: var(--space-16);
+  border-radius: var(--radius-pill);
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.doneTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.doneText {
+  max-width: 36ch;
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.nowrap {
+  white-space: nowrap;
+}

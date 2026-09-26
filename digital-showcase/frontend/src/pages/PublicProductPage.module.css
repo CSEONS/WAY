@@ -2,6 +2,10 @@
   gap: var(--space-5);
 }
 
+.back {
+  grid-column: 1 / -1;
+}
+
 @media (min-width: 720px) {
   .page {
     grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.75fr);
@@ -90,8 +94,33 @@
   gap: var(--space-4);
 }
 
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.titleText {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.titleActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+
+.share {
+  border-radius: var(--radius-pill);
+}
+
 .title {
   max-width: none;
+  overflow-wrap: anywhere;
   margin: 0;
   color: var(--color-ink);
   font-size: var(--font-size-title);
@@ -155,51 +184,38 @@
   color: var(--color-warning);
 }
 
-/* Contact options */
+/* Store the product belongs to */
 
-.contact {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  color: var(--color-ink);
-  background: var(--color-surface-muted);
-  text-decoration: none;
-  transition: background var(--duration-fast) var(--ease-standard);
-}
-
-a.contact:hover {
-  color: var(--color-ink);
-  background: var(--color-accent-soft);
-}
-
-.contactDisabled {
-  color: var(--color-ink-subtle);
-}
-
-.contactIcon {
+.store {
   display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: var(--control-sm);
-  height: var(--control-sm);
-  border-radius: var(--radius-md);
-  color: inherit;
-  background: var(--color-surface);
-}
-
-.contactText {
-  display: grid;
-  min-width: 0;
-}
-
-.contactText strong {
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+  color: var(--color-ink-muted);
   font-size: var(--font-size-md);
+}
+
+.storeName,
+.storeFact {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: inherit;
+  text-decoration: none;
+}
+
+.storeName {
+  color: var(--color-ink);
   font-weight: var(--font-weight-semibold);
 }
 
-.contactText small {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-sm);
+.storeName:hover,
+a.storeFact:hover {
+  color: var(--color-accent-strong);
+}
+
+.storeName svg,
+.storeFact svg {
+  flex-shrink: 0;
+  margin-top: var(--space-0-5);
 }

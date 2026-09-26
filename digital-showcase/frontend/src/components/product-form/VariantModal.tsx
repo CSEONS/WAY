@@ -1,6 +1,7 @@
 import { ColorPickerIcon } from "@hugeicons/core-free-icons";
 import type { FormEvent } from "react";
 import { Button, Chip, ChipGroup, ColorSwatch, Field, Input, Modal, SectionLabel, cx } from "../../ui";
+import { ProductPhoto } from "../ProductPhoto";
 import { COLOR_PRESETS, formatPrice, isValidHex, normalizeHex } from "./helpers";
 import type { ProductFormImage, VariantModalType } from "./types";
 import type { VariantBuilderState } from "./useVariantBuilder";
@@ -142,7 +143,7 @@ export function VariantModal({ builder, images }: { builder: VariantBuilderState
                       aria-pressed={image.id === pipetteImage?.id}
                       onClick={() => builder.setPipetteImageId(image.id)}
                     >
-                      <img src={image.url} alt="" />
+                      <ProductPhoto src={image.url} sizes="96px" />
                     </button>
                   ))}
                 </div>

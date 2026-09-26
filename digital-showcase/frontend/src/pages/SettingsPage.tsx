@@ -43,6 +43,7 @@ export function SettingsPage() {
         name: store.name,
         description: store.description,
         address: store.address,
+        workingHours: store.workingHours,
         phone: store.phone,
         whatsapp: store.whatsapp,
         telegram: store.telegram
@@ -107,6 +108,13 @@ export function SettingsPage() {
           </Field>
           <Field label="Адрес">
             <Input value={store.address ?? ""} onChange={(e) => setStore({ ...store, address: e.target.value })} />
+          </Field>
+          <Field label="Часы работы" hint="Покупатели увидят их на витрине рядом с адресом">
+            <Input
+              value={store.workingHours ?? ""}
+              placeholder="Ежедневно 10:00–20:00"
+              onChange={(e) => setStore({ ...store, workingHours: e.target.value })}
+            />
           </Field>
           <Field label="Телефон">
             <Input type="tel" value={store.phone ?? ""} placeholder="+79280123456" onChange={(e) => setStore({ ...store, phone: e.target.value })} />

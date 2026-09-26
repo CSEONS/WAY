@@ -12,6 +12,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { api } from "./api/client";
 import { Layout } from "./components/Layout";
+import { ScrollManager } from "./components/ScrollManager";
 import { AppRoutes } from "./routes/AppRoutes";
 import { BackgroundJobsProvider } from "./state/backgroundJobs";
 import type { User } from "./types/models";
@@ -40,6 +41,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ScrollManager />
       <ToastProvider>
         <BackgroundJobsProvider>
           <Layout user={user} onLogout={() => setUser(null)} />

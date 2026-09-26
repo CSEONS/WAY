@@ -21,6 +21,8 @@ export interface Store {
   whatsapp: string | null;
   telegram: string | null;
   logoUrl: string | null;
+  /** Free text, e.g. «Ежедневно 10:00–20:00». */
+  workingHours: string | null;
   isActive: number;
   aiFormEnabled: number;
   subscriptionEndsAt: string | null;
@@ -69,4 +71,25 @@ export interface Product {
   sizes: ProductSize[];
   colors: ProductColor[];
   variants: ProductVariant[];
+}
+
+/** What a storefront can be filtered by, across all its visible products. */
+export interface StoreFacets {
+  categories: string[];
+  sizes: string[];
+  colors: { name: string; hex: string | null }[];
+}
+
+export type LeadStatus = "NEW" | "DONE";
+
+/** A request from the landing page form. */
+export interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  storeName: string | null;
+  city: string | null;
+  comment: string | null;
+  status: LeadStatus;
+  createdAt: string;
 }

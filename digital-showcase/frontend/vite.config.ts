@@ -10,7 +10,9 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       "/api": "http://localhost:4000",
-      "/uploads": "http://localhost:4000"
+      "/uploads": "http://localhost:4000",
+      "/sitemap.xml": "http://localhost:4000",
+      "/robots.txt": "http://localhost:4000"
     }
   }
 });

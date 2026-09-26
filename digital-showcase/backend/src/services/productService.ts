@@ -9,23 +9,82 @@ type ProductVariantInput = {
   price?: number | string | null;
 };
 
-async function enrich(product: Product): Promise<ProductFull> {
-  const db = await getDb();
-  const images = await db.all<ProductImage>("SELECT * FROM product_images WHERE productId = ? ORDER BY sortOrder, createdAt", product.id);
-  const sizes = await db.all<ProductSize>("SELECT * FROM product_sizes WHERE productId = ? ORDER BY value", product.id);
-  const colors = await db.all<ProductColor>("SELECT * FROM product_colors WHERE productId = ? ORDER BY name", product.id);
-  const variants = await db.all<ProductVariant>("SELECT * FROM product_variants WHERE productId = ? ORDER BY colorName, size", product.id);
-  return { ...product, images, sizes, colors, variants };
+function groupByProduct<T extends { productId: string }>(rows: T[]) {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const group = groups.get(row.productId);
+    if (group) group.push(row);
+    else groups.set(row.productId, [row]);
+  }
+  return groups;
 }
 
-export async function listProducts(storeId: string, publicOnly = false, filters: { q?: string; category?: string; size?: string; color?: string } = {}) {
+/** Loads images, sizes, colors and variants for many products in 4 queries instead of 4 per product. */
+async function enrichMany(products: Product[]): Promise<ProductFull[]> {
+  if (!products.length) return [];
   const db = await getDb();
+  const ids = products.map((product) => product.id);
+  const inList = ids.map(() => "?").join(", ");
+  const [images, sizes, colors, variants] = await Promise.all([
+    db.all<ProductImage>(`SELECT * FROM product_images WHERE productId IN (${inList}) ORDER BY sortOrder, createdAt`, ids),
+    db.all<ProductSize>(`SELECT * FROM product_sizes WHERE productId IN (${inList}) ORDER BY value`, ids),
+    db.all<ProductColor>(`SELECT * FROM product_colors WHERE productId IN (${inList}) ORDER BY name`, ids),
+    db.all<ProductVariant>(`SELECT * FROM product_variants WHERE productId IN (${inList}) ORDER BY colorName, size`, ids)
+  ]);
+  const imagesBy = groupByProduct(images);
+  const sizesBy = groupByProduct(sizes);
+  const colorsBy = groupByProduct(colors);
+  const variantsBy = groupByProduct(variants);
+  return products.map((product) => ({
+    ...product,
+    images: imagesBy.get(product.id) ?? [],
+    sizes: sizesBy.get(product.id) ?? [],
+    colors: colorsBy.get(product.id) ?? [],
+    variants: variantsBy.get(product.id) ?? []
+  }));
+}
+
+async function enrich(product: Product): Promise<ProductFull> {
+  const [full] = await enrichMany([product]);
+  return full;
+}
+
+export type ProductSort = "new" | "price-asc" | "price-desc";
+
+export interface ProductFilters {
+  q?: string;
+  category?: string;
+  size?: string;
+  color?: string;
+  /** Only these products (the buyer's favorites). */
+  ids?: string[];
+}
+
+/** Own price, or the cheapest variant — what the buyer sees as «from». */
+const EFFECTIVE_PRICE = "COALESCE(p.price, (SELECT MIN(v.price) FROM product_variants v WHERE v.productId = p.id))";
+
+const ORDER_BY: Record<ProductSort, string> = {
+  new: "p.createdAt DESC",
+  "price-asc": `${EFFECTIVE_PRICE} IS NULL, ${EFFECTIVE_PRICE} ASC, p.createdAt DESC`,
+  "price-desc": `${EFFECTIVE_PRICE} IS NULL, ${EFFECTIVE_PRICE} DESC, p.createdAt DESC`
+};
+
+function productWhere(storeId: string, publicOnly: boolean, filters: ProductFilters) {
   const where = ["p.storeId = ?"];
   const params: unknown[] = [storeId];
   if (publicOnly) where.push("p.isVisible = 1");
   if (filters.q) {
-    where.push("LOWER(p.title) LIKE ?");
-    params.push(`%${filters.q.toLowerCase()}%`);
+    // ulower(): Unicode-aware lower(); SQLite's own LOWER() ignores Cyrillic.
+    where.push("(ulower(p.title) LIKE ? OR ulower(p.category) LIKE ?)");
+    const pattern = `%${filters.q.toLowerCase()}%`;
+    params.push(pattern, pattern);
+  }
+  if (filters.ids) {
+    if (!filters.ids.length) where.push("0");
+    else {
+      where.push(`p.id IN (${filters.ids.map(() => "?").join(", ")})`);
+      params.push(...filters.ids);
+    }
   }
   if (filters.category) {
     where.push("p.category = ?");
@@ -39,8 +98,51 @@ export async function listProducts(storeId: string, publicOnly = false, filters:
     where.push("(EXISTS (SELECT 1 FROM product_colors c WHERE c.productId = p.id AND c.name = ?) OR EXISTS (SELECT 1 FROM product_variants v WHERE v.productId = p.id AND v.colorName = ?))");
     params.push(filters.color, filters.color);
   }
-  const products = await db.all<Product>(`SELECT p.* FROM products p WHERE ${where.join(" AND ")} ORDER BY p.createdAt DESC`, params);
-  return Promise.all(products.map(enrich));
+  return { sql: where.join(" AND "), params };
+}
+
+export async function listProducts(
+  storeId: string,
+  publicOnly = false,
+  filters: ProductFilters = {},
+  options: { sort?: ProductSort; limit?: number; offset?: number } = {}
+) {
+  const db = await getDb();
+  const { sql, params } = productWhere(storeId, publicOnly, filters);
+  const page = options.limit ? ` LIMIT ${Math.max(1, Math.floor(options.limit))} OFFSET ${Math.max(0, Math.floor(options.offset ?? 0))}` : "";
+  const products = await db.all<Product>(`SELECT p.* FROM products p WHERE ${sql} ORDER BY ${ORDER_BY[options.sort ?? "new"]}${page}`, params);
+  return enrichMany(products);
+}
+
+export async function countProducts(storeId: string, publicOnly = false, filters: ProductFilters = {}) {
+  const db = await getDb();
+  const { sql, params } = productWhere(storeId, publicOnly, filters);
+  const row = await db.get<{ count: number }>(`SELECT COUNT(*) as count FROM products p WHERE ${sql}`, params);
+  return row?.count ?? 0;
+}
+
+/** Filter options of a storefront: categories, sizes and colors of its visible products. */
+export async function listFacets(storeId: string) {
+  const db = await getDb();
+  const [categories, sizes, colors] = await Promise.all([
+    db.all<{ category: string }>(
+      "SELECT DISTINCT category FROM products WHERE storeId = ? AND isVisible = 1 AND category IS NOT NULL AND category != '' ORDER BY category",
+      storeId
+    ),
+    db.all<{ value: string }>(
+      "SELECT DISTINCT s.value FROM product_sizes s JOIN products p ON p.id = s.productId WHERE p.storeId = ? AND p.isVisible = 1",
+      storeId
+    ),
+    db.all<{ name: string; hex: string | null }>(
+      "SELECT c.name, MAX(c.hex) as hex FROM product_colors c JOIN products p ON p.id = c.productId WHERE p.storeId = ? AND p.isVisible = 1 GROUP BY c.name ORDER BY c.name",
+      storeId
+    )
+  ]);
+  return {
+    categories: categories.map((row) => row.category),
+    sizes: sizes.map((row) => row.value),
+    colors: colors.map((row) => ({ name: row.name, hex: row.hex }))
+  };
 }
 
 export async function getProduct(id: string, storeId?: string, publicOnly = false) {

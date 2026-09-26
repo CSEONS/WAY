@@ -7,6 +7,7 @@ dotenv.config({ path: path.join(rootDir, ".env") });
 
 import { app } from "./app.js";
 import { initDatabase } from "./database/db.js";
+import { ensureThumbnails } from "./services/imageService.js";
 
 const port = Number(process.env.PORT ?? 4000);
 
@@ -21,3 +22,8 @@ await initDatabase();
 app.listen(port, () => {
   console.log(`Backend started on ${port}`);
 });
+
+// Photos uploaded before thumbnails existed get them in the background.
+ensureThumbnails()
+  .then((count) => count && console.log(`Created thumbnails for ${count} photos`))
+  .catch((error) => console.error("Thumbnail backfill failed", error));

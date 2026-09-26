@@ -8,6 +8,7 @@ import {
   Home01Icon,
   InformationCircleIcon,
   Link04Icon,
+  Message01Icon,
   Package01Icon,
   PackageRemoveIcon,
   PlusSignIcon,
@@ -55,10 +56,10 @@ import {
 } from "../ui";
 import styles from "./DashboardPage.module.css";
 
-type StoreAnalytics = { productCount: number; storeViews: number; productViews: number };
+type StoreAnalytics = { productCount: number; storeViews: number; productViews: number; contactClicks: number };
 type ListFilter = "all" | "visible" | "hidden" | "unavailable";
 
-const emptyAnalytics: StoreAnalytics = { productCount: 0, storeViews: 0, productViews: 0 };
+const emptyAnalytics: StoreAnalytics = { productCount: 0, storeViews: 0, productViews: 0, contactClicks: 0 };
 
 const filterMatchers: Record<ListFilter, (product: Product) => boolean> = {
   all: () => true,
@@ -313,6 +314,7 @@ export function DashboardPage() {
 
   const productWord = plural(products.length, ["товара", "товаров", "товаров"]);
   const timesWord = plural(analytics.storeViews, ["раз", "раза", "раз"]);
+  const contactWord = plural(analytics.contactClicks, ["раз", "раза", "раз"]);
 
   return (
     <Page className={styles.page}>
@@ -358,7 +360,9 @@ export function DashboardPage() {
         </div>
         <p className={styles.summary}>
           <Icon icon={EyeIcon} size="sm" />
-          Витрину посмотрели {analytics.storeViews} {timesWord} · на витрине {stats.visible} из {products.length} {productWord}
+          Витрину посмотрели {analytics.storeViews} {timesWord}
+          {analytics.contactClicks > 0 && ` · написали или позвонили ${analytics.contactClicks} ${contactWord}`} · на витрине {stats.visible} из{" "}
+          {products.length} {productWord}
         </p>
       </Card>
 
@@ -407,6 +411,7 @@ export function DashboardPage() {
               <Stat icon={PackageRemoveIcon} label="Нет в наличии" value={stats.unavailable} />
               <Stat icon={EyeIcon} label="Просмотры витрины" value={analytics.storeViews} />
               <Stat icon={Analytics01Icon} label="Просмотры товаров" value={analytics.productViews} />
+              <Stat icon={Message01Icon} label="Написали или позвонили" value={analytics.contactClicks} />
             </div>
             <div className={styles.filters}>
               <Field label="Показывать" className={styles.filter}>

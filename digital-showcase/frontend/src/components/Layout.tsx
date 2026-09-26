@@ -1,7 +1,9 @@
-﻿import { LogOut } from "lucide-react";
+import { Logout01Icon } from "@hugeicons/core-free-icons";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Button } from "../ui";
 import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
 import type { User } from "../types/models";
+import styles from "./Layout.module.css";
 
 interface Props {
   user: User | null;
@@ -24,21 +26,32 @@ export function Layout({ user, onLogout }: Props) {
 
   return (
     <>
-      <header className="site-header">
-        <Link to={storeSlug ? `/m/${storeSlug}` : "/"} className="brand">
+      <header className={styles.header}>
+        <Link to={storeSlug ? `/m/${storeSlug}` : "/"} className={styles.brand}>
           {storeSlug ? "Главная" : "Витрины"}
         </Link>
         {!hidePublicStoreNav && (
-          <nav>
-            {user?.role === "ADMIN" && !isInAdmin && <NavLink to="/admin">Админка</NavLink>}
-            {user?.role === "OWNER" && !isInDashboard && <NavLink to="/dashboard">Кабинет</NavLink>}
+          <nav className={styles.nav} aria-label="Основная навигация">
+            {user?.role === "ADMIN" && !isInAdmin && (
+              <NavLink to="/admin" className={styles.navLink}>
+                Админка
+              </NavLink>
+            )}
+            {user?.role === "OWNER" && !isInDashboard && (
+              <NavLink to="/dashboard" className={styles.navLink}>
+                Кабинет
+              </NavLink>
+            )}
             {user ? (
-              <button type="button" className="btn btn-danger btn-sm" onClick={logout}>
-                <LogOut size={16} strokeWidth={2} />
+              <Button variant="danger" size="sm" icon={Logout01Icon} onClick={logout}>
                 Выйти
-              </button>
+              </Button>
             ) : (
-              !isLoginPage && <NavLink to="/login">Войти</NavLink>
+              !isLoginPage && (
+                <NavLink to="/login" className={styles.navLink}>
+                  Войти
+                </NavLink>
+              )
             )}
           </nav>
         )}
@@ -47,4 +60,3 @@ export function Layout({ user, onLogout }: Props) {
     </>
   );
 }
-

@@ -1,0 +1,39 @@
+.page {
+  min-height: calc(100dvh - 220px);
+  align-content: center;
+}
+
+.hero {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 860px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.title {
+  max-width: 20ch;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-tight);
+}
+
+.lead {
+  max-width: 56ch;
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-lg);
+}
+
+.cta {
+  justify-self: start;
+  margin-top: var(--space-2);
+}

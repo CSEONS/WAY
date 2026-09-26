@@ -1,21 +1,37 @@
-﻿import { HugeiconsIcon } from "@hugeicons/react";
-import { PreferenceHorizontalIcon, Search01Icon } from "@hugeicons/core-free-icons";
-import { ChevronDown } from "lucide-react";
+import { ArrowDown01Icon, PreferenceHorizontalIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { EmptyState } from "../components/EmptyState";
 import { ProductCard } from "../components/ProductCard";
-import { Select } from "../components/Select";
 import type { Product, Store } from "../types/models";
+import {
+  Button,
+  Card,
+  Chip,
+  ChipGroup,
+  ColorSwatch,
+  EmptyState,
+  Field,
+  Icon,
+  Input,
+  LoadingState,
+  Page,
+  PageHeader,
+  SectionLabel,
+  Select,
+  cx
+} from "../ui";
+import styles from "./PublicStorePage.module.css";
+
+const emptyFilters = { q: "", category: "", size: "", color: "" };
 
 export function PublicStorePage() {
   const { storeSlug = "" } = useParams();
   const [store, setStore] = useState<Store>();
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState("");
-  const [filters, setFilters] = useState({ q: "", category: "", size: "", color: "" });
-  const [draftFilters, setDraftFilters] = useState({ q: "", category: "", size: "", color: "" });
+  const [filters, setFilters] = useState(emptyFilters);
+  const [draftFilters, setDraftFilters] = useState(emptyFilters);
   const [sort, setSort] = useState("new");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -51,142 +67,158 @@ export function PublicStorePage() {
   const hasQueryOrFilters = Boolean(filters.q || activeFilterCount);
 
   function resetFilters() {
-    const emptyFilters = { q: "", category: "", size: "", color: "" };
     setDraftFilters(emptyFilters);
     setFilters(emptyFilters);
   }
 
-  function toggleFilters() {
-    setFiltersOpen((current) => !current);
-  }
-
   if (error) {
+    const isUnavailable = error.includes("временно") || error.includes("подпис");
     return (
-      <section className="page page-storefront">
+      <Page>
         <EmptyState
-          title={error.includes("временно") || error.includes("подпис") ? "Магазин недоступен" : "Магазин не найден"}
-          description={error.includes("временно") || error.includes("подпис") ? "Подписка могла истечь или магазин был архивирован." : error}
+          title={isUnavailable ? "Магазин недоступен" : "Магазин не найден"}
+          description={isUnavailable ? "Подписка могла истечь или магазин был архивирован." : error}
         />
-      </section>
+      </Page>
     );
   }
-  if (!store) return <section className="page page-storefront">Загрузка...</section>;
+  if (!store) {
+    return (
+      <Page>
+        <LoadingState />
+      </Page>
+    );
+  }
 
   return (
-    <section className="page page-storefront">
-      <div className="storefront-filters">
-        <div className="search-row">
-          <label className="search">
-            <HugeiconsIcon icon={Search01Icon} size={18} strokeWidth={1.8} />
-            <input
-              placeholder="Поиск по названию"
-              value={draftFilters.q}
-              onChange={(e) => {
-                const next = { ...draftFilters, q: e.target.value };
-                setDraftFilters(next);
-                setFilters(next);
-              }}
-            />
-          </label>
-        </div>
-        <div className="chips">
-          <button type="button" className={`chip${activeFilterCount ? " active" : ""}`} onClick={toggleFilters} aria-expanded={filtersOpen}>
-            <HugeiconsIcon icon={PreferenceHorizontalIcon} size={15} strokeWidth={1.8} />
+    <Page className={styles.page}>
+      <Card padding="sm" className={styles.filters}>
+        <Input
+          icon={Search01Icon}
+          aria-label="Поиск по названию"
+          placeholder="Поиск по названию"
+          value={draftFilters.q}
+          onChange={(e) => {
+            const next = { ...draftFilters, q: e.target.value };
+            setDraftFilters(next);
+            setFilters(next);
+          }}
+        />
+        <ChipGroup scroll>
+          <Chip
+            icon={PreferenceHorizontalIcon}
+            iconEnd={ArrowDown01Icon}
+            count={activeFilterCount}
+            selected={activeFilterCount > 0}
+            className={cx(styles.filterChip, filtersOpen && styles.chipOpen)}
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((current) => !current)}
+          >
             Фильтры
-            {activeFilterCount > 0 && <span className="chip-count">{activeFilterCount}</span>}
-            <ChevronDown size={14} strokeWidth={2} className="chip-chevron" />
-          </button>
-        </div>
+          </Chip>
+        </ChipGroup>
         {filtersOpen && (
-          <div className="filters-panel">
-            <label>
-              Категория
+          <div className={styles.filtersPanel}>
+            <Field label="Категория">
               <Select
-                ariaLabel="Категория"
                 value={draftFilters.category}
                 onChange={(value) => setDraftFilters({ ...draftFilters, category: value })}
                 options={[{ value: "", label: "Все категории" }, ...options.categories.map((v) => ({ value: v ?? "", label: v ?? "" }))]}
               />
-            </label>
+            </Field>
             {Boolean(options.sizes.length) && (
-              <div className="variant-builder-block">
-                <span className="variant-builder-label">Размер</span>
-                <div className="variant-chip-row">
+              <div className={styles.filterGroup}>
+                <SectionLabel>Размер</SectionLabel>
+                <ChipGroup label="Размер">
                   {options.sizes.map((size) => (
-                    <button
+                    <Chip
                       key={size}
-                      type="button"
-                      className={`variant-size-chip${draftFilters.size === size ? " is-selected" : ""}`}
+                      selected={draftFilters.size === size}
                       onClick={() => setDraftFilters((current) => ({ ...current, size: current.size === size ? "" : size }))}
                     >
                       {size}
-                    </button>
+                    </Chip>
                   ))}
-                </div>
+                </ChipGroup>
               </div>
             )}
             {Boolean(options.colors.length) && (
-              <div className="variant-builder-block">
-                <span className="variant-builder-label">Цвет</span>
-                <div className="variant-chip-row">
+              <div className={styles.filterGroup}>
+                <SectionLabel>Цвет</SectionLabel>
+                <ChipGroup label="Цвет">
                   {options.colors.map((color) => (
-                    <button
+                    <ColorSwatch
                       key={color.name}
-                      type="button"
-                      className={`variant-color-chip${draftFilters.color === color.name ? " is-selected" : ""}`}
+                      color={color.hex}
+                      label={color.name}
+                      size="lg"
+                      selected={draftFilters.color === color.name}
                       onClick={() => setDraftFilters((current) => ({ ...current, color: current.color === color.name ? "" : color.name }))}
-                      title={color.name}
-                    >
-                      <span className="variant-color-chip-swatch" style={{ background: color.hex ?? "#d8e5e8" }} />
-                    </button>
+                    />
                   ))}
-                </div>
+                </ChipGroup>
               </div>
             )}
-            <div className="filters-panel-actions">
-              <button type="button" className="btn btn-ghost btn-sm" onClick={resetFilters}>Сбросить все</button>
-              <button type="button" className="btn btn-primary" onClick={() => { setFilters(draftFilters); setFiltersOpen(false); }}>Применить</button>
+            <div className={styles.filtersActions}>
+              <Button variant="ghost" size="sm" onClick={resetFilters}>
+                Сбросить все
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setFilters(draftFilters);
+                  setFiltersOpen(false);
+                }}
+              >
+                Применить
+              </Button>
             </div>
           </div>
         )}
-      </div>
-      <div className="storefront-head">
-        <div>
-          <h1>{store.name}</h1>
-          {store.description && <p>{store.description}</p>}
+      </Card>
+      <PageHeader
+        title={store.name}
+        description={store.description}
+        actions={
+          <div className={styles.sort}>
+            <span className={styles.sortLabel}>
+              <Icon icon={PreferenceHorizontalIcon} size="sm" />
+              Сортировка
+            </span>
+            <Select
+              ariaLabel="Сортировка"
+              className={styles.sortSelect}
+              menuAlign="end"
+              value={sort}
+              onChange={setSort}
+              options={[
+                { value: "new", label: "Новые" },
+                { value: "price-asc", label: "Сначала дешевле" },
+                { value: "price-desc", label: "Сначала дороже" }
+              ]}
+            />
+          </div>
+        }
+      />
+      {visibleProducts.length ? (
+        <div className={styles.grid}>
+          {visibleProducts.map((product) => (
+            <ProductCard key={product.id} product={product} slug={storeSlug} />
+          ))}
         </div>
-        <div className="storefront-sort">
-          <span className="storefront-sort-label">
-            <HugeiconsIcon icon={PreferenceHorizontalIcon} size={15} strokeWidth={1.8} />
-            Сортировка
-          </span>
-          <Select
-            ariaLabel="Сортировка"
-            value={sort}
-            onChange={setSort}
-            options={[
-              { value: "new", label: "Новые" },
-              { value: "price-asc", label: "Сначала дешевле" },
-              { value: "price-desc", label: "Сначала дороже" }
-            ]}
-          />
-        </div>
-      </div>
-      <div className="product-grid">
-        {visibleProducts.map((product) => <ProductCard key={product.id} product={product} slug={storeSlug} />)}
-      </div>
-      {!visibleProducts.length && (
+      ) : (
         <EmptyState
           title="Товаров не найдено"
           description="Попробуйте изменить запрос или убрать фильтры. Здесь появятся товары, которые магазин опубликует."
           action={
             hasQueryOrFilters ? (
-              <button type="button" className="btn btn-primary" onClick={resetFilters}>Сбросить поиск и фильтры</button>
+              <Button variant="primary" onClick={resetFilters}>
+                Сбросить поиск и фильтры
+              </Button>
             ) : undefined
           }
         />
       )}
-    </section>
+    </Page>
   );
 }
-

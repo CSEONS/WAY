@@ -1,0 +1,124 @@
+/* ===================================================================
+   Design tokens — the only place raw colors, sizes and timings live.
+   Rules for using them: STYLE_GUIDE.md.
+   =================================================================== */
+
+:root {
+  color-scheme: light;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Spacing / radius — 4px grid */
+  /* --space-0-5 is a half-step exception for hairline gaps (tight text
+     stacks, segmented-control gutters) that are intentionally smaller
+     than the smallest full grid step. See STYLE_GUIDE.md. */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 999px;
+
+  /* Typography */
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-base: 15px;
+  --font-size-lg: 17px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-h1: clamp(30px, 6vw, 44px);
+  --font-size-h2: clamp(20px, 4vw, 26px);
+  /* Name of a store or product at the top of its page. */
+  --font-size-title: clamp(24px, 5vw, 32px);
+  /* Form fields never go below 16px: iOS Safari zooms the page on focus
+     for anything smaller. */
+  --font-size-input: 16px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.15;
+  --line-height-snug: 1.4;
+  --line-height-base: 1.5;
+
+  /* Control heights (buttons, inputs, chips). One place to make the whole
+     UI more finger-friendly. */
+  --control-xs: 32px;
+  --control-sm: 36px;
+  --control-md: 40px;
+  --control-lg: 46px;
+  --control-input: 44px;
+
+  /* Icon sizes */
+  --icon-xs: 14px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+
+  /* Color */
+  --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f2f2f4;
+  --color-surface-hover: #ececef;
+  --color-border: #e4e4e8;
+  --color-border-strong: #d1d1d8;
+  --color-ink: #131316;
+  --color-ink-muted: #6b6b74;
+  --color-ink-subtle: #9a9aa3;
+  --color-overlay: rgba(19, 19, 22, 0.4);
+
+  --color-accent: #3452eb;
+  --color-accent-strong: #2740c9;
+  --color-accent-active: #1f329e;
+  --color-accent-soft: #eef1fe;
+  --color-accent-soft-hover: #e2e6fc;
+  --color-accent-ink: #ffffff;
+
+  --color-danger: #dc2626;
+  --color-danger-strong: #b91c1c;
+  --color-danger-soft: #fdecec;
+  --color-danger-soft-hover: #fbdada;
+
+  --color-success: #15803d;
+  --color-success-soft: #e9f7ee;
+
+  --color-warning: #b45309;
+  --color-warning-soft: #fdf1df;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  /* Lift on hover for clickable cards (product tiles). */
+  --shadow-hover: 0 8px 24px rgba(19, 19, 22, 0.1);
+  --focus-ring: 0 0 0 3px var(--color-accent-soft);
+
+  /* Stacking order */
+  --z-header: 20;
+  --z-dropdown: 30;
+  --z-modal: 60;
+  --z-jobs: 70;
+  --z-toast: 80;
+
+  /* Motion */
+  --duration-fast: 140ms;
+  --duration-base: 180ms;
+  --duration-slow: 220ms;
+  --ease-standard: ease;
+
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -1,0 +1,48 @@
+.state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  min-height: 220px;
+  padding: var(--space-8) var(--space-4);
+  color: var(--color-ink-muted);
+  text-align: center;
+}
+
+.compact {
+  min-height: 160px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  color: var(--color-ink-subtle);
+  background: var(--color-surface-muted);
+}
+
+.iconDanger {
+  color: var(--color-danger-strong);
+  background: var(--color-danger-soft);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.description {
+  max-width: 40ch;
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-base);
+}
+
+.spinner {
+  color: var(--color-accent);
+}

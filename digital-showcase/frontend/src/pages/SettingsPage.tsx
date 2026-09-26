@@ -1,20 +1,24 @@
-﻿import { ArrowLeft } from "lucide-react";
+import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Store } from "../types/models";
+import { Button, ButtonLink, Card, EmptyState, Field, FileButton, Input, LoadingState, Notice, Page, PageHeader, Textarea, useToast } from "../ui";
+import styles from "./SettingsPage.module.css";
 
 export function SettingsPage() {
   const { storeId } = useParams();
+  const toast = useToast();
   const [store, setStore] = useState<Store>();
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const logoPreviewUrl = useMemo(() => logoFile ? URL.createObjectURL(logoFile) : store?.logoUrl ?? "", [logoFile, store?.logoUrl]);
+  const logoPreviewUrl = useMemo(() => (logoFile ? URL.createObjectURL(logoFile) : store?.logoUrl ?? ""), [logoFile, store?.logoUrl]);
 
   useEffect(() => {
-    return () => { if (logoFile && logoPreviewUrl.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl); };
+    return () => {
+      if (logoFile && logoPreviewUrl.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl);
+    };
   }, [logoFile, logoPreviewUrl]);
 
   useEffect(() => {
@@ -44,8 +48,7 @@ export function SettingsPage() {
       }
       setStore(updated);
       setLogoFile(null);
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 2500);
+      toast.show("Реквизиты сохранены", { tone: "success" });
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Не удалось сохранить реквизиты");
     } finally {
@@ -55,48 +58,68 @@ export function SettingsPage() {
 
   if (!storeId) {
     return (
-      <section className="page page-narrow page-settings page-legacy">
-        <div>
-          <p>Сначала выберите магазин.</p>
-          <Link to="/dashboard">
-            К выбору магазина
-          </Link>
-        </div>
-      </section>
+      <Page width="narrow">
+        <EmptyState
+          title="Сначала выберите магазин"
+          action={
+            <ButtonLink variant="primary" to="/dashboard">
+              К выбору магазина
+            </ButtonLink>
+          }
+        />
+      </Page>
     );
   }
 
-  if (!store) return <section className="page page-narrow page-settings page-legacy">Загрузка...</section>;
+  if (!store) {
+    return (
+      <Page width="narrow">
+        <LoadingState />
+      </Page>
+    );
+  }
 
   return (
-    <section className="page page-narrow page-settings page-legacy">
-      <Link className="back-link" to={`/dashboard/stores/${storeId}`}>
-        <ArrowLeft size={16} strokeWidth={2} />
-        Вернуться назад
-      </Link>
-      <h1>Реквизиты магазина</h1>
-      <form className="app-form settings-form" onSubmit={submit}>
-        <label>Название<input value={store.name} onChange={(e) => setStore({ ...store, name: e.target.value })} /></label>
-        <label>Описание<textarea value={store.description ?? ""} onChange={(e) => setStore({ ...store, description: e.target.value })} /></label>
-        <label>Адрес<input value={store.address ?? ""} onChange={(e) => setStore({ ...store, address: e.target.value })} /></label>
-        <label>Телефон<input type="tel" value={store.phone ?? ""} placeholder="+79280123456" onChange={(e) => setStore({ ...store, phone: e.target.value })} /></label>
-        <label>WhatsApp<input type="tel" value={store.whatsapp ?? ""} placeholder="+79280123456" onChange={(e) => setStore({ ...store, whatsapp: e.target.value })} /></label>
-        <label>Telegram<input value={store.telegram ?? ""} placeholder="@Name" onChange={(e) => setStore({ ...store, telegram: e.target.value })} /></label>
-        <label>
-          Логотип магазина
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
-        </label>
-        {(logoFile || store.logoUrl) && (
-          <div>
-            <img src={logoPreviewUrl} alt="Предпросмотр логотипа" />
-            <span>{logoFile ? logoFile.name : "Текущий логотип"}</span>
+    <Page width="narrow">
+      <PageHeader title="Реквизиты магазина" back={{ to: `/dashboard/stores/${storeId}`, label: "Вернуться назад" }} />
+      <Card as="section" padding="lg">
+        <form className={styles.form} onSubmit={submit}>
+          <Field label="Название">
+            <Input value={store.name} onChange={(e) => setStore({ ...store, name: e.target.value })} />
+          </Field>
+          <Field label="Описание">
+            <Textarea value={store.description ?? ""} onChange={(e) => setStore({ ...store, description: e.target.value })} />
+          </Field>
+          <Field label="Адрес">
+            <Input value={store.address ?? ""} onChange={(e) => setStore({ ...store, address: e.target.value })} />
+          </Field>
+          <Field label="Телефон">
+            <Input type="tel" value={store.phone ?? ""} placeholder="+79280123456" onChange={(e) => setStore({ ...store, phone: e.target.value })} />
+          </Field>
+          <Field label="WhatsApp">
+            <Input type="tel" value={store.whatsapp ?? ""} placeholder="+79280123456" onChange={(e) => setStore({ ...store, whatsapp: e.target.value })} />
+          </Field>
+          <Field label="Telegram">
+            <Input value={store.telegram ?? ""} placeholder="@Name" onChange={(e) => setStore({ ...store, telegram: e.target.value })} />
+          </Field>
+          <div className={styles.logo}>
+            <span className={styles.logoLabel}>Логотип магазина</span>
+            <div className={styles.logoRow}>
+              <span className={styles.logoPreview}>{logoPreviewUrl ? <img src={logoPreviewUrl} alt="Предпросмотр логотипа" /> : null}</span>
+              <div className={styles.logoText}>
+                <FileButton icon={ImageAdd01Icon} size="sm" accept="image/jpeg,image/png,image/webp" onFiles={([file]) => setLogoFile(file)}>
+                  {logoPreviewUrl ? "Заменить логотип" : "Загрузить логотип"}
+                </FileButton>
+                <span className={styles.logoName}>{logoFile ? logoFile.name : store.logoUrl ? "Текущий логотип" : "Логотип не загружен"}</span>
+              </div>
+            </div>
           </div>
-        )}
-        <button disabled={isSaving}>{isSaving ? "Сохраняю..." : "Сохранить"}</button>
-        {error && <p>{error}</p>}
-        {saved && <div role="status">Реквизиты сохранены</div>}
-      </form>
-    </section>
+          {error && <Notice tone="danger">{error}</Notice>}
+          <Button type="submit" variant="primary" size="lg" block loading={isSaving}>
+            Сохранить
+          </Button>
+        </form>
+      </Card>
+    </Page>
   );
 }
-

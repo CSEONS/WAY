@@ -1,0 +1,39 @@
+.tiles {
+  display: grid;
+  justify-content: stretch;
+  gap: var(--space-3);
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.tile:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+.tileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (min-width: 720px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,21 +1,17 @@
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AiMagicIcon,
   ArchiveArrowDownIcon,
   ArchiveArrowUpIcon,
   CalendarAdd01Icon,
-  Cancel01Icon,
   Delete02Icon,
   Edit02Icon,
   Store01Icon
 } from "@hugeicons/core-free-icons";
-import { ArrowLeft } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { ConfirmModal } from "../components/ConfirmModal";
-import { Select } from "../components/Select";
 import type { Store, User } from "../types/models";
+import { Badge, Button, Card, CardHeader, ConfirmModal, EmptyState, Field, Icon, Input, Modal, Page, PageHeader, Select, Textarea, useToast } from "../ui";
+import styles from "./Admin.module.css";
 
 interface StoreFormState {
   ownerId: string;
@@ -69,14 +65,21 @@ function storePayload(form: StoreFormState) {
   };
 }
 
+function errorMessage(err: any, fallback: string) {
+  return err?.response?.data?.message ?? fallback;
+}
+
 export function AdminStoresPage() {
+  const toast = useToast();
   const [owners, setOwners] = useState<User[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [storeForm, setStoreForm] = useState<StoreFormState>(emptyStoreForm);
+  const [isCreating, setIsCreating] = useState(false);
   const [storeToEdit, setStoreToEdit] = useState<Store | null>(null);
   const [storeEditForm, setStoreEditForm] = useState<StoreFormState>(emptyStoreForm);
   const [storeToArchive, setStoreToArchive] = useState<Store | null>(null);
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
+  const ownerOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
 
   async function load() {
     const [ownersRes, storesRes] = await Promise.all([api.get("/admin/owners"), api.get("/admin/stores")]);
@@ -88,24 +91,30 @@ export function AdminStoresPage() {
     load();
   }, []);
 
-  useEffect(() => {
-    function closeModal(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setStoreToEdit(null);
-      setStoreToArchive(null);
-      setStoreToDelete(null);
+  async function run(action: () => Promise<unknown>, fallback: string) {
+    try {
+      await action();
+      await load();
+      return true;
+    } catch (err) {
+      toast.show(errorMessage(err, fallback), { tone: "danger" });
+      return false;
     }
-
-    document.addEventListener("keydown", closeModal);
-    return () => document.removeEventListener("keydown", closeModal);
-  }, []);
+  }
 
   async function createStore(event: FormEvent) {
     event.preventDefault();
-    if (!storeForm.ownerId) return;
-    await api.post("/admin/stores", { ...storePayload(storeForm), isActive: 1 });
-    setStoreForm(emptyStoreForm);
-    load();
+    if (!storeForm.ownerId) {
+      toast.show("Выберите владельца", { tone: "danger" });
+      return;
+    }
+    setIsCreating(true);
+    const isCreated = await run(() => api.post("/admin/stores", { ...storePayload(storeForm), isActive: 1 }), "Не удалось создать магазин");
+    setIsCreating(false);
+    if (isCreated) {
+      setStoreForm(emptyStoreForm);
+      toast.show("Магазин создан", { tone: "success" });
+    }
   }
 
   function openEditStore(store: Store) {
@@ -126,155 +135,166 @@ export function AdminStoresPage() {
   async function updateStore(event: FormEvent) {
     event.preventDefault();
     if (!storeToEdit || !storeEditForm.ownerId) return;
-    await api.patch(`/admin/stores/${storeToEdit.id}`, storePayload(storeEditForm));
-    setStoreToEdit(null);
-    load();
-  }
-
-  async function extend(id: string) {
-    await api.post(`/admin/stores/${id}/extend-subscription`, { days: 30 });
-    load();
+    if (await run(() => api.patch(`/admin/stores/${storeToEdit.id}`, storePayload(storeEditForm)), "Не удалось сохранить магазин")) {
+      setStoreToEdit(null);
+    }
   }
 
   async function toggle(store: Store) {
-    await api.post(`/admin/stores/${store.id}/${store.isActive ? "archive" : "restore"}`);
+    await run(() => api.post(`/admin/stores/${store.id}/${store.isActive ? "archive" : "restore"}`), "Не удалось изменить статус магазина");
     setStoreToArchive(null);
-    load();
-  }
-
-  async function toggleAiForm(store: Store) {
-    await api.post(`/admin/stores/${store.id}/${store.aiFormEnabled ? "disable-ai-form" : "enable-ai-form"}`);
-    load();
   }
 
   async function deleteStore() {
     if (!storeToDelete) return;
-    await api.delete(`/admin/stores/${storeToDelete.id}`);
+    await run(() => api.delete(`/admin/stores/${storeToDelete.id}`), "Не удалось удалить магазин");
     setStoreToDelete(null);
-    load();
+  }
+
+  function field(key: keyof StoreFormState) {
+    return {
+      value: storeEditForm[key],
+      onChange: (event: { target: { value: string } }) => setStoreEditForm({ ...storeEditForm, [key]: event.target.value })
+    };
   }
 
   return (
-    <section className="page page-admin-stores page-legacy">
-      <Link className="back-link" to="/admin">
-        <ArrowLeft size={16} strokeWidth={2} />
-        Назад в админку
-      </Link>
-      <h1>Управление магазинами</h1>
-      <p>Создавайте и управляйте магазинами отдельно от владельцев.</p>
-      <div>
-        <div className="panel">
-          <h2>Создать магазин</h2>
-          <form className="app-form" onSubmit={createStore}>
-            <label>
-              Владелец
-              <Select
-                ariaLabel="Владелец"
-                placeholder="Выберите"
-                value={storeForm.ownerId}
-                onChange={(value) => setStoreForm({ ...storeForm, ownerId: value })}
-                options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
-              />
-            </label>
-            <label>
-              Название
-              <input value={storeForm.name} onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} required />
-            </label>
-            <label>
-              Slug
-              <input value={storeForm.slug} onChange={(e) => setStoreForm({ ...storeForm, slug: e.target.value })} required />
-            </label>
-            <label>
-              Подписка до
-              <input type="datetime-local" value={storeForm.subscriptionEndsAt} onChange={(e) => setStoreForm({ ...storeForm, subscriptionEndsAt: e.target.value })} />
-            </label>
-            <button className="btn btn-primary">Создать</button>
+    <Page>
+      <PageHeader
+        title="Управление магазинами"
+        description="Создавайте и управляйте магазинами отдельно от владельцев."
+        back={{ to: "/admin", label: "Назад в админку" }}
+      />
+      <div className={styles.columns}>
+        <Card as="section" padding="lg">
+          <CardHeader title="Создать магазин" />
+          <form className={styles.form} onSubmit={createStore}>
+            <Field label="Владелец" required>
+              <Select placeholder="Выберите" value={storeForm.ownerId} onChange={(value) => setStoreForm({ ...storeForm, ownerId: value })} options={ownerOptions} />
+            </Field>
+            <Field label="Название" required>
+              <Input value={storeForm.name} onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} required />
+            </Field>
+            <Field label="Slug" hint="Адрес витрины: /m/slug" required>
+              <Input value={storeForm.slug} onChange={(e) => setStoreForm({ ...storeForm, slug: e.target.value })} required />
+            </Field>
+            <Field label="Подписка до">
+              <Input type="datetime-local" value={storeForm.subscriptionEndsAt} onChange={(e) => setStoreForm({ ...storeForm, subscriptionEndsAt: e.target.value })} />
+            </Field>
+            <Button type="submit" variant="primary" loading={isCreating}>
+              Создать
+            </Button>
           </form>
-        </div>
-        <div className="panel">
-          <h2>Список магазинов</h2>
-          <div className="stack-list">
-            {stores.map((store) => (
-              <div className="list-row" key={store.id}>
-                <div className="list-row-main">
-                  <span className="list-row-icon">
-                    <HugeiconsIcon icon={Store01Icon} size={18} strokeWidth={1.6} />
-                  </span>
-                  <div>
-                    <strong>{store.name}</strong>
-                    <small>/m/{store.slug}</small>
+        </Card>
+        <Card as="section" padding="lg">
+          <CardHeader title="Список магазинов" />
+          {stores.length ? (
+            <div className={styles.list}>
+              {stores.map((store) => (
+                <div className={styles.row} key={store.id}>
+                  <div className={styles.rowMain}>
+                    <span className={styles.rowIcon}>
+                      <Icon icon={Store01Icon} size="md" strokeWidth={1.6} />
+                    </span>
+                    <div className={styles.rowText}>
+                      <strong>{store.name}</strong>
+                      <small>/m/{store.slug}</small>
+                    </div>
+                  </div>
+                  <div className={styles.rowMeta}>
+                    <Badge tone={store.isActive ? "success" : "neutral"}>{store.isActive ? "Активен" : "В архиве"}</Badge>
+                    <span>до {store.subscriptionEndsAt ? new Date(store.subscriptionEndsAt).toLocaleDateString("ru-RU") : "без даты"}</span>
+                    <span>{store.ownerName}</span>
+                  </div>
+                  <div className={styles.rowActions}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={CalendarAdd01Icon}
+                      onClick={() => run(() => api.post(`/admin/stores/${store.id}/extend-subscription`, { days: 30 }), "Не удалось продлить подписку")}
+                    >
+                      +30 дней
+                    </Button>
+                    <Button variant="secondary" size="sm" icon={Edit02Icon} onClick={() => openEditStore(store)}>
+                      Редактировать
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={AiMagicIcon}
+                      onClick={() =>
+                        run(() => api.post(`/admin/stores/${store.id}/${store.aiFormEnabled ? "disable-ai-form" : "enable-ai-form"}`), "Не удалось переключить ИИ")
+                      }
+                    >
+                      {store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={store.isActive ? ArchiveArrowDownIcon : ArchiveArrowUpIcon}
+                      onClick={() => (store.isActive ? setStoreToArchive(store) : toggle(store))}
+                    >
+                      {store.isActive ? "Архивировать" : "Восстановить"}
+                    </Button>
+                    <Button variant="danger" size="sm" icon={Delete02Icon} className={styles.pushRight} onClick={() => setStoreToDelete(store)}>
+                      Удалить
+                    </Button>
                   </div>
                 </div>
-                <div className="list-row-meta">
-                  <span className={`badge ${store.isActive ? "badge-success" : "badge-neutral"}`}>{store.isActive ? "Активен" : "В архиве"}</span>
-                  <span>до {store.subscriptionEndsAt ? new Date(store.subscriptionEndsAt).toLocaleDateString("ru-RU") : "без даты"}</span>
-                  <span>{store.ownerName}</span>
-                </div>
-                <div className="list-row-actions">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => extend(store.id)}>
-                    <HugeiconsIcon icon={CalendarAdd01Icon} size={15} strokeWidth={1.8} />
-                    +30 дней
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEditStore(store)}>
-                    <HugeiconsIcon icon={Edit02Icon} size={15} strokeWidth={1.8} />
-                    Редактировать
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => toggleAiForm(store)}>
-                    <HugeiconsIcon icon={AiMagicIcon} size={15} strokeWidth={1.8} />
-                    {store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => (store.isActive ? setStoreToArchive(store) : toggle(store))}>
-                    <HugeiconsIcon icon={store.isActive ? ArchiveArrowDownIcon : ArchiveArrowUpIcon} size={15} strokeWidth={1.8} />
-                    {store.isActive ? "Архивировать" : "Восстановить"}
-                  </button>
-                  <button type="button" className="btn btn-danger btn-sm" onClick={() => setStoreToDelete(store)}>
-                    <HugeiconsIcon icon={Delete02Icon} size={15} strokeWidth={1.8} />
-                    Удалить
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      {storeToEdit && (
-        <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setStoreToEdit(null)}>
-          <div className="modal" role="dialog" aria-modal="true">
-            <div className="modal-head">
-              <div className="modal-title">
-                <h2>Редактировать магазин</h2>
-                <p>/m/{storeToEdit.slug}</p>
-              </div>
-              <button type="button" className="btn-icon btn-ghost" aria-label="Закрыть" onClick={() => setStoreToEdit(null)}>
-                <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />
-              </button>
+              ))}
             </div>
-            <form className="app-form" onSubmit={updateStore}>
-              <label>
-                Владелец
-                <Select
-                  ariaLabel="Владелец"
-                  placeholder="Выберите"
-                  value={storeEditForm.ownerId}
-                  onChange={(value) => setStoreEditForm({ ...storeEditForm, ownerId: value })}
-                  options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
-                />
-              </label>
-              <label>Название<input value={storeEditForm.name} onChange={(e) => setStoreEditForm({ ...storeEditForm, name: e.target.value })} required /></label>
-              <label>Slug<input value={storeEditForm.slug} onChange={(e) => setStoreEditForm({ ...storeEditForm, slug: e.target.value })} required /></label>
-              <label>Описание<textarea value={storeEditForm.description} onChange={(e) => setStoreEditForm({ ...storeEditForm, description: e.target.value })} /></label>
-              <label>Адрес<input value={storeEditForm.address} onChange={(e) => setStoreEditForm({ ...storeEditForm, address: e.target.value })} /></label>
-              <label>Телефон<input type="tel" value={storeEditForm.phone} placeholder="+79280123456" onChange={(e) => setStoreEditForm({ ...storeEditForm, phone: e.target.value })} /></label>
-              <label>WhatsApp<input type="tel" value={storeEditForm.whatsapp} placeholder="+79280123456" onChange={(e) => setStoreEditForm({ ...storeEditForm, whatsapp: e.target.value })} /></label>
-              <label>Telegram<input value={storeEditForm.telegram} placeholder="@Name" onChange={(e) => setStoreEditForm({ ...storeEditForm, telegram: e.target.value })} /></label>
-              <label>Подписка до<input type="datetime-local" value={storeEditForm.subscriptionEndsAt} onChange={(e) => setStoreEditForm({ ...storeEditForm, subscriptionEndsAt: e.target.value })} /></label>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setStoreToEdit(null)}>Отмена</button>
-                <button className="btn btn-primary">Сохранить</button>
-              </div>
-            </form>
-          </div>
-        </div>
+          ) : (
+            <EmptyState icon={Store01Icon} title="Магазинов пока нет" description="Создайте первый магазин в форме слева." />
+          )}
+        </Card>
+      </div>
+
+      {storeToEdit && (
+        <Modal
+          title="Редактировать магазин"
+          description={`/m/${storeToEdit.slug}`}
+          onClose={() => setStoreToEdit(null)}
+          closeOnBackdrop={false}
+          onSubmit={updateStore}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setStoreToEdit(null)}>
+                Отмена
+              </Button>
+              <Button type="submit" variant="primary">
+                Сохранить
+              </Button>
+            </>
+          }
+        >
+          <Field label="Владелец" required>
+            <Select placeholder="Выберите" value={storeEditForm.ownerId} onChange={(value) => setStoreEditForm({ ...storeEditForm, ownerId: value })} options={ownerOptions} />
+          </Field>
+          <Field label="Название" required>
+            <Input {...field("name")} required />
+          </Field>
+          <Field label="Slug" required>
+            <Input {...field("slug")} required />
+          </Field>
+          <Field label="Описание">
+            <Textarea {...field("description")} />
+          </Field>
+          <Field label="Адрес">
+            <Input {...field("address")} />
+          </Field>
+          <Field label="Телефон">
+            <Input type="tel" placeholder="+79280123456" {...field("phone")} />
+          </Field>
+          <Field label="WhatsApp">
+            <Input type="tel" placeholder="+79280123456" {...field("whatsapp")} />
+          </Field>
+          <Field label="Telegram">
+            <Input placeholder="@Name" {...field("telegram")} />
+          </Field>
+          <Field label="Подписка до">
+            <Input type="datetime-local" {...field("subscriptionEndsAt")} />
+          </Field>
+        </Modal>
       )}
       {storeToArchive && (
         <ConfirmModal
@@ -296,6 +316,6 @@ export function AdminStoresPage() {
           onConfirm={deleteStore}
         />
       )}
-    </section>
+    </Page>
   );
 }

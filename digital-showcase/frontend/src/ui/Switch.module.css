@@ -1,0 +1,83 @@
+.switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-input);
+  color: var(--color-ink);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  cursor: pointer;
+}
+
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Visually hidden, still focusable and announced as a switch. */
+.input {
+  position: absolute;
+  width: 1px;
+  min-width: 0;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.track {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.input:checked + .track {
+  background: var(--color-accent);
+}
+
+.input:checked + .track .thumb {
+  transform: translateX(18px);
+}
+
+.input:focus-visible + .track {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.text {
+  display: grid;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.label {
+  color: var(--color-ink);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+}
+
+.description {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-snug);
+}

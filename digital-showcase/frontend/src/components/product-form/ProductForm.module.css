@@ -1,0 +1,325 @@
+.form {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.section {
+  gap: var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
+.note {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-sm);
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+}
+
+/* AI panel */
+
+.voice {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.aiActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.aiFill {
+  flex: 1 1 200px;
+}
+
+/* Images */
+
+.imagePreview {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.imagePreview img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+
+.imageGrid,
+.pipetteGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: var(--space-2);
+}
+
+.pipetteGrid {
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+}
+
+.imageThumb {
+  position: relative;
+}
+
+.imageThumbButton {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.imageThumbButton img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.imageThumbActive,
+.imageThumbButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Small overlay «×» on a photo thumbnail. */
+.imageRemove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  color: var(--color-accent-ink);
+  background: var(--color-danger);
+  cursor: pointer;
+}
+
+.imageRemove:hover {
+  background: var(--color-danger-strong);
+}
+
+.dropzone {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  min-height: 120px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--color-ink-subtle);
+  background: var(--color-surface-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.dropzone:hover {
+  color: var(--color-ink-muted);
+  background: var(--color-surface-hover);
+}
+
+.dropzone:has(.dropzoneInput:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.dropzoneInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Variant builder */
+
+.builderBlock {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sizeChip {
+  text-transform: uppercase;
+}
+
+.tableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.count {
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-xs);
+}
+
+.variantTable {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.variantRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 140px) var(--control-md);
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.variantName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.variantName span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variantPrice {
+  min-height: var(--control-md);
+}
+
+.variantNote {
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-xs);
+  text-align: right;
+}
+
+.variantEmpty {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--color-ink-subtle);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .variantRow {
+    grid-template-columns: 1fr auto;
+  }
+
+  .variantName {
+    grid-column: 1 / -1;
+  }
+
+  .variantNote {
+    text-align: left;
+  }
+}
+
+/* Long-press to delete a remembered value: a red ring fills while holding. */
+.holding {
+  animation: hold-progress 550ms linear forwards;
+}
+
+@keyframes hold-progress {
+  from {
+    box-shadow: inset 0 0 0 0 var(--color-danger);
+  }
+  to {
+    box-shadow: inset 0 0 0 3px var(--color-danger);
+  }
+}
+
+/* Color dialog */
+
+.colorHead {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.colorPreview {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.colorTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nativeColor {
+  width: 56px;
+  min-width: 56px;
+  height: var(--control-input);
+  min-height: var(--control-input);
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.pipettePreview {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.pipettePreview img {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+}

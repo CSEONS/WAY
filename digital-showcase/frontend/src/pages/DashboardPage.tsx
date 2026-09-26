@@ -1,10 +1,11 @@
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Analytics01Icon,
   Archive02Icon,
+  ArrowRight01Icon,
   CheckmarkCircle02Icon,
   Clock01Icon,
   Copy01Icon,
+  Delete02Icon,
   Edit02Icon,
   Exchange01Icon,
   EyeIcon,
@@ -16,23 +17,44 @@ import {
   Search01Icon,
   Settings01Icon,
   ShoppingBag01Icon,
-  Store01Icon,
-  Delete02Icon
+  Store01Icon
 } from "@hugeicons/core-free-icons";
-import { ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { ConfirmModal } from "../components/ConfirmModal";
 import { BulkProductCreator } from "../components/BulkProductCreator";
-import { EmptyState } from "../components/EmptyState";
 import { QrShareButton } from "../components/QrShareButton";
-import { Select } from "../components/Select";
-import { Toast } from "../components/Toast";
 import type { Product, Store } from "../types/models";
+import {
+  Badge,
+  Breadcrumbs,
+  Button,
+  ButtonLink,
+  Card,
+  ConfirmModal,
+  EmptyState,
+  ErrorState,
+  Field,
+  Icon,
+  IconButton,
+  IconButtonLink,
+  Input,
+  LoadingState,
+  Notice,
+  Page,
+  PageHeader,
+  Select,
+  Stat,
+  StatusDot,
+  useCopyToClipboard,
+  type Tone
+} from "../ui";
+import styles from "./DashboardPage.module.css";
 
 type OwnerProductStatus = "published" | "draft" | "archive";
 type StoreAnalytics = { productCount: number; storeViews: number; productViews: number };
+
+const emptyAnalytics: StoreAnalytics = { productCount: 0, storeViews: 0, productViews: 0 };
 
 function formatStoreDate(value?: string | null) {
   if (!value) return "Дата создания не указана";
@@ -50,15 +72,8 @@ function productOwnerStatus(product: Product): OwnerProductStatus {
   return product.isVisible ? "published" : "draft";
 }
 
-function productStatusLabel(status: OwnerProductStatus) {
-  return status === "published" ? "Опубликован" : status === "draft" ? "Черновик" : "Архив";
-}
-
-function productStatusBadgeClass(status: OwnerProductStatus) {
-  if (status === "published") return "badge badge-success";
-  if (status === "draft") return "badge badge-warning";
-  return "badge badge-neutral";
-}
+const statusLabels: Record<OwnerProductStatus, string> = { published: "Опубликован", draft: "Черновик", archive: "Архив" };
+const statusTones: Record<OwnerProductStatus, Tone> = { published: "success", draft: "warning", archive: "neutral" };
 
 function productPrice(product: Product) {
   if (product.priceText) return product.priceText;
@@ -86,72 +101,68 @@ function formatProductDate(value?: string | null) {
 
 function ProductThumb({ product }: { product: Product }) {
   const image = product.images[0];
+  return <span className={styles.thumb}>{image ? <img src={image.url} alt="" loading="lazy" /> : product.title.slice(0, 1)}</span>;
+}
+
+function StoreAvatar({ store }: { store: Store }) {
   return (
-    <span className="product-thumb">
-      {image ? <img src={image.url} alt="" /> : product.title.slice(0, 1)}
+    <span className={styles.avatar}>
+      {store.logoUrl ? <img src={store.logoUrl} alt="" /> : <Icon icon={Store01Icon} size="md" strokeWidth={1.6} />}
     </span>
   );
 }
 
+function PublicLink({ url, slug }: { url: string; slug: string }) {
+  const copy = useCopyToClipboard();
+  return (
+    <div className={styles.linkValue}>
+      <a className={styles.link} href={`/m/${slug}`}>
+        {url}
+      </a>
+      <div className={styles.linkActions}>
+        <Button variant="neutral" size="sm" icon={Copy01Icon} onClick={() => copy(url, "Ссылка скопирована")}>
+          Копировать
+        </Button>
+        <QrShareButton url={url} label="QR" />
+      </div>
+    </div>
+  );
+}
+
 function StoreChoiceCard({ store }: { store: Store }) {
-  const [isCopied, setIsCopied] = useState(false);
   const publicUrl = `${location.origin}/m/${store.slug}`;
 
-  async function copyPublicUrl() {
-    await navigator.clipboard?.writeText(publicUrl);
-    setIsCopied(true);
-    window.setTimeout(() => setIsCopied(false), 1600);
-  }
-
   return (
-    <article className="store-card">
-      <div className="store-card-head">
-        <div className="store-avatar">
-          {store.logoUrl ? <img src={store.logoUrl} alt="" /> : <HugeiconsIcon icon={Store01Icon} size={20} strokeWidth={1.6} />}
-        </div>
-        <div className="store-card-title">
-          <h2>{store.name}</h2>
-          <span className="store-status">
-            <span className={`status-dot ${store.isActive ? "is-on" : "is-off"}`} />
-            {store.isActive ? "Активен" : "В архиве"}
-          </span>
+    <Card as="article" padding="lg" className={styles.storeCard}>
+      <div className={styles.storeHead}>
+        <StoreAvatar store={store} />
+        <div className={styles.storeTitle}>
+          <h2 className={styles.storeName}>{store.name}</h2>
+          <StatusDot tone={store.isActive ? "success" : "neutral"}>{store.isActive ? "Активен" : "В архиве"}</StatusDot>
         </div>
       </div>
 
-      <div className="store-link-row">
-        <div className="store-link-label">
-          <HugeiconsIcon icon={Link04Icon} size={15} strokeWidth={1.8} />
-          <span>Публичная ссылка</span>
-        </div>
-        <div className="store-link-value">
-          <a href={`/m/${store.slug}`}>{publicUrl}</a>
-          <div className="store-link-actions">
-            <button type="button" className="btn btn-neutral btn-sm" onClick={copyPublicUrl}>
-              <HugeiconsIcon icon={Copy01Icon} size={15} strokeWidth={1.8} />
-              Копировать
-            </button>
-            <QrShareButton url={publicUrl} label="QR" />
-          </div>
-        </div>
-        <p className="store-hint">Эта ссылка доступна для всех пользователей</p>
-        {isCopied && <Toast message="Ссылка скопирована" />}
-        <div className="store-card-actions">
-          <Link className="btn btn-primary" to={`/dashboard/stores/${store.id}`}>
-            <HugeiconsIcon icon={ShoppingBag01Icon} size={16} strokeWidth={1.8} />
-            <span>Выбрать магазин</span>
-            <ChevronRight size={16} strokeWidth={2} />
-          </Link>
-          <Link className="btn btn-secondary" to={`/dashboard/stores/${store.id}/settings`}>
-            <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.8} />
-            <span>Реквизиты</span>
-          </Link>
-        </div>
-        <div className="store-meta">
-          <HugeiconsIcon icon={InformationCircleIcon} size={15} strokeWidth={1.8} />
-          <span>{formatStoreDate(store.createdAt)}</span>
-        </div>
+      <div className={styles.linkRow}>
+        <span className={styles.linkLabel}>
+          <Icon icon={Link04Icon} size="sm" />
+          Публичная ссылка
+        </span>
+        <PublicLink url={publicUrl} slug={store.slug} />
+        <p className={styles.hint}>Эта ссылка доступна для всех пользователей</p>
       </div>
-    </article>
+      <div className={styles.storeActions}>
+        <ButtonLink variant="primary" icon={ShoppingBag01Icon} iconEnd={ArrowRight01Icon} to={`/dashboard/stores/${store.id}`}>
+          Выбрать магазин
+        </ButtonLink>
+        <ButtonLink variant="secondary" icon={Settings01Icon} to={`/dashboard/stores/${store.id}/settings`}>
+          Реквизиты
+        </ButtonLink>
+      </div>
+      <p className={styles.meta}>
+        <Icon icon={InformationCircleIcon} size="sm" />
+        {formatStoreDate(store.createdAt)}
+      </p>
+    </Card>
   );
 }
 
@@ -160,13 +171,13 @@ export function DashboardPage() {
   const routerLocation = useLocation();
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [analytics, setAnalytics] = useState<StoreAnalytics>({ productCount: 0, storeViews: 0, productViews: 0 });
+  const [analytics, setAnalytics] = useState<StoreAnalytics>(emptyAnalytics);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | OwnerProductStatus>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState("new");
-  const [copiedPublicUrl, setCopiedPublicUrl] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [bulkCreatorOpen, setBulkCreatorOpen] = useState(false);
   const selectedStore = stores.find((store) => store.id === storeId);
@@ -206,23 +217,32 @@ export function DashboardPage() {
     return { total: products.length, published, draft, archive };
   }, [products]);
 
-  useEffect(() => {
+  const loadStores = useCallback(() => {
     let ignore = false;
     setIsLoading(true);
-    api.get<Store[]>("/owner/stores").then((res) => {
-      if (ignore) return;
-      setStores(res.data);
-      setIsLoading(false);
-    });
+    setLoadError(false);
+    api
+      .get<Store[]>("/owner/stores")
+      .then((res) => {
+        if (!ignore) setStores(res.data);
+      })
+      .catch(() => {
+        if (!ignore) setLoadError(true);
+      })
+      .finally(() => {
+        if (!ignore) setIsLoading(false);
+      });
     return () => {
       ignore = true;
     };
   }, []);
 
+  useEffect(() => loadStores(), [loadStores]);
+
   useEffect(() => {
     if (!storeId) {
       setProducts([]);
-      setAnalytics({ productCount: 0, storeViews: 0, productViews: 0 });
+      setAnalytics(emptyAnalytics);
       return;
     }
 
@@ -239,13 +259,6 @@ export function DashboardPage() {
       ignore = true;
     };
   }, [storeId]);
-
-  async function copySelectedStoreUrl() {
-    if (!publicStoreUrl) return;
-    await navigator.clipboard?.writeText(publicStoreUrl);
-    setCopiedPublicUrl(true);
-    window.setTimeout(() => setCopiedPublicUrl(false), 1600);
-  }
 
   async function deleteProduct() {
     if (!storeId || !productToDelete) return;
@@ -264,7 +277,21 @@ export function DashboardPage() {
     setAnalytics(analyticsRes.data);
   }
 
-  if (isLoading) return <section className="page page-dashboard">Загрузка...</section>;
+  if (isLoading) {
+    return (
+      <Page>
+        <LoadingState />
+      </Page>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Page>
+        <ErrorState description="Не удалось загрузить магазины. Проверьте интернет и попробуйте ещё раз." onRetry={loadStores} />
+      </Page>
+    );
+  }
 
   if (!storeId) {
     if (stores.length === 1 && !(routerLocation.state as { showAll?: boolean } | null)?.showAll) {
@@ -272,260 +299,180 @@ export function DashboardPage() {
     }
 
     return (
-      <section className="page page-dashboard">
-        <div className="dashboard-intro">
-          <h1>Кабинет владельца</h1>
-          <p>Сначала выберите магазин, затем добавляйте товары или меняйте реквизиты.</p>
-        </div>
-
+      <Page>
+        <PageHeader title="Кабинет владельца" description="Сначала выберите магазин, затем добавляйте товары или меняйте реквизиты." />
         {stores.length ? (
-          <div className="store-grid">
+          <div className={styles.storeGrid}>
             {stores.map((store) => (
               <StoreChoiceCard store={store} key={store.id} />
             ))}
           </div>
         ) : (
-          <EmptyState
-            title="Магазин еще не создан"
-            description="Администратор должен создать магазин и привязать его к вашему аккаунту."
-          />
+          <EmptyState title="Магазин ещё не создан" description="Администратор должен создать магазин и привязать его к вашему аккаунту." />
         )}
-      </section>
+      </Page>
     );
   }
 
   if (!selectedStore) {
     return (
-      <section className="page page-dashboard">
+      <Page>
         <EmptyState
           title="Магазин недоступен"
           description="Магазин не найден или больше не привязан к вашему аккаунту."
           action={
-            <Link className="btn btn-primary" to="/dashboard" state={{ showAll: true }}>
+            <ButtonLink variant="primary" to="/dashboard" state={{ showAll: true }}>
               Вернуться к выбору магазина
-            </Link>
+            </ButtonLink>
           }
         />
-      </section>
+      </Page>
     );
   }
 
   return (
-    <section className="page page-dashboard">
-      <div className="breadcrumbs">
-        <Link to="/dashboard" state={{ showAll: true }} aria-label="К выбору магазина">
-          <HugeiconsIcon icon={Home01Icon} size={16} strokeWidth={1.8} />
-        </Link>
-        <ChevronRight size={14} strokeWidth={2} />
-        <Link to="/dashboard" state={{ showAll: true }}>Магазины</Link>
-        <ChevronRight size={14} strokeWidth={2} />
-        <span className="crumb-current">{selectedStore.name}</span>
-      </div>
+    <Page className={styles.page}>
+      <Breadcrumbs
+        items={[
+          { label: "К выбору магазина", icon: Home01Icon, to: "/dashboard", state: { showAll: true } },
+          { label: "Магазины", to: "/dashboard", state: { showAll: true } },
+          { label: selectedStore.name }
+        ]}
+      />
 
-      <div className="dashboard-hero">
-        <div className="dashboard-hero-top">
-          <div className="dashboard-hero-identity">
-            <div className="dashboard-hero-body">
-              <div className="dashboard-hero-name">
-                <h1>{selectedStore.name}</h1>
-              </div>
-              <span className="store-status">
-                <span className={`status-dot ${selectedStore.isActive ? "is-on" : "is-off"}`} />
-                {selectedStore.isActive ? "Активен" : "В архиве"}
-              </span>
-              <div className="store-link-value">
-                <span>Публичная ссылка:</span>
-                <a href={`/m/${selectedStore.slug}`}>{publicStoreUrl}</a>
-                <div className="store-link-actions">
-                  <button type="button" className="btn btn-neutral btn-sm" onClick={copySelectedStoreUrl}>
-                    <HugeiconsIcon icon={Copy01Icon} size={15} strokeWidth={1.8} />
-                    Копировать
-                  </button>
-                  <QrShareButton url={publicStoreUrl} label="QR" />
-                </div>
-              </div>
-              {copiedPublicUrl && <Toast message="Ссылка скопирована" />}
+      <Card padding="lg" className={styles.hero}>
+        <div className={styles.heroTop}>
+          <div className={styles.heroBody}>
+            <h1 className={styles.heroTitle}>{selectedStore.name}</h1>
+            <StatusDot tone={selectedStore.isActive ? "success" : "neutral"}>{selectedStore.isActive ? "Активен" : "В архиве"}</StatusDot>
+            <div className={styles.heroLink}>
+              <span className={styles.linkLabel}>Публичная ссылка:</span>
+              <PublicLink url={publicStoreUrl} slug={selectedStore.slug} />
             </div>
           </div>
-          <div className="dashboard-hero-icon-actions">
-            {stores.length > 1 && (
-              <Link className="btn-icon btn-ghost" to="/dashboard" state={{ showAll: true }} aria-label="Сменить магазин">
-                <HugeiconsIcon icon={Exchange01Icon} size={18} strokeWidth={1.8} />
-              </Link>
-            )}
-            <Link className="btn-icon btn-ghost" to={`/dashboard/stores/${selectedStore.id}/settings`} aria-label="Реквизиты магазина">
-              <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={1.8} />
-            </Link>
+          <div className={styles.heroIcons}>
+            {stores.length > 1 && <IconButtonLink icon={Exchange01Icon} label="Сменить магазин" to="/dashboard" state={{ showAll: true }} />}
+            <IconButtonLink icon={Settings01Icon} label="Реквизиты магазина" to={`/dashboard/stores/${selectedStore.id}/settings`} />
           </div>
         </div>
-        <div className="dashboard-toolbar">
-          <Link className="btn btn-primary" to={`/dashboard/stores/${selectedStore.id}/products/new`}>
-            <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.8} />
+        <div className={styles.toolbar}>
+          <ButtonLink variant="primary" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
             Добавить товар
-          </Link>
+          </ButtonLink>
           {Boolean(selectedStore.aiFormEnabled) && (
-            <button type="button" className="btn btn-secondary" onClick={() => setBulkCreatorOpen(true)}>
-              <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.8} />
+            <Button variant="secondary" icon={PlusSignIcon} onClick={() => setBulkCreatorOpen(true)}>
               Добавить много товаров
-            </button>
+            </Button>
           )}
         </div>
-      </div>
+      </Card>
 
       {!selectedStore.isActive && (
-        <EmptyState
-          title="Магазин архивирован"
-          description="Публичная витрина сейчас недоступна. Обратитесь к администратору, чтобы восстановить магазин."
-        />
+        <Notice tone="warning" title="Магазин архивирован">
+          Публичная витрина сейчас недоступна. Обратитесь к администратору, чтобы восстановить магазин.
+        </Notice>
       )}
 
-      {selectedStore.isActive && isSubscriptionExpired && (
-        <EmptyState
-          title="Подписка истекла"
-          description="Клиенты не смогут открыть витрину, пока администратор не продлит подписку."
-        />
+      {Boolean(selectedStore.isActive) && isSubscriptionExpired && (
+        <Notice tone="danger" title="Подписка истекла">
+          Клиенты не смогут открыть витрину, пока администратор не продлит подписку.
+        </Notice>
       )}
 
-      {selectedStore.isActive && !isSubscriptionExpired && isStoreProfileIncomplete && (
-        <div className="setup-card">
-          <div className="setup-card-head">
-            <h2>Запустите магазин</h2>
-            <p>Закройте базовые шаги, чтобы витрина выглядела готовой для клиентов.</p>
+      {Boolean(selectedStore.isActive) && !isSubscriptionExpired && isStoreProfileIncomplete && (
+        <Card className={styles.setup}>
+          <div className={styles.setupHead}>
+            <h2 className={styles.setupTitle}>Запустите магазин</h2>
+            <p className={styles.setupText}>Закройте базовые шаги, чтобы витрина выглядела готовой для клиентов.</p>
           </div>
-          <ol className="setup-steps">
-            <li>
-              <span>1</span>
-              Заполните информацию о магазине
-            </li>
-            <li>
-              <span>2</span>
-              Загрузите логотип
-            </li>
-            <li>
-              <span>3</span>
-              Добавьте первый товар
-            </li>
-            <li>
-              <span>4</span>
-              Скопируйте ссылку
-            </li>
+          <ol className={styles.setupSteps}>
+            {["Заполните информацию о магазине", "Загрузите логотип", "Добавьте первый товар", "Скопируйте ссылку"].map((step, index) => (
+              <li key={step}>
+                <span>{index + 1}</span>
+                {step}
+              </li>
+            ))}
           </ol>
-        </div>
+        </Card>
       )}
 
-      <div className="stat-grid">
-        <div className="stat-tile">
-          <span className="stat-tile-icon"><HugeiconsIcon icon={Package01Icon} size={16} strokeWidth={1.8} /></span>
-          <small>Всего товаров</small>
-          <strong>{analytics.productCount || stats.total}</strong>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-tile-icon"><HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} strokeWidth={1.8} /></span>
-          <small>Опубликовано</small>
-          <strong>{stats.published}</strong>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-tile-icon"><HugeiconsIcon icon={Clock01Icon} size={16} strokeWidth={1.8} /></span>
-          <small>Черновики</small>
-          <strong>{stats.draft}</strong>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-tile-icon"><HugeiconsIcon icon={Archive02Icon} size={16} strokeWidth={1.8} /></span>
-          <small>Архив</small>
-          <strong>{stats.archive}</strong>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-tile-icon"><HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.8} /></span>
-          <small>Просмотры магазина</small>
-          <strong>{analytics.storeViews}</strong>
-        </div>
-        <div className="stat-tile">
-          <span className="stat-tile-icon"><HugeiconsIcon icon={Analytics01Icon} size={16} strokeWidth={1.8} /></span>
-          <small>Просмотры товаров</small>
-          <strong>{analytics.productViews}</strong>
-        </div>
+      <div className={styles.stats}>
+        <Stat icon={Package01Icon} label="Всего товаров" value={analytics.productCount || stats.total} />
+        <Stat icon={CheckmarkCircle02Icon} label="Опубликовано" value={stats.published} />
+        <Stat icon={Clock01Icon} label="Черновики" value={stats.draft} />
+        <Stat icon={Archive02Icon} label="Архив" value={stats.archive} />
+        <Stat icon={EyeIcon} label="Просмотры магазина" value={analytics.storeViews} />
+        <Stat icon={Analytics01Icon} label="Просмотры товаров" value={analytics.productViews} />
       </div>
 
-      <div className="product-toolbar">
-        <div className="product-toolbar-row">
-          <label className="search-field">
-            <span>Поиск</span>
-            <span className="search-field-input">
-              <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.8} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск товара..." />
-            </span>
-          </label>
-          <label>
+      <Card className={styles.filters}>
+        <Field label="Поиск" className={styles.filter}>
+          <Input icon={Search01Icon} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск товара…" />
+        </Field>
+        <Field label="Статус" className={styles.filter}>
+          <Select
+            value={statusFilter}
+            onChange={(value) => setStatusFilter(value as "all" | OwnerProductStatus)}
+            options={[
+              { value: "all", label: "Все" },
+              { value: "published", label: "Опубликован" },
+              { value: "draft", label: "Черновик" },
+              { value: "archive", label: "Архив" }
+            ]}
+          />
+        </Field>
+        <Field label="Категория" className={styles.filter}>
+          <Select
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            options={[{ value: "all", label: "Все" }, ...categories.map((category) => ({ value: category, label: category }))]}
+          />
+        </Field>
+        <Field label="Сортировка" className={styles.filter}>
+          <Select
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: "new", label: "Сначала новые" },
+              { value: "old", label: "Сначала старые" },
+              { value: "price-asc", label: "Цена по возрастанию" },
+              { value: "price-desc", label: "Цена по убыванию" }
+            ]}
+          />
+        </Field>
+      </Card>
+
+      <Card padding="sm" className={styles.table}>
+        {filteredProducts.length > 0 && (
+          <div className={styles.tableHead} aria-hidden="true">
+            <span>Товар</span>
             <span>Статус</span>
-            <Select
-              ariaLabel="Статус"
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value as "all" | OwnerProductStatus)}
-              options={[
-                { value: "all", label: "Все" },
-                { value: "published", label: "Опубликован" },
-                { value: "draft", label: "Черновик" },
-                { value: "archive", label: "Архив" }
-              ]}
-            />
-          </label>
-          <label>
+            <span>Цена</span>
             <span>Категория</span>
-            <Select
-              ariaLabel="Категория"
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              options={[{ value: "all", label: "Все" }, ...categories.map((category) => ({ value: category, label: category }))]}
-            />
-          </label>
-          <label>
-            <span>Сортировка</span>
-            <Select
-              ariaLabel="Сортировка"
-              value={sort}
-              onChange={setSort}
-              options={[
-                { value: "new", label: "Сначала новые" },
-                { value: "old", label: "Сначала старые" },
-                { value: "price-asc", label: "Цена по возрастанию" },
-                { value: "price-desc", label: "Цена по убыванию" }
-              ]}
-            />
-          </label>
-        </div>
-      </div>
-
-      <div className="product-table">
-        <div className="product-table-head">
-          <span>Товар</span>
-          <span>Статус</span>
-          <span>Цена</span>
-          <span>Категория</span>
-          <span>Обновлен</span>
-          <span>Действия</span>
-        </div>
+            <span>Обновлён</span>
+            <span>Действия</span>
+          </div>
+        )}
         {filteredProducts.map((product) => {
           const status = productOwnerStatus(product);
           return (
-            <div className="product-row" key={product.id}>
-              <div className="product-row-main">
+            <div className={styles.row} key={product.id}>
+              <div className={styles.rowMain}>
                 <ProductThumb product={product} />
-                <div className="product-row-title">
+                <div className={styles.rowTitle}>
                   <Link to={`/m/${selectedStore.slug}/p/${product.id}`}>{product.title}</Link>
                   <small>{productDetails(product)}</small>
                 </div>
               </div>
-              <span className="product-row-status"><span className={productStatusBadgeClass(status)}>{productStatusLabel(status)}</span></span>
-              <span className="product-row-price">{productPrice(product)}</span>
-              <span className="product-row-category">{product.category || "Без категории"}</span>
-              <span className="product-row-updated">{formatProductDate(product.updatedAt ?? product.createdAt)}</span>
-              <div className="product-row-actions">
-                <Link className="btn-icon btn-ghost" to={`/dashboard/stores/${selectedStore.id}/products/${product.id}/edit`} aria-label="Редактировать товар">
-                  <HugeiconsIcon icon={Edit02Icon} size={16} strokeWidth={1.8} />
-                </Link>
-                <button type="button" className="btn-icon btn-danger" aria-label="Удалить товар" onClick={() => setProductToDelete(product)}>
-                  <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.8} />
-                </button>
+              <span className={styles.cellStatus}>
+                <Badge tone={statusTones[status]}>{statusLabels[status]}</Badge>
+              </span>
+              <span className={styles.cell}>{productPrice(product)}</span>
+              <span className={styles.cell}>{product.category || "Без категории"}</span>
+              <span className={styles.cellUpdated}>{formatProductDate(product.updatedAt ?? product.createdAt)}</span>
+              <div className={styles.rowActions}>
+                <IconButtonLink icon={Edit02Icon} label="Редактировать товар" to={`/dashboard/stores/${selectedStore.id}/products/${product.id}/edit`} />
+                <IconButton icon={Delete02Icon} label="Удалить товар" variant="danger" onClick={() => setProductToDelete(product)} />
               </div>
             </div>
           );
@@ -536,20 +483,19 @@ export function DashboardPage() {
             description={products.length ? "Попробуйте изменить поиск, фильтры или сортировку." : "Добавьте первый товар, чтобы витрина начала наполняться."}
             action={
               !products.length && (
-                <Link className="btn btn-primary" to={`/dashboard/stores/${selectedStore.id}/products/new`}>
-                  <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.8} />
+                <ButtonLink variant="primary" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
                   Добавить товар
-                </Link>
+                </ButtonLink>
               )
             }
           />
         )}
-      </div>
+      </Card>
 
-      {Boolean(filteredProducts.length) && (
-        <div className="pagination-bar">
-          <span>Показано {filteredProducts.length} из {products.length}</span>
-        </div>
+      {filteredProducts.length > 0 && (
+        <p className={styles.count}>
+          Показано {filteredProducts.length} из {products.length}
+        </p>
       )}
       {productToDelete && (
         <ConfirmModal
@@ -562,6 +508,6 @@ export function DashboardPage() {
         />
       )}
       {bulkCreatorOpen && <BulkProductCreator storeId={selectedStore.id} onClose={() => setBulkCreatorOpen(false)} onComplete={reloadProducts} />}
-    </section>
+    </Page>
   );
 }

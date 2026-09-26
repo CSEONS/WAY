@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
-import type { ProductImageSelection, ProductPayload } from "../components/ProductForm";
+import type { ProductImageSelection, ProductPayload } from "../components/product-form";
 import type { Product } from "../types/models";
 
 export type BackgroundJobStatus = "running" | "done" | "error";

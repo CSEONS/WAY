@@ -1,0 +1,60 @@
+.region {
+  position: fixed;
+  inset: auto auto calc(var(--space-6) + var(--safe-bottom)) 50%;
+  z-index: var(--z-toast);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: max-content;
+  max-width: calc(100vw - var(--space-8));
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Author `display` overrides the UA rule that hides a closed popover, so
+   restore it. Browsers without the Popover API drop this whole rule
+   (unknown pseudo-class) and keep the region visible. */
+.region:not(:popover-open) {
+  display: none;
+}
+
+.toast {
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  color: var(--color-surface);
+  background: var(--color-ink);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  text-align: center;
+  animation: toast-in var(--duration-base) var(--ease-standard) both;
+}
+
+.neutral {
+  background: var(--color-ink);
+}
+
+.success {
+  background: var(--color-success);
+}
+
+.danger {
+  background: var(--color-danger-strong);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,32 +1,31 @@
-﻿import { HugeiconsIcon } from "@hugeicons/react";
-import { Store01Icon, UserAccountIcon } from "@hugeicons/core-free-icons";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight01Icon, Store01Icon, UserAccountIcon } from "@hugeicons/core-free-icons";
 import { Link } from "react-router-dom";
+import { Card, CardHeader, Icon, Page, PageHeader } from "../ui";
+import styles from "./AdminPage.module.css";
+
+const sections = [
+  { to: "/admin/owners", label: "Владельцы", icon: UserAccountIcon },
+  { to: "/admin/stores", label: "Магазины", icon: Store01Icon }
+];
 
 export function AdminPage() {
   return (
-    <section className="page page-admin page-legacy">
-      <h1>Админ-панель</h1>
-      <div className="panel">
-        <h2>Разделы</h2>
-        <nav>
-          <Link to="/admin/owners">
-            <span>
-              <HugeiconsIcon icon={UserAccountIcon} size={18} strokeWidth={1.8} />
-              Владельцы
-            </span>
-            <ChevronRight size={16} strokeWidth={2} />
-          </Link>
-          <Link to="/admin/stores">
-            <span>
-              <HugeiconsIcon icon={Store01Icon} size={18} strokeWidth={1.8} />
-              Магазины
-            </span>
-            <ChevronRight size={16} strokeWidth={2} />
-          </Link>
+    <Page>
+      <PageHeader title="Админ-панель" />
+      <Card as="section" padding="lg">
+        <CardHeader title="Разделы" />
+        <nav className={styles.tiles} aria-label="Разделы админки">
+          {sections.map((section) => (
+            <Link key={section.to} to={section.to} className={styles.tile}>
+              <span className={styles.tileLabel}>
+                <Icon icon={section.icon} size="md" />
+                {section.label}
+              </span>
+              <Icon icon={ArrowRight01Icon} size="sm" />
+            </Link>
+          ))}
         </nav>
-      </div>
-    </section>
+      </Card>
+    </Page>
   );
 }
-

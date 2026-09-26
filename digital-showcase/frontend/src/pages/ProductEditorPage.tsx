@@ -1,12 +1,11 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { ProductForm, type ProductImageSelection, type ProductPayload } from "../components/ProductForm";
+import { ProductForm, type ProductImageSelection, type ProductPayload } from "../components/product-form";
 import { useBackgroundJobs } from "../state/backgroundJobs";
 import type { Product, Store } from "../types/models";
+import { Button, ButtonLink, EmptyState, LoadingState, Notice, Page, PageHeader } from "../ui";
+import styles from "./ProductEditorPage.module.css";
 
 export function ProductEditorPage() {
   const { storeId, id } = useParams();
@@ -71,48 +70,44 @@ export function ProductEditorPage() {
     setFormKey((key) => key + 1);
   }
 
-  function goToList() {
-    navigate(`/dashboard/stores/${storeId}`);
-  }
-
   if (!storeId) {
     return (
-      <section className="page page-narrow page-product-editor page-legacy">
-        <div>
-          <p>Сначала выберите магазин.</p>
-          <Link to="/dashboard">
-            К выбору магазина
-          </Link>
-        </div>
-      </section>
+      <Page width="narrow">
+        <EmptyState
+          title="Сначала выберите магазин"
+          action={
+            <ButtonLink variant="primary" to="/dashboard">
+              К выбору магазина
+            </ButtonLink>
+          }
+        />
+      </Page>
     );
   }
 
-  if (isLoading || (id && !product)) return <section className="page page-narrow page-product-editor page-legacy">Загрузка...</section>;
+  if (isLoading || (id && !product)) {
+    return (
+      <Page width="narrow">
+        <LoadingState />
+      </Page>
+    );
+  }
 
   return (
-    <section className="page page-narrow page-product-editor page-legacy">
-      <Link className="back-link" to={`/dashboard/stores/${storeId}`}>
-        <ArrowLeft size={16} strokeWidth={2} />
-        Вернуться назад
-      </Link>
-      <h1>{id ? "Редактировать товар" : "Новый товар"}</h1>
+    <Page width="narrow">
+      <PageHeader title={id ? "Редактировать товар" : "Новый товар"} back={{ to: `/dashboard/stores/${storeId}`, label: "Вернуться назад" }} />
       {stage === "queued" ? (
         <>
-          <div className="notice-banner notice-success" role="status">
-            <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} strokeWidth={1.8} />
-            <div>
-              <strong>Товар сохраняется в фоне</strong>
-              <span>Прогресс и результат можно посмотреть в любой момент — в правом нижнем углу экрана.</span>
-            </div>
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn btn-primary" onClick={createAnother}>
+          <Notice tone="success" title="Товар сохраняется в фоне">
+            Прогресс и результат можно посмотреть в любой момент — в правом нижнем углу экрана.
+          </Notice>
+          <div className={styles.actions}>
+            <Button variant="primary" onClick={createAnother}>
               Создать ещё один товар
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={goToList}>
+            </Button>
+            <ButtonLink variant="secondary" to={`/dashboard/stores/${storeId}`}>
               К списку товаров
-            </button>
+            </ButtonLink>
           </div>
         </>
       ) : (
@@ -125,6 +120,6 @@ export function ProductEditorPage() {
           onSubmit={handleSubmit}
         />
       )}
-    </section>
+    </Page>
   );
 }

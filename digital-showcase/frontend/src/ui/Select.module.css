@@ -1,0 +1,116 @@
+/* No width/flex/min-width here: the page decides how wide the select is. */
+.root {
+  position: relative;
+  display: block;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-input);
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+  box-shadow: none;
+  font: inherit;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.trigger:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.trigger:focus-visible,
+.trigger[aria-expanded="true"] {
+  outline: none;
+  background: var(--color-surface);
+  box-shadow: var(--focus-ring);
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.trigger[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.placeholder {
+  color: var(--color-ink-subtle);
+}
+
+.chevron {
+  color: var(--color-ink-muted);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.trigger[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.popup {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  top: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(320px, calc(100vw - 2 * var(--space-4)));
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  outline: none;
+}
+
+/* For selects near the right edge of the screen. */
+.alignEnd .popup {
+  left: auto;
+  right: 0;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.active {
+  background: var(--color-surface-muted);
+}
+
+.selected {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}

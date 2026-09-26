@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { AdminPage } from "../pages/AdminPage";
@@ -11,6 +12,11 @@ import { PublicProductPage } from "../pages/PublicProductPage";
 import { PublicStorePage } from "../pages/PublicStorePage";
 import { SettingsPage } from "../pages/SettingsPage";
 import type { User } from "../types/models";
+import { LoadingState } from "../ui";
+
+// UI-kit catalog. `import.meta.env.DEV` is false in production builds, so the
+// page and its chunk are dropped from the bundle.
+const DevUiPage = import.meta.env.DEV ? lazy(() => import("../pages/DevUiPage")) : null;
 
 export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null; isAuthLoading: boolean; onLogin: (user: User) => void }) {
   return (
@@ -19,6 +25,16 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
       <Route path="/m/:storeSlug" element={<PublicStorePage />} />
       <Route path="/m/:storeSlug/p/:productId" element={<PublicProductPage />} />
       <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
+      {DevUiPage && (
+        <Route
+          path="/dev/ui"
+          element={
+            <Suspense fallback={<LoadingState />}>
+              <DevUiPage />
+            </Suspense>
+          }
+        />
+      )}
       <Route element={<ProtectedRoute user={user} role="OWNER" isLoading={isAuthLoading} />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/dashboard/stores/:storeId" element={<DashboardPage />} />

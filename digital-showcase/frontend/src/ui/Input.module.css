@@ -1,0 +1,70 @@
+.control {
+  display: block;
+  width: 100%;
+  min-height: var(--control-input);
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+  box-shadow: none;
+  outline: none;
+  font: inherit;
+  font-size: var(--font-size-input);
+  line-height: var(--line-height-base);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.control::placeholder {
+  color: var(--color-ink-subtle);
+}
+
+.control:hover:not(:disabled):not(:focus) {
+  background: var(--color-surface-hover);
+}
+
+.control:focus {
+  background: var(--color-surface);
+  box-shadow: var(--focus-ring);
+}
+
+.control:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.control[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.control[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px var(--color-danger-soft);
+}
+
+.textarea {
+  min-height: 104px;
+  padding: var(--space-3);
+  resize: vertical;
+}
+
+.iconWrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.leadingIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--space-3);
+  color: var(--color-ink-subtle);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.withIcon {
+  padding-left: var(--space-10);
+}

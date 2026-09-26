@@ -1,0 +1,57 @@
+.shell {
+  display: grid;
+  place-items: center;
+  min-height: calc(100dvh - 60px);
+  padding: var(--space-8) var(--space-4);
+}
+
+.card {
+  display: grid;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: 380px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8) var(--space-6);
+  background: var(--color-surface);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: var(--control-input);
+  height: var(--control-input);
+  border-radius: var(--radius-md);
+  color: var(--color-surface);
+  background: var(--color-ink);
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-tight);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-md);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}

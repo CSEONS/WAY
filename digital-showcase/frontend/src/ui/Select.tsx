@@ -1,29 +1,36 @@
-import { Check, ChevronDown } from "lucide-react";
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { ArrowDown01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { cx } from "./cx";
+import { useFieldControl } from "./Field";
+import { Icon } from "./Icon";
+import styles from "./Select.module.css";
 
 export interface SelectOption {
   value: string;
   label: string;
 }
 
-export function Select({
-  value,
-  onChange,
-  options,
-  ariaLabel,
-  placeholder
-}: {
+export interface SelectProps {
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
+  /** Needed when the select is not inside a <Field>. */
   ariaLabel?: string;
   placeholder?: string;
-}) {
+  disabled?: boolean;
+  id?: string;
+  /** Which edge the option list lines up with. "end" for selects near the right edge of the screen. */
+  menuAlign?: "start" | "end";
+  className?: string;
+}
+
+export function Select({ value, onChange, options, ariaLabel, placeholder, disabled, id, menuAlign = "start", className }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const control = useFieldControl({ id });
   const selected = options.find((option) => option.value === value);
 
   useEffect(() => {
@@ -39,8 +46,7 @@ export function Select({
   }, [isOpen]);
 
   function openList() {
-    const index = Math.max(0, options.findIndex((option) => option.value === value));
-    setActiveIndex(index);
+    setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
     setIsOpen(true);
   }
 
@@ -80,42 +86,41 @@ export function Select({
   }
 
   return (
-    <div className="select-root" ref={rootRef}>
+    <div className={cx(styles.root, menuAlign === "end" && styles.alignEnd, className)} ref={rootRef}>
       <button
         type="button"
-        className="select-trigger"
+        className={styles.trigger}
         ref={triggerRef}
+        id={control.id}
+        aria-describedby={control["aria-describedby"]}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel}
+        disabled={disabled}
         onClick={() => (isOpen ? setIsOpen(false) : openList())}
         onKeyDown={onTriggerKeyDown}
       >
-        <span>{selected?.label ?? placeholder ?? ""}</span>
-        <ChevronDown size={16} strokeWidth={2} />
+        <span className={cx(styles.value, !selected && styles.placeholder)}>{selected?.label ?? placeholder ?? ""}</span>
+        <Icon icon={ArrowDown01Icon} size="sm" className={styles.chevron} />
       </button>
       {isOpen && (
-        <ul
-          className="select-popup"
-          role="listbox"
-          aria-label={ariaLabel}
-          tabIndex={-1}
-          ref={listRef}
-          onKeyDown={onListKeyDown}
-        >
-          {options.map((option, index) => (
-            <li
-              key={option.value}
-              role="option"
-              aria-selected={option.value === value}
-              className={`select-option${index === activeIndex ? " is-active" : ""}${option.value === value ? " is-selected" : ""}`}
-              onMouseEnter={() => setActiveIndex(index)}
-              onClick={() => selectOption(option)}
-            >
-              <span>{option.label}</span>
-              {option.value === value && <Check size={15} strokeWidth={2} />}
-            </li>
-          ))}
+        <ul className={styles.popup} role="listbox" aria-label={ariaLabel} tabIndex={-1} ref={listRef} onKeyDown={onListKeyDown}>
+          {options.map((option, index) => {
+            const isSelected = option.value === value;
+            return (
+              <li
+                key={option.value}
+                role="option"
+                aria-selected={isSelected}
+                className={cx(styles.option, index === activeIndex && styles.active, isSelected && styles.selected)}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => selectOption(option)}
+              >
+                <span>{option.label}</span>
+                {isSelected && <Icon icon={Tick02Icon} size="sm" />}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

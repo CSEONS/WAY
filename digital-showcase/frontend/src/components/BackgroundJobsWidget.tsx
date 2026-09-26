@@ -1,40 +1,37 @@
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, CancelCircleIcon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { useBackgroundJobs } from "../state/backgroundJobs";
+import { Icon, IconButton, ProgressBar, cx } from "../ui";
+import styles from "./BackgroundJobsWidget.module.css";
 
 export function BackgroundJobsWidget() {
   const { jobs, dismissJob } = useBackgroundJobs();
   if (!jobs.length) return null;
 
   return (
-    <div className="background-jobs-dock" role="status" aria-live="polite">
+    <div className={styles.dock} role="status" aria-live="polite">
       {jobs.map((job) => (
-        <div className={`background-job-card is-${job.status}`} key={job.id}>
-          <div className="background-job-card-head">
-            <strong>{job.title}</strong>
-            <button type="button" className="btn-icon btn-ghost" aria-label="Скрыть" onClick={() => dismissJob(job.id)}>
-              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.8} />
-            </button>
+        <div className={styles.card} key={job.id}>
+          <div className={styles.head}>
+            <strong className={styles.title}>{job.title}</strong>
+            <IconButton icon={Cancel01Icon} label="Скрыть" size="sm" onClick={() => dismissJob(job.id)} />
           </div>
           {job.status === "running" && (
             <>
-              <div className="background-job-progress">
-                <div className="background-job-progress-fill" style={{ width: `${job.percent}%` }} />
-              </div>
-              <p className="background-job-message">
+              <ProgressBar value={job.percent} label={job.title} />
+              <p className={styles.message}>
                 {job.message} · {job.percent}%
               </p>
             </>
           )}
           {job.status === "done" && (
-            <p className="background-job-message is-success">
-              <HugeiconsIcon icon={CheckmarkCircle02Icon} size={14} strokeWidth={1.8} />
+            <p className={cx(styles.message, styles.success)}>
+              <Icon icon={CheckmarkCircle02Icon} size="xs" />
               Товар сохранён
             </p>
           )}
           {job.status === "error" && (
-            <p className="background-job-message is-error">
-              <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={1.8} />
+            <p className={cx(styles.message, styles.error)}>
+              <Icon icon={CancelCircleIcon} size="xs" />
               {job.message}
             </p>
           )}

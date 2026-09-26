@@ -1,0 +1,63 @@
+.upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.uploadHint {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
+.previewGrid,
+.draftImages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.previewGrid img,
+.draftImages img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.previewGrid {
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+}
+
+.voice {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.draft {
+  gap: var(--space-3);
+}
+
+.draftFields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Fields sit on a grey card here, so give them a white fill. */
+.draftFields input,
+.draftFields textarea,
+.draftFields button[aria-haspopup] {
+  background: var(--color-surface);
+}
+
+@media (min-width: 720px) {
+  .draft {
+    grid-template-columns: 200px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .draftImages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

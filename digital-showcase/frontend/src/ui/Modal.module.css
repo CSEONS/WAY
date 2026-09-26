@@ -1,0 +1,133 @@
+.dialog {
+  --modal-width: 520px;
+
+  width: min(calc(100% - 2 * var(--space-3)), var(--modal-width));
+  max-width: none;
+  max-height: min(88dvh, 760px);
+  /* Bottom sheet on phones: pinned to the bottom edge, centered from 720px. */
+  margin: auto auto calc(var(--space-3) + var(--safe-bottom));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: sheet-in var(--duration-slow) var(--ease-standard) both;
+}
+
+.dialog::backdrop {
+  background: var(--color-overlay);
+}
+
+.sm {
+  --modal-width: 420px;
+}
+
+.md {
+  --modal-width: 520px;
+}
+
+.lg {
+  --modal-width: 920px;
+}
+
+@media (min-width: 720px) {
+  .dialog {
+    margin: auto;
+  }
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-5);
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-5);
+  background: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.heading {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.iconBox {
+  display: grid;
+  place-items: center;
+  width: var(--control-md);
+  height: var(--control-md);
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+.iconDanger {
+  color: var(--color-danger-strong);
+  background: var(--color-danger-soft);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: var(--line-height-tight);
+}
+
+.description {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  overflow-wrap: anywhere;
+}
+
+.body {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.footer > * {
+  flex: 1 1 0%;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

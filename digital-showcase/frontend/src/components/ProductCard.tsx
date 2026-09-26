@@ -1,7 +1,8 @@
-﻿import { HugeiconsIcon } from "@hugeicons/react";
 import { Image01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "react-router-dom";
 import type { Product } from "../types/models";
+import { Badge, ColorSwatch, Icon } from "../ui";
+import styles from "./ProductCard.module.css";
 
 const statusMap = {
   AVAILABLE: "В наличии",
@@ -17,40 +18,39 @@ export function ProductCard({ product, slug }: { product: Product; slug: string 
   const priceText = product.priceText ? `Цена: ${product.priceText}` : displayPrice != null ? `${displayPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине";
 
   return (
-    <Link className="product-card" to={`/m/${slug}/p/${product.id}`}>
+    <Link className={styles.card} to={`/m/${slug}/p/${product.id}`}>
       {isUnavailable && (
-        <span className="product-card-badge badge badge-danger">Нет в наличии</span>
+        <Badge tone="danger" className={styles.badge}>
+          Нет в наличии
+        </Badge>
       )}
-      <div className="product-card-media">
+      <div className={styles.media}>
         {product.images[0] ? (
-          <img src={product.images[0].url} alt={product.title} />
+          <img className={styles.image} src={product.images[0].url} alt={product.title} loading="lazy" />
         ) : (
-          <div className="product-card-placeholder">
-            <HugeiconsIcon icon={Image01Icon} size={22} strokeWidth={1.6} />
+          <div className={styles.placeholder}>
+            <Icon icon={Image01Icon} size="lg" strokeWidth={1.6} />
           </div>
         )}
       </div>
-      <div className="product-card-body">
-        <h3>{product.title}</h3>
-        <p>{priceText}</p>
-        <small>{product.category || "Без категории"}</small>
-        <div className="product-card-meta">
+      <div className={styles.body}>
+        <h3 className={styles.title}>{product.title}</h3>
+        <p className={styles.price}>{priceText}</p>
+        <small className={styles.category}>{product.category || "Без категории"}</small>
+        <div className={styles.meta}>
           {product.sizes.map((size) => (
-            <span key={size.id} className="badge badge-neutral">
-              {size.value}
-            </span>
+            <Badge key={size.id}>{size.value}</Badge>
           ))}
-          {Boolean(product.colors.length) && (
-            <div className="swatch-row">
-              {product.colors.map((color) => (
-                <span key={color.id} className="swatch" title={color.name} style={{ background: color.hex ?? "#d8e5e8" }} />
-              ))}
-            </div>
-          )}
+          {product.colors.map((color) => (
+            <ColorSwatch key={color.id} color={color.hex} label={color.name} size="sm" />
+          ))}
         </div>
-        {product.status !== "NOT_AVAILABLE" && <strong className="badge badge-success">{statusMap[product.status]}</strong>}
+        {!isUnavailable && (
+          <Badge tone="success" className={styles.status}>
+            {statusMap[product.status]}
+          </Badge>
+        )}
       </div>
     </Link>
   );
 }
-

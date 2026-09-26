@@ -1,8 +1,5 @@
-﻿import { HugeiconsIcon } from "@hugeicons/react";
-import type { IconSvgElement } from "@hugeicons/react";
 import {
   Call02Icon,
-  Cancel01Icon,
   CancelCircleIcon,
   CheckmarkCircle02Icon,
   HelpCircleIcon,
@@ -14,11 +11,28 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Product, Store } from "../types/models";
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  ChipGroup,
+  ColorSwatch,
+  EmptyState,
+  Icon,
+  LoadingState,
+  Modal,
+  Page,
+  SectionLabel,
+  cx,
+  type IconSvgElement
+} from "../ui";
+import styles from "./PublicProductPage.module.css";
 
 const AVAILABILITY_CONFIG: Record<Product["status"], { icon: IconSvgElement; label: string; tone: string }> = {
-  AVAILABLE: { icon: CheckmarkCircle02Icon, label: "в наличии", tone: "is-available" },
-  NOT_AVAILABLE: { icon: CancelCircleIcon, label: "нет в наличии", tone: "is-unavailable" },
-  CHECK_IN_STORE: { icon: HelpCircleIcon, label: "уточнить в магазине", tone: "is-unclear" }
+  AVAILABLE: { icon: CheckmarkCircle02Icon, label: "в наличии", tone: styles.available },
+  NOT_AVAILABLE: { icon: CancelCircleIcon, label: "нет в наличии", tone: styles.unavailable },
+  CHECK_IN_STORE: { icon: HelpCircleIcon, label: "уточнить в магазине", tone: styles.unclear }
 };
 
 export function PublicProductPage() {
@@ -42,8 +56,20 @@ export function PublicProductPage() {
       .catch((err) => setError(err.response?.data?.message ?? "Товар недоступен"));
   }, [storeSlug, productId]);
 
-  if (error) return <section className="page page-product-detail">{error}</section>;
-  if (!data) return <section className="page page-product-detail">Загрузка...</section>;
+  if (error) {
+    return (
+      <Page>
+        <EmptyState title="Товар недоступен" description={error} />
+      </Page>
+    );
+  }
+  if (!data) {
+    return (
+      <Page>
+        <LoadingState />
+      </Page>
+    );
+  }
   const { store, product } = data;
   const selectedImage = product.images.find((image) => image.id === selectedImageId) ?? product.images[0];
   const variants = product.variants ?? [];
@@ -69,6 +95,7 @@ export function PublicProductPage() {
   const availableSizes = new Set(
     variants.filter((variant) => !selectedColor || variant.colorName === selectedColor).map((variant) => variant.size)
   );
+  const availability = AVAILABILITY_CONFIG[product.status];
 
   function chooseColor(colorName: string) {
     const nextFirstChoice = firstChoice ?? "color";
@@ -93,142 +120,143 @@ export function PublicProductPage() {
   }
 
   return (
-    <section className="page page-product-detail">
-      <div className="product-gallery">
+    <Page className={styles.page}>
+      <div className={styles.gallery}>
         {selectedImage ? (
           <>
-            <div className="product-gallery-main">
+            <div className={styles.galleryMain}>
               <img src={selectedImage.url} alt={product.title} />
             </div>
-            <div className="product-gallery-thumbs">
-              {product.images.map((image) => (
-                <button type="button" key={image.id} className={image.id === selectedImage.id ? "is-active" : ""} onClick={() => setSelectedImageId(image.id)}>
-                  <img src={image.url} alt={product.title} />
-                </button>
-              ))}
-            </div>
+            {product.images.length > 1 && (
+              <div className={styles.thumbs}>
+                {product.images.map((image) => (
+                  <button
+                    type="button"
+                    key={image.id}
+                    className={cx(styles.thumb, image.id === selectedImage.id && styles.thumbActive)}
+                    aria-label="Показать фото"
+                    aria-pressed={image.id === selectedImage.id}
+                    onClick={() => setSelectedImageId(image.id)}
+                  >
+                    <img src={image.url} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         ) : (
-          <div className="product-gallery-empty">
-            <HugeiconsIcon icon={Image01Icon} size={28} strokeWidth={1.6} />
+          <div className={styles.galleryEmpty}>
+            <Icon icon={Image01Icon} size="lg" strokeWidth={1.6} />
           </div>
         )}
       </div>
-      <article className="product-info-panel">
-        <h1>{product.title}</h1>
-        <p className="product-price">{product.priceText ? `Цена: ${displayedPriceText}` : displayedPriceText}</p>
-        <p className="product-description">{product.description}</p>
+      <Card as="article" padding="lg" className={styles.info}>
+        <h1 className={styles.title}>{product.title}</h1>
+        <p className={styles.price}>{product.priceText ? `Цена: ${displayedPriceText}` : displayedPriceText}</p>
+        {product.description && <p className={styles.description}>{product.description}</p>}
         {variants.length ? (
-          <div>
-            <div className="variant-group">
-              <div className="variant-group-head">
-                <strong>Цвет</strong>
-              </div>
-              <div className="variant-chip-row">
+          <div className={styles.variants}>
+            <div className={styles.variantGroup}>
+              <SectionLabel>Цвет</SectionLabel>
+              <ChipGroup label="Цвет">
                 {colorOptions.map((color) => (
-                  <button
-                    type="button"
+                  <ColorSwatch
                     key={color.colorName}
-                    className={`variant-color-chip${color.colorName === selectedColor ? " is-selected" : ""}`}
-                    onClick={() => chooseColor(color.colorName)}
+                    color={color.colorHex}
+                    label={color.colorName}
+                    size="lg"
+                    selected={color.colorName === selectedColor}
                     disabled={Boolean(selectedSize) && !availableColorNames.has(color.colorName)}
-                    title={color.colorName}
-                  >
-                    <span className="variant-color-chip-swatch" style={{ background: color.colorHex ?? "#d8e5e8" }} />
-                  </button>
+                    onClick={() => chooseColor(color.colorName)}
+                  />
                 ))}
-              </div>
+              </ChipGroup>
             </div>
-            <div className="variant-group">
-              <div className="variant-group-head">
-                <strong>Размер</strong>
-              </div>
-              <div className="variant-chip-row">
+            <div className={styles.variantGroup}>
+              <SectionLabel>Размер</SectionLabel>
+              <ChipGroup label="Размер">
                 {sizeOptions.map((size) => (
-                  <button
-                    type="button"
+                  <Chip
                     key={size}
-                    className={`variant-size-chip${size === selectedSize ? " is-selected" : ""}`}
-                    onClick={() => chooseSize(size)}
+                    selected={size === selectedSize}
                     disabled={Boolean(selectedColor) && !availableSizes.has(size)}
+                    onClick={() => chooseSize(size)}
                   >
                     {size}
-                  </button>
+                  </Chip>
                 ))}
-              </div>
+              </ChipGroup>
             </div>
-            <div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={resetVariantSelection} disabled={!firstChoice}>
-                Сбросить выбор
-              </button>
-            </div>
+            <Button variant="ghost" size="sm" className={styles.reset} onClick={resetVariantSelection} disabled={!firstChoice}>
+              Сбросить выбор
+            </Button>
           </div>
         ) : (
-          <div className="static-attrs">
-            {product.sizes.map((s) => (
-              <span key={s.id} className="badge badge-neutral">{s.value}</span>
-            ))}
-            {product.colors.map((c) => (
-              <span key={c.id} className="badge badge-neutral">{c.name}</span>
-            ))}
-          </div>
+          (product.sizes.length > 0 || product.colors.length > 0) && (
+            <div className={styles.staticAttrs}>
+              {product.sizes.map((s) => (
+                <Badge key={s.id}>{s.value}</Badge>
+              ))}
+              {product.colors.map((c) => (
+                <Badge key={c.id}>{c.name}</Badge>
+              ))}
+            </div>
+          )
         )}
-        <p className={`product-availability ${AVAILABILITY_CONFIG[product.status].tone}`}>
-          <HugeiconsIcon icon={AVAILABILITY_CONFIG[product.status].icon} size={16} strokeWidth={1.8} />
-          <strong>Наличие:</strong> {AVAILABILITY_CONFIG[product.status].label}
+        <p className={cx(styles.availability, availability.tone)}>
+          <Icon icon={availability.icon} size="sm" />
+          <strong>Наличие:</strong> {availability.label}
         </p>
-        <button type="button" className="btn btn-primary" onClick={() => setContactModalOpen(true)}>Связаться с магазином</button>
-      </article>
+        <Button variant="primary" size="lg" block onClick={() => setContactModalOpen(true)}>
+          Связаться с магазином
+        </Button>
+      </Card>
       {contactModalOpen && (
-        <div className="modal-backdrop" role="presentation" onPointerDown={(event) => event.currentTarget === event.target && setContactModalOpen(false)}>
-          <div className="modal" role="dialog" aria-modal="true">
-            <div className="modal-head">
-              <div className="modal-title">
-                <h2>Выберите способ связи</h2>
-                <p>{store.name}</p>
-                {store.address && <p className="modal-subtitle-muted">{store.address}</p>}
-              </div>
-              <button type="button" className="btn-icon btn-ghost" aria-label="Закрыть" onClick={() => setContactModalOpen(false)}>
-                <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <ContactOption icon={Call02Icon} label="Позвонить" value={store.phone} href={store.phone ? `tel:${store.phone}` : undefined} />
-              <ContactOption icon={WhatsappIcon} label="WhatsApp" value={store.whatsapp} href={store.whatsapp ? `https://wa.me/${store.whatsapp.replace(/\D/g, "")}` : undefined} />
-              <ContactOption icon={TelegramIcon} label="Telegram" value={store.telegram} href={store.telegram ? (store.telegram.startsWith("http") ? store.telegram : `https://t.me/${store.telegram.replace("@", "")}`) : undefined} />
-            </div>
-          </div>
-        </div>
+        <Modal
+          title="Выберите способ связи"
+          description={[store.name, store.address].filter(Boolean).join(" · ")}
+          onClose={() => setContactModalOpen(false)}
+        >
+          <ContactOption icon={Call02Icon} label="Позвонить" value={store.phone} href={store.phone ? `tel:${store.phone}` : undefined} />
+          <ContactOption
+            icon={WhatsappIcon}
+            label="WhatsApp"
+            value={store.whatsapp}
+            href={store.whatsapp ? `https://wa.me/${store.whatsapp.replace(/\D/g, "")}` : undefined}
+          />
+          <ContactOption
+            icon={TelegramIcon}
+            label="Telegram"
+            value={store.telegram}
+            href={store.telegram ? (store.telegram.startsWith("http") ? store.telegram : `https://t.me/${store.telegram.replace("@", "")}`) : undefined}
+          />
+        </Modal>
       )}
-    </section>
+    </Page>
   );
 }
 
-function ContactOption({
-  icon,
-  label,
-  value,
-  href
-}: {
-  icon: IconSvgElement;
-  label: string;
-  value?: string | null;
-  href?: string;
-}) {
+function ContactOption({ icon, label, value, href }: { icon: IconSvgElement; label: string; value?: string | null; href?: string }) {
   const content = (
     <>
-      <span className="contact-option-icon">
-        <HugeiconsIcon icon={icon} size={18} strokeWidth={1.8} />
+      <span className={styles.contactIcon}>
+        <Icon icon={icon} size="md" />
       </span>
-      <span>
+      <span className={styles.contactText}>
         <strong>{label}</strong>
         <small>{href ? value : "Не указан владельцем"}</small>
       </span>
     </>
   );
-  if (!href) return <span className="contact-option" aria-disabled="true">{content}</span>;
+  if (!href) {
+    return (
+      <span className={cx(styles.contact, styles.contactDisabled)} aria-disabled="true">
+        {content}
+      </span>
+    );
+  }
   return (
-    <a className="contact-option" href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+    <a className={styles.contact} href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
       {content}
     </a>
   );
@@ -243,4 +271,3 @@ function uniqueBy<T>(items: T[], getKey: (item: T) => string) {
     return true;
   });
 }
-

@@ -39,6 +39,7 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
   const [images, setImages] = useState<File[]>([]);
   const [inputMode, setInputMode] = useState<"text" | "voice">("text");
   const [prompt, setPrompt] = useState("");
+  const [expectedCount, setExpectedCount] = useState("");
   const [drafts, setDrafts] = useState<BulkDraft[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +58,7 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
       const formData = new FormData();
       images.forEach((image) => formData.append("images", image));
       if (inputMode === "text" && prompt.trim()) formData.append("prompt", prompt.trim());
+      if (Number(expectedCount) > 0) formData.append("expectedCount", String(Number(expectedCount)));
       if (inputMode === "voice" && recorder.blob) formData.append("voice", recorder.blob, "bulk-products-voice.webm");
       const { data } = await api.post<BulkDraft[]>(`/owner/stores/${storeId}/products/bulk-ai-draft`, formData);
       setDrafts(data);
@@ -153,6 +155,17 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
               { value: "voice", label: "Голос", icon: Mic01Icon }
             ]}
           />
+          <Field label="Сколько примерно товаров на фото?" hint="Необязательно. Помогает ИИ не склеить разные вещи и не разбить одну.">
+            <Input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              max={Math.max(images.length, 1)}
+              value={expectedCount}
+              onChange={(event) => setExpectedCount(event.target.value)}
+              placeholder="Например, 5"
+            />
+          </Field>
           <VoiceQuestions questions={bulkQuestions} />
           {inputMode === "text" ? (
             <Field label="Текстовое описание">

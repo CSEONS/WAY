@@ -24,6 +24,12 @@
   display: none;
 }
 
+@media print {
+  .region {
+    display: none;
+  }
+}
+
 .toast {
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-pill);

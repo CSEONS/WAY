@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductForm, type ProductImageSelection, type ProductPayload } from "../components/product-form";
 import { useBackgroundJobs } from "../state/backgroundJobs";
 import type { Product, Store } from "../types/models";
-import { Button, ButtonLink, EmptyState, LoadingState, Notice, Page, PageHeader } from "../ui";
+import { Button, ButtonLink, EmptyState, ErrorState, LoadingState, Notice, Page, PageHeader } from "../ui";
 import styles from "./ProductEditorPage.module.css";
 
 export function ProductEditorPage() {
@@ -14,14 +14,16 @@ export function ProductEditorPage() {
   const [store, setStore] = useState<Store>();
   const [product, setProduct] = useState<Product>();
   const [isLoading, setIsLoading] = useState(Boolean(storeId));
+  const [hasLoadError, setHasLoadError] = useState(false);
   const [stage, setStage] = useState<"form" | "queued">("form");
   const [formKey, setFormKey] = useState(0);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!storeId) return;
 
     let ignore = false;
     setIsLoading(true);
+    setHasLoadError(false);
     const requests: Promise<unknown>[] = [
       api.get<Store>(`/owner/stores/${storeId}`).then((res) => {
         if (!ignore) setStore(res.data);
@@ -36,14 +38,20 @@ export function ProductEditorPage() {
       );
     }
 
-    Promise.all(requests).finally(() => {
-      if (!ignore) setIsLoading(false);
-    });
+    Promise.all(requests)
+      .catch(() => {
+        if (!ignore) setHasLoadError(true);
+      })
+      .finally(() => {
+        if (!ignore) setIsLoading(false);
+      });
 
     return () => {
       ignore = true;
     };
   }, [storeId, id]);
+
+  useEffect(() => load(), [load]);
 
   function handleSubmit(payload: ProductPayload, imageSelection: ProductImageSelection) {
     if (!storeId) return;
@@ -81,6 +89,14 @@ export function ProductEditorPage() {
             </ButtonLink>
           }
         />
+      </Page>
+    );
+  }
+
+  if (hasLoadError) {
+    return (
+      <Page width="narrow">
+        <ErrorState description="Не удалось загрузить товар. Проверьте интернет и попробуйте ещё раз." onRetry={load} />
       </Page>
     );
   }

@@ -25,7 +25,8 @@ interface AiPanelProps {
 
 /** Describe the product in text or by voice; the AI fills the form below. */
 export function AiPanel({ prompt, onPromptChange, images, aiDraftPath, onDraft }: AiPanelProps) {
-  const [inputMode, setInputMode] = useState<"text" | "voice">("text");
+  // Talking is easier than typing on a phone, so voice comes first.
+  const [inputMode, setInputMode] = useState<"text" | "voice">("voice");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const recorder = useVoiceRecorder(setError);
@@ -63,8 +64,8 @@ export function AiPanel({ prompt, onPromptChange, images, aiDraftPath, onDraft }
         value={inputMode}
         onChange={setInputMode}
         options={[
-          { value: "text", label: "Текст", icon: TextFontIcon },
-          { value: "voice", label: "Голос", icon: Mic01Icon }
+          { value: "voice", label: "Голосом", icon: Mic01Icon },
+          { value: "text", label: "Текстом", icon: TextFontIcon }
         ]}
       />
       {inputMode === "text" ? (
@@ -84,11 +85,11 @@ export function AiPanel({ prompt, onPromptChange, images, aiDraftPath, onDraft }
       {error && <Notice tone="danger">{error}</Notice>}
       <div className={styles.aiActions}>
         {inputMode === "voice" && (
-          <Button variant="secondary" icon={Mic01Icon} onClick={recorder.toggle}>
+          <Button variant={recorder.blob || recorder.isRecording ? "secondary" : "primary"} size="lg" icon={Mic01Icon} onClick={recorder.toggle}>
             {voiceButtonLabel(recorder)}
           </Button>
         )}
-        <Button variant="primary" icon={AiMagicIcon} className={styles.aiFill} disabled={!canFill} loading={isLoading} onClick={fillWithAi}>
+        <Button variant="primary" size="lg" icon={AiMagicIcon} className={styles.aiFill} disabled={!canFill} loading={isLoading} onClick={fillWithAi}>
           {isLoading ? "ИИ обрабатывает данные…" : "Заполнить форму"}
         </Button>
       </div>

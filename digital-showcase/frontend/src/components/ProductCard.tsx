@@ -1,6 +1,7 @@
 import { Image01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "react-router-dom";
 import type { Product } from "../types/models";
+import { sortSizes } from "../utils/format";
 import { Badge, ColorSwatch, Icon } from "../ui";
 import styles from "./ProductCard.module.css";
 
@@ -38,8 +39,8 @@ export function ProductCard({ product, slug }: { product: Product; slug: string 
         <p className={styles.price}>{priceText}</p>
         <small className={styles.category}>{product.category || "Без категории"}</small>
         <div className={styles.meta}>
-          {product.sizes.map((size) => (
-            <Badge key={size.id}>{size.value}</Badge>
+          {sortSizes(product.sizes.map((size) => size.value)).map((size) => (
+            <Badge key={size}>{size}</Badge>
           ))}
           {product.colors.map((color) => (
             <ColorSwatch key={color.id} color={color.hex} label={color.name} size="sm" />

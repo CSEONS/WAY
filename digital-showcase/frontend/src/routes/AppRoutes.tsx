@@ -1,12 +1,15 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ProtectedRoute } from "../components/ProtectedRoute";
+import { AccountPage } from "../pages/AccountPage";
 import { AdminPage } from "../pages/AdminPage";
 import { AdminOwnersPage } from "../pages/AdminOwnersPage";
 import { AdminStoresPage } from "../pages/AdminStoresPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { HomePage } from "../pages/HomePage";
 import { LoginPage } from "../pages/LoginPage";
+import { PosterPage } from "../pages/PosterPage";
 import { ProductEditorPage } from "../pages/ProductEditorPage";
 import { PublicProductPage } from "../pages/PublicProductPage";
 import { PublicStorePage } from "../pages/PublicStorePage";
@@ -19,8 +22,10 @@ import { LoadingState } from "../ui";
 const DevUiPage = import.meta.env.DEV ? lazy(() => import("../pages/DevUiPage")) : null;
 
 export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null; isAuthLoading: boolean; onLogin: (user: User) => void }) {
+  const location = useLocation();
   return (
-    <Routes>
+    <ErrorBoundary resetKey={location.pathname}>
+      <Routes>
       <Route index element={<HomePage />} />
       <Route path="/m/:storeSlug" element={<PublicStorePage />} />
       <Route path="/m/:storeSlug/p/:productId" element={<PublicProductPage />} />
@@ -42,6 +47,10 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
         <Route path="/dashboard/stores/:storeId/products/new" element={<ProductEditorPage />} />
         <Route path="/dashboard/stores/:storeId/products/:id/edit" element={<ProductEditorPage />} />
         <Route path="/dashboard/stores/:storeId/settings" element={<SettingsPage />} />
+        <Route path="/dashboard/stores/:storeId/poster" element={<PosterPage />} />
+      </Route>
+      <Route element={<ProtectedRoute user={user} isLoading={isAuthLoading} />}>
+        <Route path="/account" element={<AccountPage user={user} />} />
       </Route>
       <Route element={<ProtectedRoute user={user} role="ADMIN" isLoading={isAuthLoading} />}>
         <Route path="/admin" element={<AdminPage />} />
@@ -51,6 +60,7 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
         <Route path="/admin/stores/new" element={<AdminStoresPage />} />
         <Route path="/admin/stores/:id/edit" element={<AdminStoresPage />} />
       </Route>
-    </Routes>
+      </Routes>
+    </ErrorBoundary>
   );
 }

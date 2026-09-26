@@ -1,4 +1,4 @@
-import { Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
+import { Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import type { Product } from "../../types/models";
 import { Card, CardHeader, FileButton, Icon, cx } from "../../ui";
@@ -35,20 +35,21 @@ export function useImageManager(initial?: Product) {
 
 export type ImageManagerState = ReturnType<typeof useImageManager>;
 
-/** «Картинки товара»: pick photos, choose the cover, remove extras. */
+/** «Фото товара»: take or pick photos, choose the cover, remove extras. */
 export function ImageManager({ manager }: { manager: ImageManagerState }) {
   const { images, previewImage, setPreviewImageId, addImages, removeImage } = manager;
 
   return (
     <Card as="section" className={styles.section}>
-      <CardHeader
-        title="Картинки товара"
-        actions={
-          <FileButton size="sm" icon={ImageAdd01Icon} accept={ACCEPT} multiple onFiles={addImages}>
-            Добавить картинки
-          </FileButton>
-        }
-      />
+      <CardHeader title="Фото товара" description="Первое фото — обложка на витрине. Нажмите на фото, чтобы сделать его обложкой." />
+      <div className={styles.photoActions}>
+        <FileButton variant="primary" icon={Camera01Icon} accept="image/*" capture="environment" onFiles={addImages}>
+          Сфотографировать
+        </FileButton>
+        <FileButton icon={ImageAdd01Icon} accept={ACCEPT} multiple onFiles={addImages}>
+          Из галереи
+        </FileButton>
+      </div>
       {previewImage ? (
         <>
           <div className={styles.imagePreview}>
@@ -76,7 +77,7 @@ export function ImageManager({ manager }: { manager: ImageManagerState }) {
       ) : (
         <label className={styles.dropzone}>
           <Icon icon={ImageAdd01Icon} size="lg" strokeWidth={1.6} />
-          Картинки ещё не выбраны — нажмите, чтобы добавить
+          Фото ещё не добавлены
           <input
             type="file"
             className={styles.dropzoneInput}

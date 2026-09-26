@@ -23,6 +23,8 @@ export interface ProductAiDraftInput {
   voice?: AiDraftFile;
   images?: AiDraftFile[];
   imageUrls?: string[];
+  /** Bulk mode: how many products the owner roughly expects on the photos. */
+  expectedCount?: number;
 }
 
 export interface ProductAiDraft {
@@ -231,6 +233,7 @@ export async function createBulkProductAiDraft(input: ProductAiDraftInput): Prom
         Верни результат только в формате JSON с корневым полем products.
 
         Количество фотографий: ${input.images.length}
+        ${input.expectedCount ? `Владелец говорит, что на фотографиях примерно ${input.expectedCount} товаров. Ориентируйся на это число, но не объединяй разные изделия ради него.` : ""}
 
         ${description || "Дополнительное описание отсутствует."}
         `

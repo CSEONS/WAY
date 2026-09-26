@@ -92,6 +92,8 @@ export interface FileButtonProps extends ButtonStyleProps {
   icon?: IconSvgElement;
   accept?: string;
   multiple?: boolean;
+  /** On phones: open the camera right away ("environment" = back camera). */
+  capture?: "user" | "environment";
   disabled?: boolean;
   /** Called with the chosen files; not called when the picker is cancelled. */
   onFiles: (files: File[]) => void;
@@ -100,7 +102,7 @@ export interface FileButtonProps extends ButtonStyleProps {
 }
 
 /** A button that opens the file picker (photos, logo). */
-export function FileButton({ variant = "secondary", size = "md", block, icon, accept, multiple, disabled, onFiles, children, className }: FileButtonProps) {
+export function FileButton({ variant = "secondary", size = "md", block, icon, accept, multiple, capture, disabled, onFiles, children, className }: FileButtonProps) {
   return (
     <label className={buttonClassName({ variant, size, block }, false, cx(styles.fileButton, disabled && styles.fileDisabled, className))}>
       {icon && <Icon icon={icon} size={labelIconSize[size]} />}
@@ -110,6 +112,7 @@ export function FileButton({ variant = "secondary", size = "md", block, icon, ac
         className={styles.fileInput}
         accept={accept}
         multiple={multiple}
+        capture={capture}
         disabled={disabled}
         onChange={(event) => {
           const files = [...(event.target.files ?? [])];

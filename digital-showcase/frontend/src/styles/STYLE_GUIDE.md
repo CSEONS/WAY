@@ -176,10 +176,12 @@ fine as-is (it's not a missing token, it's "no radius").
 - **Offsets derived from a component size.** When a spacing value has to
   follow the size of an element (e.g. a product row's second line starts
   under the title, after a 44px thumbnail), don't write `calc(44px + …)` in
-  a margin. Declare the size once as a local custom property and derive the
-  offset from it — see `--thumb-size` / `--under-title` on `.row` in
-  `DashboardPage.module.css`. The size itself is a dimension (width/height),
-  not spacing.
+  a margin. Declare the size once as a local custom property on the parent
+  and derive the offset from it:
+  `--thumb-size: 44px; --under-title: calc(var(--thumb-size) + var(--space-3));`
+  then `width: var(--thumb-size)` on the thumbnail and
+  `margin-left: var(--under-title)` on the second line. The size itself is a
+  dimension (width/height), not spacing.
 
 ### Adding a new token
 

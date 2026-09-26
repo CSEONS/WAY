@@ -1,4 +1,5 @@
 import type { ProductStatus } from "../../types/models";
+import type { SimpleDetails } from "./simple";
 
 export interface VariantFormRow {
   id: string;
@@ -23,10 +24,15 @@ export interface ProductFormState {
   isVisible: number;
 }
 
+export type DetailsMode = "simple" | "advanced";
+
 export interface SavedProductFormDraft {
   form: ProductFormState;
   aiPrompt: string;
   variants: VariantFormRow[];
+  /** Absent in drafts saved before the simple form existed. */
+  mode?: DetailsMode;
+  simple?: SimpleDetails;
 }
 
 export interface ProductPayload {

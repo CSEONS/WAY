@@ -43,10 +43,17 @@ export interface ErrorStateProps {
   description?: ReactNode;
   /** Shows a «Повторить» button. */
   onRetry?: () => void;
+  retryLabel?: string;
   className?: string;
 }
 
-export function ErrorState({ title = "Не удалось загрузить", description = "Проверьте интернет и попробуйте ещё раз.", onRetry, className }: ErrorStateProps) {
+export function ErrorState({
+  title = "Не удалось загрузить",
+  description = "Проверьте интернет и попробуйте ещё раз.",
+  onRetry,
+  retryLabel = "Повторить",
+  className
+}: ErrorStateProps) {
   return (
     <div className={cx(styles.state, className)} role="alert">
       <span className={cx(styles.icon, styles.iconDanger)}>
@@ -56,7 +63,7 @@ export function ErrorState({ title = "Не удалось загрузить", d
       {description && <p className={styles.description}>{description}</p>}
       {onRetry && (
         <Button variant="primary" icon={RefreshIcon} onClick={onRetry}>
-          Повторить
+          {retryLabel}
         </Button>
       )}
     </div>

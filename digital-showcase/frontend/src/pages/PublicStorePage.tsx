@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductCard } from "../components/ProductCard";
 import type { Product, Store } from "../types/models";
+import { sortSizes } from "../utils/format";
 import {
   Button,
   Card,
@@ -53,7 +54,7 @@ export function PublicStorePage() {
 
     return {
       categories: [...new Set(products.map((p) => p.category).filter(Boolean))],
-      sizes: [...new Set(products.flatMap((p) => p.sizes.map((s) => s.value)))],
+      sizes: sortSizes([...new Set(products.flatMap((p) => p.sizes.map((s) => s.value)))]),
       colors: [...colorMap.entries()].map(([name, hex]) => ({ name, hex }))
     };
   }, [products]);

@@ -1,32 +1,37 @@
 import {
   Analytics01Icon,
-  Archive02Icon,
+  ArrowDown01Icon,
   ArrowRight01Icon,
-  CheckmarkCircle02Icon,
-  Clock01Icon,
   Copy01Icon,
-  Delete02Icon,
-  Edit02Icon,
   Exchange01Icon,
   EyeIcon,
   Home01Icon,
   InformationCircleIcon,
   Link04Icon,
   Package01Icon,
+  PackageRemoveIcon,
   PlusSignIcon,
+  PrinterIcon,
   Search01Icon,
   Settings01Icon,
   ShoppingBag01Icon,
-  Store01Icon
+  Store01Icon,
+  ViewIcon,
+  ViewOffSlashIcon
 } from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { BulkProductCreator } from "../components/BulkProductCreator";
+import { InstallHint } from "../components/dashboard/InstallHint";
+import { LaunchChecklist } from "../components/dashboard/LaunchChecklist";
+import { OwnerProductItem } from "../components/dashboard/OwnerProductItem";
+import { PriceModal } from "../components/dashboard/PriceModal";
+import { markStoreShared } from "../components/dashboard/shareState";
 import { QrShareButton } from "../components/QrShareButton";
 import type { Product, Store } from "../types/models";
+import { plural } from "../utils/format";
 import {
-  Badge,
   Breadcrumbs,
   Button,
   ButtonLink,
@@ -36,7 +41,6 @@ import {
   ErrorState,
   Field,
   Icon,
-  IconButton,
   IconButtonLink,
   Input,
   LoadingState,
@@ -46,62 +50,30 @@ import {
   Select,
   Stat,
   StatusDot,
-  useCopyToClipboard,
-  type Tone
+  cx,
+  useCopyToClipboard
 } from "../ui";
 import styles from "./DashboardPage.module.css";
 
-type OwnerProductStatus = "published" | "draft" | "archive";
 type StoreAnalytics = { productCount: number; storeViews: number; productViews: number };
+type ListFilter = "all" | "visible" | "hidden" | "unavailable";
 
 const emptyAnalytics: StoreAnalytics = { productCount: 0, storeViews: 0, productViews: 0 };
 
+const filterMatchers: Record<ListFilter, (product: Product) => boolean> = {
+  all: () => true,
+  visible: (product) => Boolean(product.isVisible),
+  hidden: (product) => !product.isVisible,
+  unavailable: (product) => product.status === "NOT_AVAILABLE"
+};
+
 function formatStoreDate(value?: string | null) {
   if (!value) return "Дата создания не указана";
-  return `Магазин создан ${new Date(value).toLocaleString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  })}`;
+  return `Магазин создан ${new Date(value).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}`;
 }
 
-function productOwnerStatus(product: Product): OwnerProductStatus {
-  if (product.status === "NOT_AVAILABLE") return "archive";
-  return product.isVisible ? "published" : "draft";
-}
-
-const statusLabels: Record<OwnerProductStatus, string> = { published: "Опубликован", draft: "Черновик", archive: "Архив" };
-const statusTones: Record<OwnerProductStatus, Tone> = { published: "success", draft: "warning", archive: "neutral" };
-
-function productPrice(product: Product) {
-  if (product.priceText) return product.priceText;
-  if (product.price != null) return `${product.price.toLocaleString("ru-RU")} ₽`;
-  const prices = product.variants.map((variant) => variant.price).filter((price): price is number => price != null);
-  return prices.length ? `${Math.min(...prices).toLocaleString("ru-RU")} ₽` : "Цена в магазине";
-}
-
-function productDetails(product: Product) {
-  if (product.sizes.length) return `Размеры: ${product.sizes.map((size) => size.value).join(", ")}`;
-  if (product.colors.length) return `Цвета: ${product.colors.map((color) => color.name).join(", ")}`;
-  return product.description || "Без параметров";
-}
-
-function formatProductDate(value?: string | null) {
-  if (!value) return "Не указано";
-  return new Date(value).toLocaleString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-function ProductThumb({ product }: { product: Product }) {
-  const image = product.images[0];
-  return <span className={styles.thumb}>{image ? <img src={image.url} alt="" loading="lazy" /> : product.title.slice(0, 1)}</span>;
+function sortValue(product: Product) {
+  return product.price ?? Math.min(...product.variants.map((variant) => variant.price ?? Number.POSITIVE_INFINITY));
 }
 
 function StoreAvatar({ store }: { store: Store }) {
@@ -112,18 +84,28 @@ function StoreAvatar({ store }: { store: Store }) {
   );
 }
 
-function PublicLink({ url, slug }: { url: string; slug: string }) {
+function PublicLink({ store, url }: { store: Store; url: string }) {
   const copy = useCopyToClipboard();
   return (
     <div className={styles.linkValue}>
-      <a className={styles.link} href={`/m/${slug}`}>
-        {url}
+      <a className={styles.link} href={`/m/${store.slug}`}>
+        {url.replace(/^https?:\/\//, "")}
       </a>
       <div className={styles.linkActions}>
-        <Button variant="neutral" size="sm" icon={Copy01Icon} onClick={() => copy(url, "Ссылка скопирована")}>
+        <Button
+          variant="neutral"
+          size="sm"
+          icon={Copy01Icon}
+          onClick={async () => {
+            if (await copy(url, "Ссылка скопирована")) markStoreShared(store.id);
+          }}
+        >
           Копировать
         </Button>
-        <QrShareButton url={url} label="QR" />
+        <QrShareButton url={url} label="QR" onOpen={() => markStoreShared(store.id)} />
+        <ButtonLink variant="outline" size="sm" icon={PrinterIcon} to={`/dashboard/stores/${store.id}/poster`}>
+          Плакат
+        </ButtonLink>
       </div>
     </div>
   );
@@ -141,18 +123,16 @@ function StoreChoiceCard({ store }: { store: Store }) {
           <StatusDot tone={store.isActive ? "success" : "neutral"}>{store.isActive ? "Активен" : "В архиве"}</StatusDot>
         </div>
       </div>
-
       <div className={styles.linkRow}>
         <span className={styles.linkLabel}>
           <Icon icon={Link04Icon} size="sm" />
-          Публичная ссылка
+          Ссылка на витрину
         </span>
-        <PublicLink url={publicUrl} slug={store.slug} />
-        <p className={styles.hint}>Эта ссылка доступна для всех пользователей</p>
+        <PublicLink store={store} url={publicUrl} />
       </div>
       <div className={styles.storeActions}>
         <ButtonLink variant="primary" icon={ShoppingBag01Icon} iconEnd={ArrowRight01Icon} to={`/dashboard/stores/${store.id}`}>
-          Выбрать магазин
+          Открыть магазин
         </ButtonLink>
         <ButtonLink variant="secondary" icon={Settings01Icon} to={`/dashboard/stores/${store.id}/settings`}>
           Реквизиты
@@ -174,17 +154,17 @@ export function DashboardPage() {
   const [analytics, setAnalytics] = useState<StoreAnalytics>(emptyAnalytics);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [productsState, setProductsState] = useState<"loading" | "ready" | "error">("loading");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | OwnerProductStatus>("all");
+  const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState("new");
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [productToReprice, setProductToReprice] = useState<Product | null>(null);
   const [bulkCreatorOpen, setBulkCreatorOpen] = useState(false);
   const selectedStore = stores.find((store) => store.id === storeId);
   const publicStoreUrl = selectedStore ? `${location.origin}/m/${selectedStore.slug}` : "";
-  const isStoreProfileIncomplete = Boolean(
-    selectedStore && (!selectedStore.description || !selectedStore.logoUrl || !selectedStore.phone || (!selectedStore.whatsapp && !selectedStore.telegram))
-  );
   const isSubscriptionExpired = Boolean(selectedStore?.subscriptionEndsAt && new Date(selectedStore.subscriptionEndsAt).getTime() < Date.now());
 
   const categories = useMemo(
@@ -194,28 +174,30 @@ export function DashboardPage() {
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const nextProducts = products.filter((product) => {
-      const status = productOwnerStatus(product);
-      const matchesSearch = !query || product.title.toLowerCase().includes(query);
-      const matchesStatus = statusFilter === "all" || status === statusFilter;
-      const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-      return matchesSearch && matchesStatus && matchesCategory;
-    });
+    const nextProducts = products.filter(
+      (product) =>
+        (!query || product.title.toLowerCase().includes(query)) &&
+        filterMatchers[listFilter](product) &&
+        (categoryFilter === "all" || product.category === categoryFilter)
+    );
 
+    const updatedAt = (product: Product) => new Date(product.updatedAt ?? product.createdAt).getTime();
     return nextProducts.sort((left, right) => {
-      if (sort === "old") return new Date(left.updatedAt ?? left.createdAt).getTime() - new Date(right.updatedAt ?? right.createdAt).getTime();
-      if (sort === "price-asc") return (left.price ?? 0) - (right.price ?? 0);
-      if (sort === "price-desc") return (right.price ?? 0) - (left.price ?? 0);
-      return new Date(right.updatedAt ?? right.createdAt).getTime() - new Date(left.updatedAt ?? left.createdAt).getTime();
+      if (sort === "old") return updatedAt(left) - updatedAt(right);
+      if (sort === "price-asc") return sortValue(left) - sortValue(right);
+      if (sort === "price-desc") return sortValue(right) - sortValue(left);
+      return updatedAt(right) - updatedAt(left);
     });
-  }, [categoryFilter, products, search, sort, statusFilter]);
+  }, [categoryFilter, products, search, sort, listFilter]);
 
-  const stats = useMemo(() => {
-    const published = products.filter((product) => productOwnerStatus(product) === "published").length;
-    const draft = products.filter((product) => productOwnerStatus(product) === "draft").length;
-    const archive = products.filter((product) => productOwnerStatus(product) === "archive").length;
-    return { total: products.length, published, draft, archive };
-  }, [products]);
+  const stats = useMemo(
+    () => ({
+      visible: products.filter(filterMatchers.visible).length,
+      hidden: products.filter(filterMatchers.hidden).length,
+      unavailable: products.filter(filterMatchers.unavailable).length
+    }),
+    [products]
+  );
 
   const loadStores = useCallback(() => {
     let ignore = false;
@@ -239,7 +221,7 @@ export function DashboardPage() {
 
   useEffect(() => loadStores(), [loadStores]);
 
-  useEffect(() => {
+  const loadProducts = useCallback(() => {
     if (!storeId) {
       setProducts([]);
       setAnalytics(emptyAnalytics);
@@ -247,34 +229,33 @@ export function DashboardPage() {
     }
 
     let ignore = false;
-    Promise.all([
-      api.get<Product[]>(`/owner/stores/${storeId}/products`),
-      api.get<StoreAnalytics>(`/owner/stores/${storeId}/analytics`)
-    ]).then(([productsRes, analyticsRes]) => {
-      if (ignore) return;
-      setProducts(productsRes.data);
-      setAnalytics(analyticsRes.data);
-    });
+    setProductsState("loading");
+    Promise.all([api.get<Product[]>(`/owner/stores/${storeId}/products`), api.get<StoreAnalytics>(`/owner/stores/${storeId}/analytics`)])
+      .then(([productsRes, analyticsRes]) => {
+        if (ignore) return;
+        setProducts(productsRes.data);
+        setAnalytics(analyticsRes.data);
+        setProductsState("ready");
+      })
+      .catch(() => {
+        if (!ignore) setProductsState("error");
+      });
     return () => {
       ignore = true;
     };
   }, [storeId]);
+
+  useEffect(() => loadProducts(), [loadProducts]);
+
+  function replaceProduct(updated: Product) {
+    setProducts((current) => current.map((product) => (product.id === updated.id ? updated : product)));
+  }
 
   async function deleteProduct() {
     if (!storeId || !productToDelete) return;
     await api.delete(`/owner/stores/${storeId}/products/${productToDelete.id}`);
     setProducts((current) => current.filter((product) => product.id !== productToDelete.id));
     setProductToDelete(null);
-  }
-
-  async function reloadProducts() {
-    if (!storeId) return;
-    const [productsRes, analyticsRes] = await Promise.all([
-      api.get<Product[]>(`/owner/stores/${storeId}/products`),
-      api.get<StoreAnalytics>(`/owner/stores/${storeId}/analytics`)
-    ]);
-    setProducts(productsRes.data);
-    setAnalytics(analyticsRes.data);
   }
 
   if (isLoading) {
@@ -300,7 +281,7 @@ export function DashboardPage() {
 
     return (
       <Page>
-        <PageHeader title="Кабинет владельца" description="Сначала выберите магазин, затем добавляйте товары или меняйте реквизиты." />
+        <PageHeader title="Кабинет владельца" description="Выберите магазин, чтобы добавлять товары и менять реквизиты." />
         {stores.length ? (
           <div className={styles.storeGrid}>
             {stores.map((store) => (
@@ -330,184 +311,185 @@ export function DashboardPage() {
     );
   }
 
+  const productWord = plural(products.length, ["товара", "товаров", "товаров"]);
+  const timesWord = plural(analytics.storeViews, ["раз", "раза", "раз"]);
+
   return (
     <Page className={styles.page}>
-      <Breadcrumbs
-        items={[
-          { label: "К выбору магазина", icon: Home01Icon, to: "/dashboard", state: { showAll: true } },
-          { label: "Магазины", to: "/dashboard", state: { showAll: true } },
-          { label: selectedStore.name }
-        ]}
-      />
+      {stores.length > 1 && (
+        <Breadcrumbs
+          items={[
+            { label: "К выбору магазина", icon: Home01Icon, to: "/dashboard", state: { showAll: true } },
+            { label: "Магазины", to: "/dashboard", state: { showAll: true } },
+            { label: selectedStore.name }
+          ]}
+        />
+      )}
 
       <Card padding="lg" className={styles.hero}>
         <div className={styles.heroTop}>
           <div className={styles.heroBody}>
             <h1 className={styles.heroTitle}>{selectedStore.name}</h1>
-            <StatusDot tone={selectedStore.isActive ? "success" : "neutral"}>{selectedStore.isActive ? "Активен" : "В архиве"}</StatusDot>
-            <div className={styles.heroLink}>
-              <span className={styles.linkLabel}>Публичная ссылка:</span>
-              <PublicLink url={publicStoreUrl} slug={selectedStore.slug} />
-            </div>
+            <StatusDot tone={selectedStore.isActive && !isSubscriptionExpired ? "success" : "danger"}>
+              {!selectedStore.isActive ? "Витрина выключена" : isSubscriptionExpired ? "Подписка истекла" : "Витрина работает"}
+            </StatusDot>
           </div>
           <div className={styles.heroIcons}>
             {stores.length > 1 && <IconButtonLink icon={Exchange01Icon} label="Сменить магазин" to="/dashboard" state={{ showAll: true }} />}
             <IconButtonLink icon={Settings01Icon} label="Реквизиты магазина" to={`/dashboard/stores/${selectedStore.id}/settings`} />
           </div>
         </div>
-        <div className={styles.toolbar}>
-          <ButtonLink variant="primary" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+        <div className={styles.primaryActions}>
+          <ButtonLink variant="primary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
             Добавить товар
           </ButtonLink>
           {Boolean(selectedStore.aiFormEnabled) && (
-            <Button variant="secondary" icon={PlusSignIcon} onClick={() => setBulkCreatorOpen(true)}>
+            <Button variant="secondary" size="lg" icon={PlusSignIcon} onClick={() => setBulkCreatorOpen(true)}>
               Добавить много товаров
             </Button>
           )}
         </div>
+        <div className={styles.heroLink}>
+          <span className={styles.linkLabel}>
+            <Icon icon={Link04Icon} size="sm" />
+            Ссылка на витрину
+          </span>
+          <PublicLink store={selectedStore} url={publicStoreUrl} />
+        </div>
+        <p className={styles.summary}>
+          <Icon icon={EyeIcon} size="sm" />
+          Витрину посмотрели {analytics.storeViews} {timesWord} · на витрине {stats.visible} из {products.length} {productWord}
+        </p>
       </Card>
 
       {!selectedStore.isActive && (
-        <Notice tone="warning" title="Магазин архивирован">
-          Публичная витрина сейчас недоступна. Обратитесь к администратору, чтобы восстановить магазин.
+        <Notice tone="warning" title="Витрина выключена">
+          Покупатели сейчас её не видят. Обратитесь к администратору, чтобы включить магазин.
         </Notice>
       )}
 
       {Boolean(selectedStore.isActive) && isSubscriptionExpired && (
         <Notice tone="danger" title="Подписка истекла">
-          Клиенты не смогут открыть витрину, пока администратор не продлит подписку.
+          Покупатели не смогут открыть витрину, пока администратор не продлит подписку.
         </Notice>
       )}
 
-      {Boolean(selectedStore.isActive) && !isSubscriptionExpired && isStoreProfileIncomplete && (
-        <Card className={styles.setup}>
-          <div className={styles.setupHead}>
-            <h2 className={styles.setupTitle}>Запустите магазин</h2>
-            <p className={styles.setupText}>Закройте базовые шаги, чтобы витрина выглядела готовой для клиентов.</p>
-          </div>
-          <ol className={styles.setupSteps}>
-            {["Заполните информацию о магазине", "Загрузите логотип", "Добавьте первый товар", "Скопируйте ссылку"].map((step, index) => (
-              <li key={step}>
-                <span>{index + 1}</span>
-                {step}
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
+      {productsState === "ready" && <LaunchChecklist store={selectedStore} productCount={products.length} publicUrl={publicStoreUrl} />}
+      <InstallHint />
 
-      <div className={styles.stats}>
-        <Stat icon={Package01Icon} label="Всего товаров" value={analytics.productCount || stats.total} />
-        <Stat icon={CheckmarkCircle02Icon} label="Опубликовано" value={stats.published} />
-        <Stat icon={Clock01Icon} label="Черновики" value={stats.draft} />
-        <Stat icon={Archive02Icon} label="Архив" value={stats.archive} />
-        <Stat icon={EyeIcon} label="Просмотры магазина" value={analytics.storeViews} />
-        <Stat icon={Analytics01Icon} label="Просмотры товаров" value={analytics.productViews} />
-      </div>
+      <section className={styles.products} aria-labelledby="products-title">
+        <div className={styles.productsHead}>
+          <h2 id="products-title" className={styles.productsTitle}>
+            Товары <span className={styles.productsCount}>{products.length}</span>
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconEnd={ArrowDown01Icon}
+            className={cx(styles.moreToggle, isMoreOpen && styles.moreOpen)}
+            aria-expanded={isMoreOpen}
+            onClick={() => setIsMoreOpen((current) => !current)}
+          >
+            {isMoreOpen ? "Скрыть фильтры" : "Ещё: фильтры и статистика"}
+          </Button>
+        </div>
 
-      <Card className={styles.filters}>
-        <Field label="Поиск" className={styles.filter}>
-          <Input icon={Search01Icon} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск товара…" />
-        </Field>
-        <Field label="Статус" className={styles.filter}>
-          <Select
-            value={statusFilter}
-            onChange={(value) => setStatusFilter(value as "all" | OwnerProductStatus)}
-            options={[
-              { value: "all", label: "Все" },
-              { value: "published", label: "Опубликован" },
-              { value: "draft", label: "Черновик" },
-              { value: "archive", label: "Архив" }
-            ]}
-          />
-        </Field>
-        <Field label="Категория" className={styles.filter}>
-          <Select
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            options={[{ value: "all", label: "Все" }, ...categories.map((category) => ({ value: category, label: category }))]}
-          />
-        </Field>
-        <Field label="Сортировка" className={styles.filter}>
-          <Select
-            value={sort}
-            onChange={setSort}
-            options={[
-              { value: "new", label: "Сначала новые" },
-              { value: "old", label: "Сначала старые" },
-              { value: "price-asc", label: "Цена по возрастанию" },
-              { value: "price-desc", label: "Цена по убыванию" }
-            ]}
-          />
-        </Field>
-      </Card>
-
-      <Card padding="sm" className={styles.table}>
-        {filteredProducts.length > 0 && (
-          <div className={styles.tableHead} aria-hidden="true">
-            <span>Товар</span>
-            <span>Статус</span>
-            <span>Цена</span>
-            <span>Категория</span>
-            <span>Обновлён</span>
-            <span>Действия</span>
-          </div>
+        {products.length > 4 && (
+          <Input icon={Search01Icon} aria-label="Поиск товара" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найти товар по названию" />
         )}
-        {filteredProducts.map((product) => {
-          const status = productOwnerStatus(product);
-          return (
-            <div className={styles.row} key={product.id}>
-              <div className={styles.rowMain}>
-                <ProductThumb product={product} />
-                <div className={styles.rowTitle}>
-                  <Link to={`/m/${selectedStore.slug}/p/${product.id}`}>{product.title}</Link>
-                  <small>{productDetails(product)}</small>
-                </div>
-              </div>
-              <span className={styles.cellStatus}>
-                <Badge tone={statusTones[status]}>{statusLabels[status]}</Badge>
-              </span>
-              <span className={styles.cell}>{productPrice(product)}</span>
-              <span className={styles.cell}>{product.category || "Без категории"}</span>
-              <span className={styles.cellUpdated}>{formatProductDate(product.updatedAt ?? product.createdAt)}</span>
-              <div className={styles.rowActions}>
-                <IconButtonLink icon={Edit02Icon} label="Редактировать товар" to={`/dashboard/stores/${selectedStore.id}/products/${product.id}/edit`} />
-                <IconButton icon={Delete02Icon} label="Удалить товар" variant="danger" onClick={() => setProductToDelete(product)} />
-              </div>
+
+        {isMoreOpen && (
+          <Card className={styles.more}>
+            <div className={styles.stats}>
+              <Stat icon={Package01Icon} label="Всего товаров" value={analytics.productCount || products.length} />
+              <Stat icon={ViewIcon} label="На витрине" value={stats.visible} />
+              <Stat icon={ViewOffSlashIcon} label="Скрыто" value={stats.hidden} />
+              <Stat icon={PackageRemoveIcon} label="Нет в наличии" value={stats.unavailable} />
+              <Stat icon={EyeIcon} label="Просмотры витрины" value={analytics.storeViews} />
+              <Stat icon={Analytics01Icon} label="Просмотры товаров" value={analytics.productViews} />
             </div>
-          );
-        })}
-        {!filteredProducts.length && (
-          <EmptyState
-            title={products.length ? "Товары не найдены" : "Нет товаров"}
-            description={products.length ? "Попробуйте изменить поиск, фильтры или сортировку." : "Добавьте первый товар, чтобы витрина начала наполняться."}
-            action={
-              !products.length && (
-                <ButtonLink variant="primary" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
-                  Добавить товар
-                </ButtonLink>
-              )
-            }
-          />
+            <div className={styles.filters}>
+              <Field label="Показывать" className={styles.filter}>
+                <Select
+                  value={listFilter}
+                  onChange={(value) => setListFilter(value as ListFilter)}
+                  options={[
+                    { value: "all", label: "Все товары" },
+                    { value: "visible", label: "На витрине" },
+                    { value: "hidden", label: "Скрытые" },
+                    { value: "unavailable", label: "Нет в наличии" }
+                  ]}
+                />
+              </Field>
+              <Field label="Категория" className={styles.filter}>
+                <Select
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                  options={[{ value: "all", label: "Все" }, ...categories.map((category) => ({ value: category, label: category }))]}
+                />
+              </Field>
+              <Field label="Сортировка" className={styles.filter}>
+                <Select
+                  value={sort}
+                  onChange={setSort}
+                  options={[
+                    { value: "new", label: "Сначала новые" },
+                    { value: "old", label: "Сначала старые" },
+                    { value: "price-asc", label: "Сначала дешевле" },
+                    { value: "price-desc", label: "Сначала дороже" }
+                  ]}
+                />
+              </Field>
+            </div>
+          </Card>
         )}
-      </Card>
 
-      {filteredProducts.length > 0 && (
-        <p className={styles.count}>
-          Показано {filteredProducts.length} из {products.length}
-        </p>
-      )}
+        {productsState === "loading" && <LoadingState label="Загружаем товары…" />}
+        {productsState === "error" && <ErrorState description="Не удалось загрузить товары." onRetry={loadProducts} />}
+        {productsState === "ready" &&
+          (filteredProducts.length ? (
+            <div className={styles.list}>
+              {filteredProducts.map((product) => (
+                <OwnerProductItem
+                  key={product.id}
+                  product={product}
+                  storeId={selectedStore.id}
+                  storeSlug={selectedStore.slug}
+                  onUpdated={replaceProduct}
+                  onEditPrice={setProductToReprice}
+                  onDelete={setProductToDelete}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title={products.length ? "Ничего не найдено" : "Товаров пока нет"}
+              description={products.length ? "Измените поиск или фильтры." : "Сфотографируйте первый товар — это займёт минуту."}
+              action={
+                !products.length && (
+                  <ButtonLink variant="primary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+                    Добавить товар
+                  </ButtonLink>
+                )
+              }
+            />
+          ))}
+      </section>
+
       {productToDelete && (
         <ConfirmModal
           title="Удалить товар?"
-          description={`Товар "${productToDelete.title}" исчезнет из кабинета и публичной витрины. Это действие нельзя отменить.`}
+          description={`Товар «${productToDelete.title}» исчезнет из кабинета и с витрины. Если товар просто закончился, лучше отметьте «Нет в наличии» или скройте его.`}
           confirmLabel="Удалить"
           danger
           onCancel={() => setProductToDelete(null)}
           onConfirm={deleteProduct}
         />
       )}
-      {bulkCreatorOpen && <BulkProductCreator storeId={selectedStore.id} onClose={() => setBulkCreatorOpen(false)} onComplete={reloadProducts} />}
+      {productToReprice && (
+        <PriceModal product={productToReprice} storeId={selectedStore.id} onClose={() => setProductToReprice(null)} onSaved={replaceProduct} />
+      )}
+      {bulkCreatorOpen && <BulkProductCreator storeId={selectedStore.id} onClose={() => setBulkCreatorOpen(false)} onComplete={loadProducts} />}
     </Page>
   );
 }

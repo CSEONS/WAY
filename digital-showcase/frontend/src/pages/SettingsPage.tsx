@@ -1,9 +1,9 @@
 import { ImageAdd01Icon } from "@hugeicons/core-free-icons";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Store } from "../types/models";
-import { Button, ButtonLink, Card, EmptyState, Field, FileButton, Input, LoadingState, Notice, Page, PageHeader, Textarea, useToast } from "../ui";
+import { Button, ButtonLink, Card, EmptyState, ErrorState, Field, FileButton, Input, LoadingState, Notice, Page, PageHeader, Textarea, useToast } from "../ui";
 import styles from "./SettingsPage.module.css";
 
 export function SettingsPage() {
@@ -13,6 +13,7 @@ export function SettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [hasLoadError, setHasLoadError] = useState(false);
   const logoPreviewUrl = useMemo(() => (logoFile ? URL.createObjectURL(logoFile) : store?.logoUrl ?? ""), [logoFile, store?.logoUrl]);
 
   useEffect(() => {
@@ -21,10 +22,16 @@ export function SettingsPage() {
     };
   }, [logoFile, logoPreviewUrl]);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!storeId) return;
-    api.get<Store>(`/owner/stores/${storeId}`).then((res) => setStore(res.data));
+    setHasLoadError(false);
+    api
+      .get<Store>(`/owner/stores/${storeId}`)
+      .then((res) => setStore(res.data))
+      .catch(() => setHasLoadError(true));
   }, [storeId]);
+
+  useEffect(load, [load]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -67,6 +74,14 @@ export function SettingsPage() {
             </ButtonLink>
           }
         />
+      </Page>
+    );
+  }
+
+  if (hasLoadError) {
+    return (
+      <Page width="narrow">
+        <ErrorState onRetry={load} />
       </Page>
     );
   }

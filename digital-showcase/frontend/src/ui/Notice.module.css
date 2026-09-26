@@ -1,5 +1,6 @@
 .notice {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   margin: 0;
@@ -16,7 +17,7 @@
 
 .content {
   display: grid;
-  flex: 1;
+  flex: 1 1 200px;
   gap: var(--space-0-5);
   min-width: 0;
 }
@@ -33,6 +34,7 @@
   display: flex;
   flex-shrink: 0;
   gap: var(--space-2);
+  margin-left: auto;
 }
 
 .neutral {

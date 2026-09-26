@@ -188,6 +188,20 @@ export function useVariantBuilder(initial: Product | undefined, savedDraft: Save
     closeModal();
   }
 
+  /** Replaces the rows (switching from the simple form) and remembers their values. */
+  function replaceRows(rows: VariantFormRow[]) {
+    setVariants(rows);
+    setColorHistory((current) => {
+      const merged = uniqueColorHistory([
+        ...rows,
+        ...current.map((color) => ({ id: createId(), colorName: color.name, colorHex: color.hex, size: "", price: "" }))
+      ]);
+      return merged.length ? merged : current;
+    });
+    setSizeHistory((current) => [...new Set([...rows.map((row) => row.size).filter((size) => size && size !== ASK_SELLER), ...current])]);
+    setPriceHistory((current) => [...new Set([...rows.map((row) => row.price.trim()).filter(Boolean), ...current])]);
+  }
+
   /** Replaces the rows with an AI draft and remembers its values for quick picks. */
   function applyDraftVariants(draftVariants: ProductDraft["variants"]) {
     if (!draftVariants?.length) return;
@@ -249,6 +263,7 @@ export function useVariantBuilder(initial: Product | undefined, savedDraft: Save
     submitNewColor,
     submitNewSize,
     submitNewPrice,
+    replaceRows,
     applyDraftVariants
   };
 }

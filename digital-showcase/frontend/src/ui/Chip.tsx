@@ -54,8 +54,8 @@ export function ChipGroup({ children, label, scroll, className }: ChipGroupProps
 export type ColorSwatchProps = Omit<ComponentProps<"button">, "color" | "children"> & {
   /** Any CSS color. Falls back to a neutral tint when missing. */
   color?: string | null;
-  /** Color name — the tooltip and the accessible name. */
-  label: string;
+  /** Color name — the tooltip and the accessible name. Omit when the name is written next to the swatch. */
+  label?: string;
   size?: "sm" | "md" | "lg";
   selected?: boolean;
 };
@@ -82,5 +82,6 @@ export function ColorSwatch({ color, label, size = "md", selected, className, st
       />
     );
   }
+  if (!label) return <span className={classes} style={swatchStyle} aria-hidden="true" />;
   return <span className={classes} style={swatchStyle} role="img" aria-label={label} title={label} />;
 }

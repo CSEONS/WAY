@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
 import type { ProductImageSelection, ProductPayload } from "../components/product-form";
@@ -81,6 +81,18 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
     },
     [updateJob, dismissJob]
   );
+
+  const hasRunningJobs = jobs.some((job) => job.status === "running");
+  useEffect(() => {
+    if (!hasRunningJobs) return;
+    function warn(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      // Older browsers need returnValue set to show the «Leave site?» dialog.
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasRunningJobs]);
 
   const value = useMemo(() => ({ jobs, queueProductSave, dismissJob }), [jobs, queueProductSave, dismissJob]);
 

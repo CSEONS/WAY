@@ -153,6 +153,9 @@ export function hasDraftContent(draft: SavedProductFormDraft) {
     draft.form.description.trim() ||
     draft.form.category.trim() ||
     draft.aiPrompt.trim() ||
+    draft.simple?.price.trim() ||
+    draft.simple?.sizes.length ||
+    draft.simple?.colors.length ||
     draft.variants.some((variant) => variant.colorName.trim() || variant.size.trim() || variant.price.trim())
   );
 }

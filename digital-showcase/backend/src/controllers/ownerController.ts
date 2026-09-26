@@ -96,7 +96,15 @@ export const createBulkProductDraft = asyncHandler(async (req, res) => {
   const { voice, images } = uploadedAiDraftFiles(req);
   if (images.length < 2) throw new HttpError(400, "Для массовой группировки добавьте минимум два изображения");
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
-  res.json(await createBulkProductAiDraft({ prompt, voice, images }));
+  const expectedCount = Number(req.body.expectedCount);
+  res.json(
+    await createBulkProductAiDraft({
+      prompt,
+      voice,
+      images,
+      expectedCount: Number.isInteger(expectedCount) && expectedCount > 0 && expectedCount <= images.length ? expectedCount : undefined
+    })
+  );
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {

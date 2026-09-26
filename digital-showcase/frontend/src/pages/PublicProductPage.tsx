@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Product, Store } from "../types/models";
+import { sortSizes } from "../utils/format";
 import {
   Badge,
   Button,
@@ -88,7 +89,7 @@ export function PublicProductPage() {
     ? `${selectedVariant.price.toLocaleString("ru-RU")} ₽`
     : priceRangeText || product.priceText || (displayedPrice != null ? `${displayedPrice.toLocaleString("ru-RU")} ₽` : "Цена в магазине");
   const colorOptions = uniqueBy(variants, (variant) => variant.colorName);
-  const sizeOptions = [...new Set(variants.map((variant) => variant.size))];
+  const sizeOptions = sortSizes([...new Set(variants.map((variant) => variant.size))]);
   const availableColorNames = new Set(
     variants.filter((variant) => !selectedSize || variant.size === selectedSize).map((variant) => variant.colorName)
   );
@@ -194,8 +195,8 @@ export function PublicProductPage() {
         ) : (
           (product.sizes.length > 0 || product.colors.length > 0) && (
             <div className={styles.staticAttrs}>
-              {product.sizes.map((s) => (
-                <Badge key={s.id}>{s.value}</Badge>
+              {sortSizes(product.sizes.map((s) => s.value)).map((size) => (
+                <Badge key={size}>{size}</Badge>
               ))}
               {product.colors.map((c) => (
                 <Badge key={c.id}>{c.name}</Badge>

@@ -85,6 +85,46 @@
   gap: var(--space-2);
 }
 
+.passwordRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.passwordRow > :first-child {
+  flex: 1;
+}
+
+.credential {
+  display: grid;
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+}
+
+.credential span {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
+.credential strong {
+  color: var(--color-ink);
+  font-size: var(--font-size-lg);
+  overflow-wrap: anywhere;
+}
+
+.credential .password {
+  font-size: var(--font-size-2xl);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.credentialHint {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
 .pushRight {
   margin-left: auto;
 }

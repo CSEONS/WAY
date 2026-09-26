@@ -18,6 +18,12 @@
   }
 }
 
+@media print {
+  .header {
+    display: none;
+  }
+}
+
 .brand {
   display: inline-flex;
   align-items: center;

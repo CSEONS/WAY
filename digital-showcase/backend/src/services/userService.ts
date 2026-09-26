@@ -4,9 +4,30 @@ import type { User } from "../types/models.js";
 
 const publicUserFields = "id, name, email, phone, role, createdAt, updatedAt";
 
+/** One form for a Russian phone number: "8 928 …", "+7 (928) …" and "928…" all become "7928…". */
+export function normalizePhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("8")) return `7${digits.slice(1)}`;
+  if (digits.length === 10) return `7${digits}`;
+  return digits;
+}
+
+/** Login is an email (any letter case) or a phone number in any common format. */
 export async function findUserByLogin(login: string) {
   const db = await getDb();
-  return db.get<User>("SELECT * FROM users WHERE email = ? OR phone = ?", login, login);
+  const value = login.trim();
+  const byEmail = await db.get<User>("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", value);
+  if (byEmail) return byEmail;
+
+  const phone = normalizePhone(value);
+  if (phone.length < 10) return undefined;
+  const usersWithPhone = await db.all<User>("SELECT * FROM users WHERE phone IS NOT NULL AND phone != ''");
+  return usersWithPhone.find((user) => normalizePhone(user.phone ?? "") === phone);
+}
+
+export async function setUserPassword(id: string, password: string) {
+  const db = await getDb();
+  await db.run("UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?", await bcrypt.hash(password, 10), new Date().toISOString(), id);
 }
 
 export async function findUserById(id: string) {

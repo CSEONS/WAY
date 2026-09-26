@@ -28,6 +28,28 @@
   font-style: italic;
 }
 
+.blockHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.modeLink {
+  justify-self: start;
+}
+
+.photoActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.photoActions > * {
+  flex: 1 1 160px;
+}
+
 /* AI panel */
 
 .voice {

@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Button, ButtonLink, Modal, useCopyToClipboard } from "../ui";
 import styles from "./QrShareButton.module.css";
 
-export function QrShareButton({ url, label = "QR" }: { url: string; label?: string }) {
+/** `onOpen` fires when the owner opens the code (counts as sharing the link). */
+export function QrShareButton({ url, label = "QR", onOpen }: { url: string; label?: string; onOpen?: () => void }) {
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const copy = useCopyToClipboard();
@@ -12,6 +13,7 @@ export function QrShareButton({ url, label = "QR" }: { url: string; label?: stri
   async function openQr() {
     setQrDataUrl(await QRCode.toDataURL(url, { width: 320, margin: 2 }));
     setIsOpen(true);
+    onOpen?.();
   }
 
   async function shareQr() {

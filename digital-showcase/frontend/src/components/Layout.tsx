@@ -17,6 +17,7 @@ export function Layout({ user, onLogout }: Props) {
   const isLoginPage = location.pathname === "/login";
   const isInDashboard = location.pathname.startsWith("/dashboard");
   const isInAdmin = location.pathname.startsWith("/admin");
+  const isInAccount = location.pathname === "/account";
   const storeSlug = location.pathname.match(/^\/m\/([^/]+)/)?.[1];
   function logout() {
     localStorage.removeItem("token");
@@ -40,6 +41,11 @@ export function Layout({ user, onLogout }: Props) {
             {user?.role === "OWNER" && !isInDashboard && (
               <NavLink to="/dashboard" className={styles.navLink}>
                 Кабинет
+              </NavLink>
+            )}
+            {user && !isInAccount && (
+              <NavLink to="/account" className={styles.navLink}>
+                Аккаунт
               </NavLink>
             )}
             {user ? (

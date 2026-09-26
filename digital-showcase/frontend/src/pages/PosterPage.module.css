@@ -1,0 +1,124 @@
+.page {
+  justify-items: center;
+}
+
+.controls {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  width: min(100%, 210mm);
+}
+
+.tip {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-md);
+}
+
+/* The sheet keeps A4 proportions on screen and fills the page when printed. */
+.sheet {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-5);
+  width: min(100%, 210mm);
+  aspect-ratio: 210 / 297;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-10) var(--space-8);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.brand {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+}
+
+.logo,
+.logoPlaceholder {
+  width: 20mm;
+  height: 20mm;
+  border-radius: var(--radius-md);
+}
+
+.logo {
+  object-fit: cover;
+}
+
+.logoPlaceholder {
+  display: grid;
+  place-items: center;
+  color: var(--color-ink-subtle);
+  background: var(--color-surface-muted);
+}
+
+.storeName {
+  margin: 0;
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-tight);
+}
+
+.headline {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.qr {
+  width: min(70%, 120mm);
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+}
+
+.instruction {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.url,
+.address {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-base);
+  overflow-wrap: anywhere;
+}
+
+/* @page is global (CSS Modules cannot scope it), so keep it harmless for
+   other pages: plain A4 with small margins. */
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+@media print {
+  .page {
+    display: block;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    animation: none;
+  }
+
+  .controls {
+    display: none;
+  }
+
+  .sheet {
+    width: 190mm;
+    height: 277mm;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+    padding: 10mm;
+  }
+
+  .storeName {
+    font-size: var(--font-size-h1);
+  }
+}

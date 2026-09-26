@@ -34,12 +34,26 @@ function BuilderRow({ label, isAskSelected, onAsk, onAdd, onShowAll, children }:
   );
 }
 
-export function VariantBuilder({ builder, onOpenModal }: { builder: VariantBuilderState; onOpenModal: (type: VariantModalType) => void }) {
+interface VariantBuilderProps {
+  builder: VariantBuilderState;
+  onOpenModal: (type: VariantModalType) => void;
+  /** Back to «one price for everything». */
+  onSwitchToSimple: () => void;
+}
+
+export function VariantBuilder({ builder, onOpenModal, onSwitchToSimple }: VariantBuilderProps) {
   const { variants } = builder;
 
   return (
     <Card as="section" className={styles.section}>
-      <CardHeader title="Комбинации товара" />
+      <CardHeader
+        title="Цены по размерам и цветам"
+        actions={
+          <Button variant="ghost" size="sm" onClick={onSwitchToSimple}>
+            Одна цена для всех
+          </Button>
+        }
+      />
       <p className={styles.hint}>
         Выберите цвет, размер и цену, затем добавьте комбинацию. Для любого параметра можно выбрать «Уточнить у продавца», если он неизвестен заранее.
       </p>

@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
+import { BackupCard } from "../components/admin/BackupCard";
 import type { AdminOverview, OverviewStore } from "../types/models";
 import { formatLastSeen, formatMoney, formatMonth, plural } from "../utils/format";
 import { phoneUrl } from "../utils/contact";
@@ -97,6 +98,8 @@ export function AdminPage() {
           value={`${overview.ai.cards} ${plural(overview.ai.cards, ["карточка", "карточки", "карточек"])}${overview.ai.costRub != null ? ` · ≈${formatMoney(overview.ai.costRub)}` : ""}`}
         />
       </div>
+
+      <BackupCard />
 
       {needsAttention && (
         <Card as="section" padding="lg" className={styles.attention}>

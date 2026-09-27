@@ -1,9 +1,10 @@
-import { asyncHandler, requireFields } from "../utils/http.js";
+import { asyncHandler } from "../utils/http.js";
+import { changePasswordSchema, loginSchema, parseBody } from "../utils/validation.js";
 import * as authService from "../services/authService.js";
 
 export const login = asyncHandler(async (req, res) => {
-  requireFields(req.body, ["login", "password"]);
-  res.json(await authService.login(String(req.body.login), String(req.body.password)));
+  const { login, password } = parseBody(loginSchema, req.body);
+  res.json(await authService.login(login, password));
 });
 
 export const me = asyncHandler(async (req, res) => {
@@ -11,8 +12,8 @@ export const me = asyncHandler(async (req, res) => {
 });
 
 export const changePassword = asyncHandler(async (req, res) => {
-  requireFields(req.body, ["currentPassword", "newPassword"]);
-  await authService.changePassword(req.user!.userId, String(req.body.currentPassword), String(req.body.newPassword));
+  const { currentPassword, newPassword } = parseBody(changePasswordSchema, req.body);
+  await authService.changePassword(req.user!.userId, currentPassword, newPassword);
   res.json({ message: "ok" });
 });
 

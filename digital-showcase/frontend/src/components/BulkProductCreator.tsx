@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 import type { Product, ProductStatus } from "../types/models";
+import { compressImages } from "../utils/compressImage";
 import { Button, Card, Field, FileButton, Input, Modal, Notice, SegmentedControl, Select, Textarea } from "../ui";
 import { VoiceQuestions, VoiceStatus, voiceButtonLabel } from "./VoiceRecorder";
 import styles from "./BulkProductCreator.module.css";
@@ -131,7 +132,7 @@ export function BulkProductCreator({ storeId, onClose, onComplete }: { storeId: 
       {!drafts.length ? (
         <>
           <div className={styles.upload}>
-            <FileButton icon={CloudUploadIcon} accept="image/jpeg,image/png,image/webp" multiple onFiles={(files) => setImages(files.slice(0, 40))}>
+            <FileButton icon={CloudUploadIcon} accept="image/jpeg,image/png,image/webp" multiple onFiles={(files) => void compressImages(files.slice(0, 40)).then(setImages)}>
               {images.length ? "Выбрать другие фото" : "Выбрать фотографии"}
             </FileButton>
             <span className={styles.uploadHint}>

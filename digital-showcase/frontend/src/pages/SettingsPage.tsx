@@ -3,6 +3,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Store } from "../types/models";
+import { compressImage } from "../utils/compressImage";
 import { Button, ButtonLink, Card, EmptyState, ErrorState, Field, FileButton, Input, LoadingState, Notice, Page, PageHeader, Textarea, useToast } from "../ui";
 import styles from "./SettingsPage.module.css";
 
@@ -130,7 +131,7 @@ export function SettingsPage() {
             <div className={styles.logoRow}>
               <span className={styles.logoPreview}>{logoPreviewUrl ? <img src={logoPreviewUrl} alt="Предпросмотр логотипа" /> : null}</span>
               <div className={styles.logoText}>
-                <FileButton icon={ImageAdd01Icon} size="sm" accept="image/jpeg,image/png,image/webp" onFiles={([file]) => setLogoFile(file)}>
+                <FileButton icon={ImageAdd01Icon} size="sm" accept="image/jpeg,image/png,image/webp" onFiles={([file]) => void compressImage(file, 1024).then(setLogoFile)}>
                   {logoPreviewUrl ? "Заменить логотип" : "Загрузить логотип"}
                 </FileButton>
                 <span className={styles.logoName}>{logoFile ? logoFile.name : store.logoUrl ? "Текущий логотип" : "Логотип не загружен"}</span>

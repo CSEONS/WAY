@@ -1,6 +1,7 @@
 import { Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import type { Product } from "../../types/models";
+import { compressImages } from "../../utils/compressImage";
 import { Card, CardHeader, FileButton, Icon, cx } from "../../ui";
 import { ProductPhoto } from "../ProductPhoto";
 import { createId, initialImages } from "./helpers";
@@ -14,8 +15,9 @@ export function useImageManager(initial?: Product) {
   const [previewImageId, setPreviewImageId] = useState<string | null>(() => initial?.images[0]?.id ?? null);
   const previewImage = images.find((image) => image.id === previewImageId) ?? images[0];
 
-  function addImages(files: File[]) {
-    if (!files.length) return;
+  async function addImages(selected: File[]) {
+    if (!selected.length) return;
+    const files = await compressImages(selected);
     const nextImages = files.map((file) => ({ id: createId(), existingId: null, file, name: file.name, url: URL.createObjectURL(file) }));
     setImages((current) => [...current, ...nextImages]);
     setPreviewImageId((current) => current ?? nextImages[0]?.id ?? null);

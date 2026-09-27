@@ -15,7 +15,8 @@ const actions: Record<string, { label: string; tone: Tone }> = {
   ACTION_AS_OWNER: { label: "Действие от имени владельца", tone: "danger" },
   OWNER_PASSWORD_SET: { label: "Задан пароль владельцу", tone: "neutral" },
   OWNER_DELETED: { label: "Удалён владелец", tone: "danger" },
-  STORE_DELETED: { label: "Удалён магазин", tone: "danger" }
+  STORE_DELETED: { label: "Удалён магазин", tone: "danger" },
+  BACKUP_STARTED: { label: "Копия сделана вручную", tone: "neutral" }
 };
 
 const timeFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });

@@ -12,6 +12,8 @@ adminRoutes.get("/payments", controller.listPayments);
 adminRoutes.delete("/payments/:id", controller.cancelPayment);
 adminRoutes.get("/reports", controller.listReports);
 adminRoutes.get("/journal", controller.listJournal);
+adminRoutes.get("/backups", controller.listBackups);
+adminRoutes.post("/backups", controller.startBackup);
 adminRoutes.get("/owners", controller.listOwners);
 adminRoutes.post("/owners", controller.createOwner);
 adminRoutes.get("/owners/:id", controller.getOwner);

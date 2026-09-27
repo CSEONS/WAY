@@ -11,7 +11,8 @@ export type AuditAction =
   | "ACTION_AS_OWNER"
   | "OWNER_PASSWORD_SET"
   | "OWNER_DELETED"
-  | "STORE_DELETED";
+  | "STORE_DELETED"
+  | "BACKUP_STARTED";
 
 export interface AuditTarget {
   type: "store" | "owner" | "payment";

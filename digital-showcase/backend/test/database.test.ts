@@ -11,7 +11,7 @@ process.env.UPLOAD_DIR = path.join(dir, "uploads");
 process.env.ADMIN_EMAIL = "admin@test.local";
 process.env.ADMIN_PASSWORD = "test-password";
 
-const { getDb, initDatabase } = await import("../src/database/db.js");
+const { closeDb, getDb, initDatabase } = await import("../src/database/db.js");
 const { createOwner } = await import("../src/services/userService.js");
 const { createStore } = await import("../src/services/storeService.js");
 const { createProduct, deleteProduct, listProducts } = await import("../src/services/productService.js");
@@ -38,4 +38,7 @@ test("поиск находит русские названия без учёт�
   assert.deepEqual(found.map((item) => item.title), ["Льняное Платье"]);
 });
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => {
+  closeDb();
+  fs.rmSync(dir, { recursive: true, force: true });
+});

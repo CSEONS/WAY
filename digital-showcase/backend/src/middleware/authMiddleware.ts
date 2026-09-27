@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { jwtSecret } from "../config.js";
 import type { JwtPayload } from "../types/models.js";
 import { logAction } from "../services/auditService.js";
 import { HttpError } from "../utils/http.js";
@@ -9,7 +10,7 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token) return next(new HttpError(401, "Требуется авторизация"));
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET ?? "change_me") as JwtPayload;
+    req.user = jwt.verify(token, jwtSecret()) as JwtPayload;
     next();
   } catch {
     next(new HttpError(401, "Недействительный токен"));

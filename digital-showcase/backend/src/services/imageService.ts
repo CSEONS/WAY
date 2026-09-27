@@ -19,7 +19,7 @@ export const THUMBNAIL_WIDTHS = [400, 800] as const;
 const THUMBNAIL_QUALITY = 78;
 const ORIGINAL_NAME = /^[0-9a-f-]{36}\.webp$/;
 
-function uploadDir() {
+export function uploadDir() {
   return path.resolve(process.env.UPLOAD_DIR ?? "uploads");
 }
 

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { HttpError } from "../utils/http.js";
 import { findUserById, findUserByLogin, getOwner, setUserPassword, touchLastSeen } from "./userService.js";
+import { jwtSecret } from "../config.js";
 import type { JwtPayload } from "../types/models.js";
 
 // Owners sign in on their own phone; a long session means no weekly re-login.
@@ -10,7 +11,7 @@ const SESSION_LIFETIME = "90d";
 const IMPERSONATION_LIFETIME = "2h";
 
 function secret() {
-  return process.env.JWT_SECRET ?? "change_me";
+  return jwtSecret();
 }
 
 export async function login(loginValue: string, password: string) {

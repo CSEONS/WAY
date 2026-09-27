@@ -1,6 +1,18 @@
-import { asyncHandler, HttpError, requireFields } from "../utils/http.js";
+import { asyncHandler, HttpError } from "../utils/http.js";
+import {
+  connectSchema,
+  extendSchema,
+  ownerCreateSchema,
+  ownerPasswordSchema,
+  ownerUpdateSchema,
+  parseBody,
+  paymentSchema,
+  storeCreateSchema,
+  storeUpdateSchema
+} from "../utils/validation.js";
 import * as auditService from "../services/auditService.js";
 import * as authService from "../services/authService.js";
+import * as backupService from "../services/backupService.js";
 import * as onboardingService from "../services/onboardingService.js";
 import * as overviewService from "../services/overviewService.js";
 import * as paymentService from "../services/paymentService.js";
@@ -8,7 +20,7 @@ import * as reportService from "../services/reportService.js";
 import * as userService from "../services/userService.js";
 import * as storeService from "../services/storeService.js";
 import { withSubscription } from "../services/subscriptionService.js";
-import type { PaymentMethod, Store } from "../types/models.js";
+import type { Store } from "../types/models.js";
 
 export const listOwners = asyncHandler(async (_req, res) => res.json(await userService.listOwners()));
 
@@ -19,19 +31,19 @@ export const getOwner = asyncHandler(async (req, res) => {
 });
 
 export const createOwner = asyncHandler(async (req, res) => {
-  requireFields(req.body, ["name", "password"]);
-  res.status(201).json(await userService.createOwner(req.body));
+  const input = parseBody(ownerCreateSchema, req.body);
+  res.status(201).json(await userService.createOwner({ ...input, email: input.email ?? undefined, phone: input.phone ?? undefined }));
 });
 
 export const updateOwner = asyncHandler(async (req, res) => {
-  const owner = await userService.updateOwner(String(req.params.id), req.body);
+  const owner = await userService.updateOwner(String(req.params.id), parseBody(ownerUpdateSchema, req.body));
   if (!owner) throw new HttpError(404, "Владелец не найден");
   res.json(owner);
 });
 
 export const changeOwnerPassword = asyncHandler(async (req, res) => {
-  requireFields(req.body, ["password"]);
-  const owner = await userService.updateOwner(String(req.params.id), { password: req.body.password });
+  const { password } = parseBody(ownerPasswordSchema, req.body);
+  const owner = await userService.updateOwner(String(req.params.id), { password });
   if (!owner) throw new HttpError(404, "Владелец не найден");
   await auditService.logAction(req.user!.userId, "OWNER_PASSWORD_SET", { type: "owner", id: owner.id, name: owner.name });
   res.json(owner);
@@ -73,21 +85,7 @@ export const checkSlug = asyncHandler(async (req, res) => {
 
 /** «Подключить магазин»: owner + store + trial in one form. */
 export const connectStore = asyncHandler(async (req, res) => {
-  const body = req.body ?? {};
-  const result = await onboardingService.connectStore(
-    {
-      ownerName: String(body.ownerName ?? ""),
-      phone: String(body.phone ?? ""),
-      email: body.email ? String(body.email) : null,
-      storeName: String(body.storeName ?? ""),
-      slug: String(body.slug ?? ""),
-      storePhone: body.storePhone ? String(body.storePhone) : null,
-      withAi: body.withAi === true,
-      trialDays: Number(body.trialDays),
-      leadId: body.leadId ? String(body.leadId) : null
-    },
-    req.user!.userId
-  );
+  const result = await onboardingService.connectStore(parseBody(connectSchema, req.body), req.user!.userId);
   res.status(201).json({ ...result, store: withSubscription(result.store) });
 });
 
@@ -97,12 +95,7 @@ export const listPayments = asyncHandler(async (_req, res) => {
 });
 
 export const acceptPayment = asyncHandler(async (req, res) => {
-  const body = req.body ?? {};
-  const result = await paymentService.acceptPayment(
-    String(req.params.id),
-    { amount: Number(body.amount), months: Number(body.months), method: body.method as PaymentMethod, comment: body.comment ? String(body.comment) : null },
-    req.user!.userId
-  );
+  const result = await paymentService.acceptPayment(String(req.params.id), parseBody(paymentSchema, req.body), req.user!.userId);
   await auditService.logAction(
     req.user!.userId,
     "PAYMENT_ACCEPTED",
@@ -152,34 +145,9 @@ export const getStore = asyncHandler(async (req, res) => {
 });
 
 export const createStore = asyncHandler(async (req, res) => {
-  requireFields(req.body, ["ownerId", "name", "slug"]);
-  const { ownerId, name, slug, description, address, phone, whatsapp, telegram, workingHours, isActive, aiFormEnabled, subscriptionEndsAt, aiMonthlyLimit } = req.body;
-  const store = await storeService.createStore({
-    ownerId,
-    name,
-    slug,
-    description,
-    address,
-    phone,
-    whatsapp,
-    telegram,
-    workingHours,
-    isActive,
-    aiFormEnabled,
-    subscriptionEndsAt,
-    aiMonthlyLimit: limitValue(aiMonthlyLimit)
-  });
+  const store = await storeService.createStore(parseBody(storeCreateSchema, req.body));
   res.status(201).json(store && withSubscription(store));
 });
-
-/** «Лимит ИИ»: empty — the default, otherwise a whole number of cards. */
-function limitValue(value: unknown) {
-  if (value === undefined) return undefined;
-  if (value === null || value === "") return null;
-  const limit = Number(value);
-  if (!Number.isInteger(limit) || limit < 0) throw new HttpError(400, "Лимит ИИ — целое число карточек в месяц");
-  return limit;
-}
 
 function rubles(amount: number) {
   return amount ? `${amount.toLocaleString("ru-RU")} ₽` : "Бесплатно";
@@ -190,23 +158,9 @@ function dateLabel(value: string | null) {
 }
 
 export const updateStore = asyncHandler(async (req, res) => {
-  const { ownerId, name, slug, description, address, phone, whatsapp, telegram, workingHours, isActive, aiFormEnabled, subscriptionEndsAt, aiMonthlyLimit } = req.body;
+  const input = parseBody(storeUpdateSchema, req.body);
   const before = await storeService.getStore(String(req.params.id));
-  const store = await storeService.updateStore(String(req.params.id), {
-    ownerId,
-    name,
-    slug,
-    description,
-    address,
-    phone,
-    whatsapp,
-    telegram,
-    workingHours,
-    isActive,
-    aiFormEnabled,
-    subscriptionEndsAt,
-    aiMonthlyLimit: limitValue(aiMonthlyLimit)
-  });
+  const store = await storeService.updateStore(String(req.params.id), input);
   if (!store || !before) throw new HttpError(404, "Магазин не найден");
   await logStoreChanges(req.user!.userId, before, store);
   res.json(withSubscription(store));
@@ -233,8 +187,7 @@ export const deleteStore = asyncHandler(async (req, res) => {
 
 /** Extension without a payment record. The admin panel uses «Принять оплату» (0 ₽ for free) instead. */
 export const extendSubscription = asyncHandler(async (req, res) => {
-  const days = Number(req.body.days ?? 30);
-  if (!Number.isFinite(days) || days <= 0) throw new HttpError(400, "days должен быть положительным числом");
+  const { days } = parseBody(extendSchema, req.body);
   const before = await storeService.getStore(String(req.params.id));
   const store = await storeService.extendSubscription(String(req.params.id), days);
   if (!store || !before) throw new HttpError(404, "Магазин не найден");
@@ -272,4 +225,26 @@ export const enableAiForm = asyncHandler(async (req, res) => {
 
 export const disableAiForm = asyncHandler(async (req, res) => {
   res.json(await setAiForm(req.user!.userId, String(req.params.id), 0));
+});
+
+/** Backup status for the admin panel: settings (no secrets) and the latest runs. */
+export const listBackups = asyncHandler(async (_req, res) => {
+  const settings = backupService.backupSettings();
+  res.json({
+    settings: {
+      enabled: settings.enabled,
+      storage: settings.s3 ? `${new URL(settings.s3.endpoint).host}/${settings.s3.bucket}/${settings.prefix}` : null,
+      hour: settings.hour,
+      keepLocal: settings.keepLocal,
+      keepRemoteDays: settings.keepRemoteDays
+    },
+    runs: await backupService.listBackupRuns(10)
+  });
+});
+
+/** «Сделать копию сейчас»: starts in the background, the page polls the list. */
+export const startBackup = asyncHandler(async (req, res) => {
+  void backupService.runBackup();
+  await auditService.logAction(req.user!.userId, "BACKUP_STARTED");
+  res.status(202).json({ started: true });
 });

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { getDb } from "../database/db.js";
+import { deleteStoredImage } from "./imageService.js";
 import type { User } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
 
@@ -100,7 +101,16 @@ export async function updateOwner(id: string, input: { name?: string; email?: st
   return getOwner(id);
 }
 
+/** Removes the owner with their stores and products (cascade) and their photo files on disk. */
 export async function deleteOwner(id: string) {
   const db = await getDb();
+  const files = await db.all<{ url: string | null }>(
+    `SELECT logoUrl as url FROM stores WHERE ownerId = ?
+     UNION ALL
+     SELECT i.url FROM product_images i JOIN products p ON p.id = i.productId JOIN stores s ON s.id = p.storeId WHERE s.ownerId = ?`,
+    id,
+    id
+  );
   await db.run("DELETE FROM users WHERE id = ? AND role = 'OWNER'", id);
+  await Promise.all(files.map((file) => deleteStoredImage(file.url)));
 }

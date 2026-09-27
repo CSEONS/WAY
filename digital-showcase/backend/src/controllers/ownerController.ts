@@ -7,7 +7,8 @@ import * as productService from "../services/productService.js";
 import * as reportService from "../services/reportService.js";
 import * as storeService from "../services/storeService.js";
 import { GRACE_DAYS, withSubscription } from "../services/subscriptionService.js";
-import { asyncHandler, HttpError, requireFields } from "../utils/http.js";
+import { asyncHandler, HttpError } from "../utils/http.js";
+import { imageOrderSchema, parseBody, productCreateSchema, productUpdateSchema, storeDetailsSchema } from "../utils/validation.js";
 
 async function firstOwnerStore(ownerId: string) {
   const store = await storeService.getOwnerStore(ownerId);
@@ -82,8 +83,8 @@ export const getSubscription = asyncHandler(async (req, res) => {
 
 export const updateStore = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
-  const { name, description, address, phone, whatsapp, telegram, workingHours } = req.body;
-  res.json(await storeService.updateStore(store.id, { name, description, address, phone, whatsapp, telegram, workingHours, ownerId: store.ownerId }));
+  const details = parseBody(storeDetailsSchema, req.body);
+  res.json(await storeService.updateStore(store.id, { ...details, ownerId: store.ownerId }));
 });
 
 export const updateStoreLogo = asyncHandler(async (req, res) => {
@@ -111,9 +112,9 @@ export const getProduct = asyncHandler(async (req, res) => {
 });
 
 export const createProduct = asyncHandler(async (req, res) => {
-  requireFields(req.body, ["title"]);
+  const input = parseBody(productCreateSchema, req.body);
   const store = await scopedStore(req);
-  res.status(201).json(await productService.createProduct({ ...req.body, storeId: store.id }));
+  res.status(201).json(await productService.createProduct({ ...input, storeId: store.id }));
 });
 
 export const createProductDraft = asyncHandler(async (req, res) => {
@@ -151,8 +152,9 @@ export const createBulkProductDraft = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
+  const input = parseBody(productUpdateSchema, req.body);
   const store = await scopedStore(req);
-  const product = await productService.updateProduct(String(req.params.id), store.id, req.body);
+  const product = await productService.updateProduct(String(req.params.id), store.id, input);
   if (!product) throw new HttpError(404, "Товар не найден");
   res.json(product);
 });
@@ -180,7 +182,7 @@ export const deleteImage = asyncHandler(async (req, res) => {
 
 export const reorderImages = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
-  const imageIds = Array.isArray(req.body.imageIds) ? req.body.imageIds.map(String) : [];
+  const { imageIds } = parseBody(imageOrderSchema, req.body);
   const product = await productService.reorderProductImages(String(req.params.id), store.id, imageIds);
   if (!product) throw new HttpError(404, "Товар не найден");
   res.json(product);

@@ -1,7 +1,7 @@
 import * as leadService from "../services/leadService.js";
 import { normalizePhone } from "../services/userService.js";
-import type { LeadStatus } from "../types/models.js";
 import { asyncHandler, HttpError } from "../utils/http.js";
+import { leadStatusSchema, parseBody } from "../utils/validation.js";
 
 const MAX_LEADS_PER_HOUR = 5;
 const recentByIp = new Map<string, number[]>();
@@ -51,8 +51,7 @@ export const listLeads = asyncHandler(async (_req, res) => {
 });
 
 export const updateLead = asyncHandler(async (req, res) => {
-  const status = req.body?.status as LeadStatus;
-  if (status !== "NEW" && status !== "DONE") throw new HttpError(400, "Неизвестный статус заявки");
+  const { status } = parseBody(leadStatusSchema, req.body);
   const lead = await leadService.setLeadStatus(String(req.params.id), status);
   if (!lead) throw new HttpError(404, "Заявка не найдена");
   res.json(lead);

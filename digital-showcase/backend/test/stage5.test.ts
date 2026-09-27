@@ -13,7 +13,7 @@ process.env.ADMIN_PASSWORD = "test-password";
 process.env.JWT_SECRET = "test-secret-test-secret-test-secret";
 process.env.TRIAL_DAYS = "14";
 
-const { getDb, initDatabase } = await import("../src/database/db.js");
+const { closeDb, getDb, initDatabase } = await import("../src/database/db.js");
 const { addMonths, subscriptionInfo, isStorefrontOpen } = await import("../src/services/subscriptionService.js");
 const { slugify } = await import("../src/utils/slug.js");
 const { createStore, getStore } = await import("../src/services/storeService.js");
@@ -147,4 +147,7 @@ test("вход от имени владельца: короткая сессия
   assert.notEqual((await db.get<{ lastSeenAt: string | null }>("SELECT lastSeenAt FROM users WHERE id = ?", owner.id))!.lastSeenAt, null);
 });
 
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+test.after(() => {
+  closeDb();
+  fs.rmSync(dir, { recursive: true, force: true });
+});

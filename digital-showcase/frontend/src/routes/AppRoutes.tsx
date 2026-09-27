@@ -20,6 +20,11 @@ const AdminPage = lazy(() => import("../pages/AdminPage").then((m) => ({ default
 const AdminOwnersPage = lazy(() => import("../pages/AdminOwnersPage").then((m) => ({ default: m.AdminOwnersPage })));
 const AdminStoresPage = lazy(() => import("../pages/AdminStoresPage").then((m) => ({ default: m.AdminStoresPage })));
 const AdminLeadsPage = lazy(() => import("../pages/AdminLeadsPage").then((m) => ({ default: m.AdminLeadsPage })));
+const AdminConnectPage = lazy(() => import("../pages/AdminConnectPage").then((m) => ({ default: m.AdminConnectPage })));
+const AdminPaymentsPage = lazy(() => import("../pages/AdminPaymentsPage").then((m) => ({ default: m.AdminPaymentsPage })));
+const AdminReportsPage = lazy(() => import("../pages/AdminReportsPage").then((m) => ({ default: m.AdminReportsPage })));
+const AdminJournalPage = lazy(() => import("../pages/AdminJournalPage").then((m) => ({ default: m.AdminJournalPage })));
+const SubscriptionPage = lazy(() => import("../pages/SubscriptionPage").then((m) => ({ default: m.SubscriptionPage })));
 
 // UI-kit catalog. `import.meta.env.DEV` is false in production builds, so the
 // page and its chunk are dropped from the bundle.
@@ -44,6 +49,7 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
             <Route path="/dashboard/stores/:storeId/products/:id/edit" element={<ProductEditorPage />} />
             <Route path="/dashboard/stores/:storeId/settings" element={<SettingsPage />} />
             <Route path="/dashboard/stores/:storeId/poster" element={<PosterPage />} />
+            <Route path="/dashboard/stores/:storeId/subscription" element={<SubscriptionPage />} />
           </Route>
           <Route element={<ProtectedRoute user={user} isLoading={isAuthLoading} />}>
             <Route path="/account" element={<AccountPage user={user} />} />
@@ -56,6 +62,10 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
             <Route path="/admin/stores/new" element={<AdminStoresPage />} />
             <Route path="/admin/stores/:id/edit" element={<AdminStoresPage />} />
             <Route path="/admin/leads" element={<AdminLeadsPage />} />
+            <Route path="/admin/connect" element={<AdminConnectPage />} />
+            <Route path="/admin/payments" element={<AdminPaymentsPage />} />
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
+            <Route path="/admin/journal" element={<AdminJournalPage />} />
           </Route>
         </Routes>
       </Suspense>

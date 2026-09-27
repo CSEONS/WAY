@@ -1,7 +1,9 @@
-import { Copy01Icon, Delete02Icon, Edit02Icon, Key01Icon, LockKeyIcon, UserAccountIcon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Delete02Icon, Edit02Icon, Key01Icon, LockKeyIcon, Login01Icon, UserAccountIcon } from "@hugeicons/core-free-icons";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { User } from "../types/models";
+import { formatLastSeen } from "../utils/format";
+import { startImpersonation } from "../utils/impersonation";
 import { Button, Card, CardHeader, ConfirmModal, EmptyState, Field, Icon, Input, Menu, Modal, Page, PageHeader, useCopyToClipboard, useToast } from "../ui";
 import styles from "./Admin.module.css";
 
@@ -33,6 +35,7 @@ export function AdminOwnersPage() {
   const [passwordOwner, setPasswordOwner] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [ownerToDelete, setOwnerToDelete] = useState<User | null>(null);
+  const [ownerToEnter, setOwnerToEnter] = useState<User | null>(null);
   /** Shown once after a password is set, so the admin can pass it on. */
   const [issuedPassword, setIssuedPassword] = useState<{ owner: string; login: string; password: string } | null>(null);
   const copy = useCopyToClipboard();
@@ -96,6 +99,17 @@ export function AdminOwnersPage() {
     }
   }
 
+  async function enterAsOwner() {
+    if (!ownerToEnter) return;
+    try {
+      const { data } = await api.post<{ token: string }>(`/admin/owners/${ownerToEnter.id}/impersonate`);
+      startImpersonation(data.token);
+    } catch (err) {
+      toast.show(errorMessage(err, "Не удалось войти как владелец"), { tone: "danger" });
+      setOwnerToEnter(null);
+    }
+  }
+
   async function deleteOwner() {
     if (!ownerToDelete) return;
     await api.delete(`/admin/owners/${ownerToDelete.id}`);
@@ -148,11 +162,14 @@ export function AdminOwnersPage() {
                     </span>
                     <div className={styles.rowText}>
                       <strong>{owner.name}</strong>
-                      <small>{owner.email || owner.phone}</small>
+                      <small>
+                        {owner.phone || owner.email} · {formatLastSeen(owner.lastSeenAt)}
+                      </small>
                     </div>
                     <Menu
                       label={`Операции владельца ${owner.name}`}
                       items={[
+                        { label: "Войти как владелец", icon: Login01Icon, onSelect: () => setOwnerToEnter(owner) },
                         { label: "Редактировать", icon: Edit02Icon, onSelect: () => openEditModal(owner) },
                         { label: "Сменить пароль", icon: LockKeyIcon, onSelect: () => setPasswordOwner(owner) },
                         { label: "Удалить владельца", icon: Delete02Icon, danger: true, onSelect: () => setOwnerToDelete(owner) }
@@ -266,6 +283,16 @@ export function AdminOwnersPage() {
           </div>
           <p className={styles.credentialHint}>Пароль больше не будет показан. Владелец сможет сменить его в разделе «Аккаунт».</p>
         </Modal>
+      )}
+
+      {ownerToEnter && (
+        <ConfirmModal
+          title="Войти как владелец?"
+          description={`Откроется кабинет «${ownerToEnter.name}» на 2 часа — чтобы помочь по телефону. Вход и все изменения записываются в журнал. Вернуться в админку можно кнопкой сверху.`}
+          confirmLabel="Войти"
+          onCancel={() => setOwnerToEnter(null)}
+          onConfirm={enterAsOwner}
+        />
       )}
 
       {ownerToDelete && (

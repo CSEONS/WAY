@@ -1,9 +1,22 @@
 import { getDb } from "../database/db.js";
 import type { Store } from "../types/models.js";
+import { HttpError } from "../utils/http.js";
+import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "../utils/slug.js";
 import { deleteStoredImage, storeProductImage, type UploadedImage } from "./imageService.js";
+import { addDays, extensionBase, isStorefrontOpen, trialDays } from "./subscriptionService.js";
 
+/** Buyers can open the storefront (paid, or within the grace days after the paid date). */
 export function isSubscriptionValid(store: Store) {
-  return store.isActive === 1 && (!store.subscriptionEndsAt || new Date(store.subscriptionEndsAt).getTime() >= Date.now());
+  return isStorefrontOpen(store);
+}
+
+/** Clean, free store address or a clear 400 — instead of a 500 from the UNIQUE constraint. */
+export async function assertSlugAvailable(slug: string, exceptStoreId?: string) {
+  if (!SLUG_PATTERN.test(slug) || slug.length > SLUG_MAX_LENGTH) {
+    throw new HttpError(400, "Адрес витрины: только латинские буквы, цифры и дефис, до 40 символов");
+  }
+  const existing = await getStoreBySlug(slug);
+  if (existing && existing.id !== exceptStoreId) throw new HttpError(400, `Адрес /m/${slug} уже занят магазином «${existing.name}»`);
 }
 
 export async function listStores() {
@@ -38,17 +51,20 @@ export async function getStoreBySlug(slug: string) {
   return db.get<Store>("SELECT * FROM stores WHERE slug = ?", slug);
 }
 
+/** A store without a paid date gets the trial period, so nobody runs for free forever by accident. */
 export async function createStore(input: Partial<Store> & { ownerId: string; name: string; slug: string }) {
+  const slug = input.slug.trim().toLowerCase();
+  await assertSlugAvailable(slug);
   const db = await getDb();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   await db.run(
-    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, workingHours, isActive, aiFormEnabled, subscriptionEndsAt, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, workingHours, isActive, aiFormEnabled, subscriptionEndsAt, aiMonthlyLimit, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.ownerId,
     input.name,
-    input.slug,
+    slug,
     input.description ?? null,
     input.address ?? null,
     input.phone ?? null,
@@ -58,7 +74,8 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
     input.workingHours ?? null,
     input.isActive ?? 1,
     input.aiFormEnabled ?? 0,
-    input.subscriptionEndsAt ?? null,
+    input.subscriptionEndsAt || addDays(new Date(), trialDays()).toISOString(),
+    input.aiMonthlyLimit ?? null,
     now,
     now
   );
@@ -68,13 +85,15 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
 export async function updateStore(id: string, input: Partial<Store>) {
   const current = await getStore(id);
   if (!current) return null;
+  const slug = input.slug?.trim().toLowerCase() || current.slug;
+  if (slug !== current.slug) await assertSlugAvailable(slug, id);
   const db = await getDb();
   await db.run(
     `UPDATE stores SET ownerId = ?, name = ?, slug = ?, description = ?, address = ?, phone = ?, whatsapp = ?, telegram = ?,
-     logoUrl = ?, workingHours = ?, isActive = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, updatedAt = ? WHERE id = ?`,
+     logoUrl = ?, workingHours = ?, isActive = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, aiMonthlyLimit = ?, updatedAt = ? WHERE id = ?`,
     input.ownerId ?? current.ownerId,
     input.name ?? current.name,
-    input.slug ?? current.slug,
+    slug,
     field(input, "description", current.description),
     field(input, "address", current.address),
     field(input, "phone", current.phone),
@@ -85,6 +104,7 @@ export async function updateStore(id: string, input: Partial<Store>) {
     input.isActive ?? current.isActive,
     input.aiFormEnabled ?? current.aiFormEnabled,
     field(input, "subscriptionEndsAt", current.subscriptionEndsAt),
+    field(input, "aiMonthlyLimit", current.aiMonthlyLimit),
     new Date().toISOString(),
     id
   );
@@ -106,9 +126,7 @@ export async function deleteStore(id: string) {
 export async function extendSubscription(id: string, days: number) {
   const store = await getStore(id);
   if (!store) return null;
-  const base = store.subscriptionEndsAt && new Date(store.subscriptionEndsAt).getTime() > Date.now() ? new Date(store.subscriptionEndsAt) : new Date();
-  base.setDate(base.getDate() + days);
-  return updateStore(id, { subscriptionEndsAt: base.toISOString(), isActive: 1 });
+  return updateStore(id, { subscriptionEndsAt: addDays(extensionBase(store), days).toISOString(), isActive: 1 });
 }
 
 export async function updateStoreLogo(id: string, file: UploadedImage) {

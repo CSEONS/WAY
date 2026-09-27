@@ -1,4 +1,4 @@
-import { Call02Icon, CheckmarkCircle02Icon, InboxIcon, RefreshIcon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import { Call02Icon, CheckmarkCircle02Icon, InboxIcon, PlusSignIcon, RefreshIcon, WhatsappIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { Lead, LeadStatus } from "../types/models";
@@ -98,6 +98,11 @@ export function AdminLeadsPage() {
                 <ButtonLink variant="outline" icon={WhatsappIcon} href={whatsappUrl(lead.phone, `Здравствуйте, ${lead.name}! Вы оставили заявку на подключение витрины.`)} target="_blank" rel="noreferrer">
                   WhatsApp
                 </ButtonLink>
+                {lead.status === "NEW" && (
+                  <ButtonLink variant="outline" icon={PlusSignIcon} to={`/admin/connect?lead=${lead.id}`}>
+                    Подключить
+                  </ButtonLink>
+                )}
                 {lead.status === "NEW" ? (
                   <Button variant="secondary" icon={CheckmarkCircle02Icon} loading={savingId === lead.id} onClick={() => setStatus(lead, "DONE")} className={styles.pushRight}>
                     Обработана

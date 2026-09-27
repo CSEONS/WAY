@@ -1,8 +1,12 @@
 import type { Request } from "express";
 import { createBulkProductAiDraft, createProductAiDraft } from "../services/aiDraftService.js";
+import * as aiUsageService from "../services/aiUsageService.js";
 import * as analyticsService from "../services/analyticsService.js";
+import * as paymentService from "../services/paymentService.js";
 import * as productService from "../services/productService.js";
+import * as reportService from "../services/reportService.js";
 import * as storeService from "../services/storeService.js";
+import { GRACE_DAYS, withSubscription } from "../services/subscriptionService.js";
 import { asyncHandler, HttpError, requireFields } from "../utils/http.js";
 
 async function firstOwnerStore(ownerId: string) {
@@ -35,11 +39,45 @@ function stringList(value: unknown) {
 }
 
 export const listStores = asyncHandler(async (req, res) => {
-  res.json(await storeService.listOwnerStores(req.user!.userId));
+  res.json((await storeService.listOwnerStores(req.user!.userId)).map(withSubscription));
 });
 
 export const getStore = asyncHandler(async (req, res) => {
-  res.json(await scopedStore(req));
+  res.json(withSubscription(await scopedStore(req)));
+});
+
+/** Who to call about the subscription: SUPPORT_* in .env. */
+function supportContacts() {
+  return {
+    whatsapp: process.env.SUPPORT_WHATSAPP?.trim() || null,
+    phone: process.env.SUPPORT_PHONE?.trim() || null,
+    telegram: process.env.SUPPORT_TELEGRAM?.trim() || null
+  };
+}
+
+/** «Подписка и итоги»: paid date, tariff, AI left this month, payments and month results. */
+export const getSubscription = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  const [ai, payments, reports] = await Promise.all([
+    aiUsageService.aiStatus(store),
+    paymentService.listPayments({ storeId: store.id, limit: 24 }),
+    Promise.all(
+      reportService
+        .recentMonths(3)
+        // No reports for months before the store was connected.
+        .filter((month) => month >= paymentService.monthKey(new Date(store.createdAt)))
+        .map((month) => reportService.storeMonthReport(store.id, month))
+    )
+  ]);
+  res.json({
+    subscription: withSubscription(store).subscription,
+    graceDays: GRACE_DAYS,
+    ai,
+    // Admin comments stay in the admin panel.
+    payments: payments.map(({ id, amount, months, method, periodEnd, createdAt }) => ({ id, amount, months, method, periodEnd, createdAt })),
+    reports,
+    support: supportContacts()
+  });
 });
 
 export const updateStore = asyncHandler(async (req, res) => {
@@ -85,8 +123,11 @@ export const createProductDraft = asyncHandler(async (req, res) => {
   const { voice, images } = uploadedAiDraftFiles(req);
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
   if (!prompt.trim() && !voice) throw new HttpError(400, "Добавьте текстовое или голосовое описание товара");
+  await aiUsageService.assertWithinLimit(store);
 
-  res.json(await createProductAiDraft({ prompt, voice, images, imageUrls: stringList(req.body.imageUrls) }));
+  const { result, usage } = await aiUsageService.measureTokens(() => createProductAiDraft({ prompt, voice, images, imageUrls: stringList(req.body.imageUrls) }));
+  await aiUsageService.recordUsage(store.id, "DRAFT", 1, usage);
+  res.json(result);
 });
 
 export const createBulkProductDraft = asyncHandler(async (req, res) => {
@@ -96,14 +137,17 @@ export const createBulkProductDraft = asyncHandler(async (req, res) => {
   if (images.length < 2) throw new HttpError(400, "Для массовой группировки добавьте минимум два изображения");
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
   const expectedCount = Number(req.body.expectedCount);
-  res.json(
-    await createBulkProductAiDraft({
+  await aiUsageService.assertWithinLimit(store);
+  const { result, usage } = await aiUsageService.measureTokens(() =>
+    createBulkProductAiDraft({
       prompt,
       voice,
       images,
       expectedCount: Number.isInteger(expectedCount) && expectedCount > 0 && expectedCount <= images.length ? expectedCount : undefined
     })
   );
+  await aiUsageService.recordUsage(store.id, "BULK", result.length, usage);
+  res.json(result);
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {

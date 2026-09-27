@@ -8,6 +8,8 @@ export interface User {
   phone: string | null;
   passwordHash: string;
   role: Role;
+  /** Last time the owner opened the app (not counting an admin signed in as them). */
+  lastSeenAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +30,8 @@ export interface Store {
   isActive: number;
   aiFormEnabled: number;
   subscriptionEndsAt: string | null;
+  /** AI cards per calendar month; null — the AI_MONTHLY_LIMIT default. */
+  aiMonthlyLimit: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -99,4 +103,37 @@ export interface Lead {
 export interface JwtPayload {
   userId: string;
   role: Role;
+  /** Set when an admin signed in as this owner («Войти как владелец»). */
+  impersonatedBy?: string;
+}
+
+export type PaymentMethod = "CASH" | "TRANSFER" | "OTHER";
+
+export interface Payment {
+  id: string;
+  storeId: string;
+  storeName: string;
+  /** Rubles. 0 — a free extension. */
+  amount: number;
+  months: number;
+  method: PaymentMethod;
+  comment: string | null;
+  /** Subscription end before this payment (null — there was none). */
+  periodStart: string | null;
+  /** Subscription end after this payment. */
+  periodEnd: string;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  actorId: string | null;
+  actorName: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  targetName: string | null;
+  details: string | null;
+  createdAt: string;
 }

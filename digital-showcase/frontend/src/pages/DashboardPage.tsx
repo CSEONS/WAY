@@ -2,6 +2,7 @@ import {
   Analytics01Icon,
   ArrowDown01Icon,
   ArrowRight01Icon,
+  Calendar03Icon,
   Copy01Icon,
   Exchange01Icon,
   EyeIcon,
@@ -21,7 +22,7 @@ import {
   ViewOffSlashIcon
 } from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { BulkProductCreator } from "../components/BulkProductCreator";
 import { InstallHint } from "../components/dashboard/InstallHint";
@@ -32,6 +33,7 @@ import { markStoreShared } from "../components/dashboard/shareState";
 import { QrShareButton } from "../components/QrShareButton";
 import type { Product, Store } from "../types/models";
 import { plural } from "../utils/format";
+import { subscriptionBadge, subscriptionNotice } from "../utils/subscription";
 import {
   Breadcrumbs,
   Button,
@@ -166,7 +168,11 @@ export function DashboardPage() {
   const [bulkCreatorOpen, setBulkCreatorOpen] = useState(false);
   const selectedStore = stores.find((store) => store.id === storeId);
   const publicStoreUrl = selectedStore ? `${location.origin}/m/${selectedStore.slug}` : "";
-  const isSubscriptionExpired = Boolean(selectedStore?.subscriptionEndsAt && new Date(selectedStore.subscriptionEndsAt).getTime() < Date.now());
+  const subscription = selectedStore?.subscription;
+  const isSubscriptionExpired = subscription
+    ? subscription.state === "expired"
+    : Boolean(selectedStore?.subscriptionEndsAt && new Date(selectedStore.subscriptionEndsAt).getTime() < Date.now());
+  const notice = subscriptionNotice(subscription);
 
   const categories = useMemo(
     () => [...new Set(products.map((product) => product.category).filter((category): category is string => Boolean(category)))],
@@ -332,8 +338,14 @@ export function DashboardPage() {
         <div className={styles.heroTop}>
           <div className={styles.heroBody}>
             <h1 className={styles.heroTitle}>{selectedStore.name}</h1>
-            <StatusDot tone={selectedStore.isActive && !isSubscriptionExpired ? "success" : "danger"}>
-              {!selectedStore.isActive ? "Витрина выключена" : isSubscriptionExpired ? "Подписка истекла" : "Витрина работает"}
+            <StatusDot tone={!selectedStore.isActive || isSubscriptionExpired || subscription?.state === "grace" ? "danger" : subscription?.state === "expiring" ? "warning" : "success"}>
+              {!selectedStore.isActive
+                ? "Витрина выключена"
+                : isSubscriptionExpired
+                  ? "Витрина отключена: подписка закончилась"
+                  : subscription?.state === "grace"
+                    ? "Подписка закончилась, витрина пока работает"
+                    : "Витрина работает"}
             </StatusDot>
           </div>
           <div className={styles.heroIcons}>
@@ -364,6 +376,16 @@ export function DashboardPage() {
           {analytics.contactClicks > 0 && ` · написали или позвонили ${analytics.contactClicks} ${contactWord}`} · на витрине {stats.visible} из{" "}
           {products.length} {productWord}
         </p>
+        {subscription && subscription.state !== "disabled" && (
+          <Link to={`/dashboard/stores/${selectedStore.id}/subscription`} className={styles.subscriptionLink}>
+            <Icon icon={Calendar03Icon} size="sm" />
+            {subscriptionBadge(subscription).label}
+            <span className={styles.subscriptionMore}>
+              Подписка и итоги месяца
+              <Icon icon={ArrowRight01Icon} size="xs" />
+            </span>
+          </Link>
+        )}
       </Card>
 
       {!selectedStore.isActive && (
@@ -372,9 +394,17 @@ export function DashboardPage() {
         </Notice>
       )}
 
-      {Boolean(selectedStore.isActive) && isSubscriptionExpired && (
-        <Notice tone="danger" title="Подписка истекла">
-          Покупатели не смогут открыть витрину, пока администратор не продлит подписку.
+      {Boolean(selectedStore.isActive) && notice && (
+        <Notice
+          tone={notice.tone}
+          title={notice.title}
+          action={
+            <ButtonLink variant="secondary" size="sm" to={`/dashboard/stores/${selectedStore.id}/subscription`}>
+              Как продлить
+            </ButtonLink>
+          }
+        >
+          {notice.text}
         </Notice>
       )}
 

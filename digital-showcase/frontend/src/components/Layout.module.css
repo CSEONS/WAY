@@ -64,3 +64,38 @@
   color: var(--color-ink);
   background: var(--color-surface-muted);
 }
+
+/* «Войти как владелец»: always visible while the admin works in an owner's account. */
+.impersonation {
+  position: sticky;
+  top: 60px;
+  z-index: var(--z-header);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-danger-strong);
+  background: var(--color-danger-soft);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.impersonation span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (min-width: 720px) {
+  .impersonation {
+    padding-inline: var(--space-8);
+  }
+}
+
+@media print {
+  .impersonation {
+    display: none;
+  }
+}

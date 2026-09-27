@@ -1,8 +1,9 @@
-import { Logout01Icon } from "@hugeicons/core-free-icons";
+import { Logout01Icon, ShieldUserIcon } from "@hugeicons/core-free-icons";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Button } from "../ui";
+import { Button, Icon } from "../ui";
 import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
 import type { User } from "../types/models";
+import { stopImpersonation } from "../utils/impersonation";
 import styles from "./Layout.module.css";
 
 interface Props {
@@ -20,6 +21,10 @@ export function Layout({ user, onLogout }: Props) {
   const isInAccount = location.pathname === "/account";
   const storeSlug = location.pathname.match(/^\/m\/([^/]+)/)?.[1];
   function logout() {
+    if (user?.impersonatedBy) {
+      stopImpersonation();
+      return;
+    }
     localStorage.removeItem("token");
     onLogout();
     navigate("/");
@@ -62,6 +67,17 @@ export function Layout({ user, onLogout }: Props) {
           </nav>
         )}
       </header>
+      {user?.impersonatedBy && (
+        <div className={styles.impersonation} role="status">
+          <span>
+            <Icon icon={ShieldUserIcon} size="sm" />
+            Вы в кабинете владельца «{user.name}». Изменения записываются в журнал.
+          </span>
+          <Button variant="secondary" size="sm" onClick={stopImpersonation}>
+            Вернуться в админку
+          </Button>
+        </div>
+      )}
       <BackgroundJobsWidget />
     </>
   );

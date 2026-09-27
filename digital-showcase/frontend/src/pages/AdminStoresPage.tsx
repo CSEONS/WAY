@@ -1,16 +1,28 @@
-import {
-  AiMagicIcon,
-  ArchiveArrowDownIcon,
-  ArchiveArrowUpIcon,
-  CalendarAdd01Icon,
-  Delete02Icon,
-  Edit02Icon,
-  Store01Icon
-} from "@hugeicons/core-free-icons";
+import { ArchiveArrowDownIcon, ArchiveArrowUpIcon, Delete02Icon, Edit02Icon, Money03Icon, PlusSignIcon, Store01Icon } from "@hugeicons/core-free-icons";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
+import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
 import type { Store, User } from "../types/models";
-import { Badge, Button, Card, CardHeader, ConfirmModal, EmptyState, Field, Icon, Input, Modal, Page, PageHeader, Select, Textarea, useToast } from "../ui";
+import { subscriptionBadge } from "../utils/subscription";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHeader,
+  ConfirmModal,
+  EmptyState,
+  Field,
+  Icon,
+  Input,
+  Modal,
+  Page,
+  PageHeader,
+  SegmentedControl,
+  Select,
+  Textarea,
+  useToast
+} from "../ui";
 import styles from "./Admin.module.css";
 
 interface StoreFormState {
@@ -24,6 +36,9 @@ interface StoreFormState {
   whatsapp: string;
   telegram: string;
   subscriptionEndsAt: string;
+  aiFormEnabled: boolean;
+  /** Empty — the server default. */
+  aiMonthlyLimit: string;
 }
 
 const emptyStoreForm: StoreFormState = {
@@ -36,7 +51,9 @@ const emptyStoreForm: StoreFormState = {
   phone: "",
   whatsapp: "",
   telegram: "",
-  subscriptionEndsAt: ""
+  subscriptionEndsAt: "",
+  aiFormEnabled: false,
+  aiMonthlyLimit: ""
 };
 
 function toDateTimeLocal(value?: string | null) {
@@ -64,7 +81,9 @@ function storePayload(form: StoreFormState) {
     phone: form.phone || null,
     whatsapp: form.whatsapp || null,
     telegram: form.telegram || null,
-    subscriptionEndsAt: toIsoDate(form.subscriptionEndsAt)
+    subscriptionEndsAt: toIsoDate(form.subscriptionEndsAt),
+    aiFormEnabled: form.aiFormEnabled ? 1 : 0,
+    aiMonthlyLimit: form.aiMonthlyLimit.trim() === "" ? null : Number(form.aiMonthlyLimit)
   };
 }
 
@@ -82,6 +101,7 @@ export function AdminStoresPage() {
   const [storeEditForm, setStoreEditForm] = useState<StoreFormState>(emptyStoreForm);
   const [storeToArchive, setStoreToArchive] = useState<Store | null>(null);
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
+  const [storeToPay, setStoreToPay] = useState<Store | null>(null);
   const ownerOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
 
   async function load() {
@@ -132,14 +152,25 @@ export function AdminStoresPage() {
       phone: store.phone ?? "",
       whatsapp: store.whatsapp ?? "",
       telegram: store.telegram ?? "",
-      subscriptionEndsAt: toDateTimeLocal(store.subscriptionEndsAt)
+      subscriptionEndsAt: toDateTimeLocal(store.subscriptionEndsAt),
+      aiFormEnabled: Boolean(store.aiFormEnabled),
+      aiMonthlyLimit: store.aiMonthlyLimit == null ? "" : String(store.aiMonthlyLimit)
     });
   }
 
   async function updateStore(event: FormEvent) {
     event.preventDefault();
     if (!storeToEdit || !storeEditForm.ownerId) return;
-    if (await run(() => api.patch(`/admin/stores/${storeToEdit.id}`, storePayload(storeEditForm)), "Не удалось сохранить магазин")) {
+    const limit = storeEditForm.aiMonthlyLimit.trim();
+    if (limit && !/^\d+$/.test(limit)) {
+      toast.show("Лимит ИИ — целое число или пусто", { tone: "danger" });
+      return;
+    }
+    const payload: Partial<ReturnType<typeof storePayload>> = storePayload(storeEditForm);
+    // The form shows minutes only: resending an untouched date would cut its seconds
+    // and break «Отменить оплату», which matches the exact paid date.
+    if (storeEditForm.subscriptionEndsAt === toDateTimeLocal(storeToEdit.subscriptionEndsAt)) delete payload.subscriptionEndsAt;
+    if (await run(() => api.patch(`/admin/stores/${storeToEdit.id}`, payload), "Не удалось сохранить магазин")) {
       setStoreToEdit(null);
     }
   }
@@ -155,7 +186,7 @@ export function AdminStoresPage() {
     setStoreToDelete(null);
   }
 
-  function field(key: keyof StoreFormState) {
+  function field(key: Exclude<keyof StoreFormState, "aiFormEnabled">) {
     return {
       value: storeEditForm[key],
       onChange: (event: { target: { value: string } }) => setStoreEditForm({ ...storeEditForm, [key]: event.target.value })
@@ -166,12 +197,17 @@ export function AdminStoresPage() {
     <Page>
       <PageHeader
         title="Управление магазинами"
-        description="Создавайте и управляйте магазинами отдельно от владельцев."
+        description="Новому клиенту удобнее «Подключить магазин»: владелец, магазин и пробный период одной формой."
         back={{ to: "/admin", label: "Назад в админку" }}
+        actions={
+          <ButtonLink variant="primary" icon={PlusSignIcon} to="/admin/connect">
+            Подключить магазин
+          </ButtonLink>
+        }
       />
       <div className={styles.columns}>
         <Card as="section" padding="lg">
-          <CardHeader title="Создать магазин" />
+          <CardHeader title="Ещё один магазин владельцу" />
           <form className={styles.form} onSubmit={createStore}>
             <Field label="Владелец" required>
               <Select placeholder="Выберите" value={storeForm.ownerId} onChange={(value) => setStoreForm({ ...storeForm, ownerId: value })} options={ownerOptions} />
@@ -182,7 +218,7 @@ export function AdminStoresPage() {
             <Field label="Slug" hint="Адрес витрины: /m/slug" required>
               <Input value={storeForm.slug} onChange={(e) => setStoreForm({ ...storeForm, slug: e.target.value })} required />
             </Field>
-            <Field label="Подписка до">
+            <Field label="Подписка до" hint="Пусто — пробный период">
               <Input type="datetime-local" value={storeForm.subscriptionEndsAt} onChange={(e) => setStoreForm({ ...storeForm, subscriptionEndsAt: e.target.value })} />
             </Field>
             <Button type="submit" variant="primary" loading={isCreating}>
@@ -206,31 +242,20 @@ export function AdminStoresPage() {
                     </div>
                   </div>
                   <div className={styles.rowMeta}>
-                    <Badge tone={store.isActive ? "success" : "neutral"}>{store.isActive ? "Активен" : "В архиве"}</Badge>
-                    <span>до {store.subscriptionEndsAt ? new Date(store.subscriptionEndsAt).toLocaleDateString("ru-RU") : "без даты"}</span>
+                    {store.isActive ? (
+                      <Badge tone={subscriptionBadge(store.subscription).tone}>{subscriptionBadge(store.subscription).label}</Badge>
+                    ) : (
+                      <Badge tone="neutral">В архиве</Badge>
+                    )}
+                    <Badge tone={store.aiFormEnabled ? "accent" : "neutral"}>{store.aiFormEnabled ? "Витрина + ИИ" : "Витрина"}</Badge>
                     <span>{store.ownerName}</span>
                   </div>
                   <div className={styles.rowActions}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon={CalendarAdd01Icon}
-                      onClick={() => run(() => api.post(`/admin/stores/${store.id}/extend-subscription`, { days: 30 }), "Не удалось продлить подписку")}
-                    >
-                      +30 дней
+                    <Button variant="primary" size="sm" icon={Money03Icon} onClick={() => setStoreToPay(store)}>
+                      Принять оплату
                     </Button>
                     <Button variant="secondary" size="sm" icon={Edit02Icon} onClick={() => openEditStore(store)}>
                       Редактировать
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon={AiMagicIcon}
-                      onClick={() =>
-                        run(() => api.post(`/admin/stores/${store.id}/${store.aiFormEnabled ? "disable-ai-form" : "enable-ai-form"}`), "Не удалось переключить ИИ")
-                      }
-                    >
-                      {store.aiFormEnabled ? "Отключить ИИ" : "Включить ИИ"}
                     </Button>
                     <Button
                       variant="secondary"
@@ -298,10 +323,37 @@ export function AdminStoresPage() {
           <Field label="Telegram">
             <Input placeholder="@Name" {...field("telegram")} />
           </Field>
-          <Field label="Подписка до">
+          <Field label="Подписка до" hint="Для оплаты используйте «Принять оплату» — так платёж попадёт в учёт">
             <Input type="datetime-local" {...field("subscriptionEndsAt")} />
           </Field>
+          <div className={styles.tariff}>
+            <span className={styles.tariffLabel}>Тариф</span>
+            <SegmentedControl
+              label="Тариф"
+              value={storeEditForm.aiFormEnabled ? "ai" : "basic"}
+              onChange={(value) => setStoreEditForm({ ...storeEditForm, aiFormEnabled: value === "ai" })}
+              options={[
+                { value: "basic", label: "Витрина" },
+                { value: "ai", label: "Витрина + ИИ" }
+              ]}
+            />
+          </div>
+          {storeEditForm.aiFormEnabled && (
+            <Field label="Лимит ИИ в месяц" hint="Карточек, созданных с помощью ИИ. Пусто — общий лимит сервера (AI_MONTHLY_LIMIT)">
+              <Input inputMode="numeric" placeholder="по умолчанию" {...field("aiMonthlyLimit")} />
+            </Field>
+          )}
         </Modal>
+      )}
+      {storeToPay && (
+        <AcceptPaymentModal
+          store={storeToPay}
+          onClose={() => setStoreToPay(null)}
+          onPaid={() => {
+            setStoreToPay(null);
+            load();
+          }}
+        />
       )}
       {storeToArchive && (
         <ConfirmModal

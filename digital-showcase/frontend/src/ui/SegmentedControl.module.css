@@ -31,6 +31,13 @@
     color var(--duration-fast) var(--ease-standard);
 }
 
+/* Four short options still fit one line on a phone. */
+@media (max-width: 480px) {
+  .segment {
+    padding: 0 var(--space-3);
+  }
+}
+
 .segment:hover {
   color: var(--color-ink);
   background: transparent;

@@ -169,6 +169,7 @@ export async function initDatabase() {
       phone TEXT,
       passwordHash TEXT NOT NULL,
       role TEXT NOT NULL CHECK(role IN ('ADMIN', 'OWNER')),
+      lastSeenAt TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
@@ -187,6 +188,7 @@ export async function initDatabase() {
       isActive INTEGER NOT NULL DEFAULT 1,
       aiFormEnabled INTEGER NOT NULL DEFAULT 0,
       subscriptionEndsAt TEXT,
+      aiMonthlyLimit INTEGER,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
@@ -247,6 +249,43 @@ export async function initDatabase() {
       status TEXT NOT NULL DEFAULT 'NEW' CHECK(status IN ('NEW', 'DONE')),
       createdAt TEXT NOT NULL
     );
+    -- No foreign key: revenue history stays when a store is deleted.
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      storeId TEXT NOT NULL,
+      storeName TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      months INTEGER NOT NULL,
+      method TEXT NOT NULL CHECK(method IN ('CASH', 'TRANSFER', 'OTHER')),
+      comment TEXT,
+      periodStart TEXT,
+      periodEnd TEXT NOT NULL,
+      createdBy TEXT,
+      createdAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS payments_store ON payments(storeId, createdAt);
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id TEXT PRIMARY KEY,
+      storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK(kind IN ('DRAFT', 'BULK')),
+      units INTEGER NOT NULL,
+      inputTokens INTEGER NOT NULL DEFAULT 0,
+      outputTokens INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ai_usage_store ON ai_usage(storeId, createdAt);
+    -- Who did what in the admin panel. Names are copied so entries stay readable after deletions.
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      actorId TEXT,
+      actorName TEXT NOT NULL,
+      action TEXT NOT NULL,
+      targetType TEXT,
+      targetId TEXT,
+      targetName TEXT,
+      details TEXT,
+      createdAt TEXT NOT NULL
+    );
   `);
 
   const storeColumns = await database.all<{ name: string }>("PRAGMA table_info(stores)");
@@ -258,6 +297,13 @@ export async function initDatabase() {
   }
   if (!storeColumns.some((column) => column.name === "workingHours")) {
     await database.exec("ALTER TABLE stores ADD COLUMN workingHours TEXT");
+  }
+  if (!storeColumns.some((column) => column.name === "aiMonthlyLimit")) {
+    await database.exec("ALTER TABLE stores ADD COLUMN aiMonthlyLimit INTEGER");
+  }
+  const userColumns = await database.all<{ name: string }>("PRAGMA table_info(users)");
+  if (!userColumns.some((column) => column.name === "lastSeenAt")) {
+    await database.exec("ALTER TABLE users ADD COLUMN lastSeenAt TEXT");
   }
 
   await removeOrphans(database);

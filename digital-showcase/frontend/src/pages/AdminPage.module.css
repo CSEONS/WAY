@@ -1,6 +1,131 @@
+.page {
+  gap: var(--space-5);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (min-width: 880px) {
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.attention {
+  gap: var(--space-5);
+  border-color: var(--color-warning);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.groupCount {
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+  color: var(--color-ink-muted);
+  background: var(--color-surface-muted);
+  font-size: var(--font-size-xs);
+}
+
+.attentionRow,
+.storeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.rowText {
+  display: grid;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.rowText strong {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowText a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowText a:hover {
+  color: var(--color-accent-strong);
+}
+
+.rowText small {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.storeList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.storeFacts {
+  display: flex;
+  flex: 2 1 320px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
+.storeFacts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.aiOver {
+  color: var(--color-danger);
+}
+
+.payButton {
+  flex-shrink: 0;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
 .tiles {
   display: grid;
-  justify-content: stretch;
   gap: var(--space-3);
 }
 
@@ -8,7 +133,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 54px;
+  min-height: var(--control-lg);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   color: var(--color-ink);
@@ -35,5 +160,11 @@
 @media (min-width: 720px) {
   .tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1040px) {
+  .tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

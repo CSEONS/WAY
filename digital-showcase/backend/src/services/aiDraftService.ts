@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ProductStatus } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
+import { reportTokens } from "./aiUsageService.js";
 import { optimizeImageForAi } from "./imageService.js";
 
 interface DraftVariant {
@@ -385,6 +386,7 @@ function mimeFromFilename(filename: string) {
 async function readOpenAiPayload(response: Response) {
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new HttpError(502, openAiErrorMessage(payload));
+  reportTokens(payload && typeof payload === "object" ? (payload as { usage?: unknown }).usage : null);
   return payload;
 }
 

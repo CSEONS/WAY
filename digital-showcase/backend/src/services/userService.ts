@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
 import { getDb } from "../database/db.js";
 import type { User } from "../types/models.js";
+import { HttpError } from "../utils/http.js";
 
-const publicUserFields = "id, name, email, phone, role, createdAt, updatedAt";
+const publicUserFields = "id, name, email, phone, role, lastSeenAt, createdAt, updatedAt";
+const LAST_SEEN_STEP_MS = 60 * 60 * 1000;
 
 /** One form for a Russian phone number: "8 928 …", "+7 (928) …" and "928…" all become "7928…". */
 export function normalizePhone(value: string) {
@@ -30,6 +32,13 @@ export async function setUserPassword(id: string, password: string) {
   await db.run("UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?", await bcrypt.hash(password, 10), new Date().toISOString(), id);
 }
 
+/** «Давно не заходил» in the admin panel. Written at most once an hour per user. */
+export async function touchLastSeen(user: Pick<User, "id" | "lastSeenAt">) {
+  if (user.lastSeenAt && Date.now() - Date.parse(user.lastSeenAt) < LAST_SEEN_STEP_MS) return;
+  const db = await getDb();
+  await db.run("UPDATE users SET lastSeenAt = ? WHERE id = ?", new Date().toISOString(), user.id);
+}
+
 export async function findUserById(id: string) {
   const db = await getDb();
   return db.get<User>(`SELECT * FROM users WHERE id = ?`, id);
@@ -47,10 +56,13 @@ export async function getOwner(id: string) {
 
 export async function createOwner(input: { name: string; email?: string; phone?: string; password: string }) {
   if (input.password.length < 6) {
-    throw new Error("Пароль должен содержать минимум 6 символов");
+    throw new HttpError(400, "Пароль должен содержать минимум 6 символов");
   }
 
   const db = await getDb();
+  if (input.email && (await db.get("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", input.email))) {
+    throw new HttpError(400, "Эта почта уже используется другим пользователем");
+  }
   const now = new Date().toISOString();
   const passwordHash = await bcrypt.hash(input.password, 10);
   const id = crypto.randomUUID();
@@ -69,7 +81,7 @@ export async function createOwner(input: { name: string; email?: string; phone?:
 
 export async function updateOwner(id: string, input: { name?: string; email?: string | null; phone?: string | null; password?: string }) {
   if (input.password !== undefined && input.password.length < 6) {
-    throw new Error("Пароль должен содержать минимум 6 символов");
+    throw new HttpError(400, "Пароль должен содержать минимум 6 символов");
   }
 
   const db = await getDb();

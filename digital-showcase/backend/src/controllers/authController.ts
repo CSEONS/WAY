@@ -7,7 +7,7 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const me = asyncHandler(async (req, res) => {
-  res.json(await authService.me(req.user!.userId));
+  res.json(await authService.me(req.user!));
 });
 
 export const changePassword = asyncHandler(async (req, res) => {

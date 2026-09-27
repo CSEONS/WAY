@@ -1,6 +1,6 @@
 import { LockKeyIcon } from "@hugeicons/core-free-icons";
 import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { User } from "../types/models";
 import { Button, Field, Icon, Input, Notice } from "../ui";
@@ -50,6 +50,9 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
           <Button type="submit" variant="primary" size="lg" block loading={isSubmitting}>
             Войти
           </Button>
+          <p className={styles.legal}>
+            Входя, вы принимаете условия <Link to="/offer">оферты</Link> и <Link to="/privacy">политики конфиденциальности</Link>.
+          </p>
         </form>
       </div>
     </section>

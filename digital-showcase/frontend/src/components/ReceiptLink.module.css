@@ -1,0 +1,8 @@
+.link {
+  color: var(--color-accent-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.text {
+  color: var(--color-ink-muted);
+}

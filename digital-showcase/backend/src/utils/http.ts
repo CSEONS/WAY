@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 
-/** Public origin of the request behind nginx, e.g. https://waytuk.ru. */
+/** Public origin of the request behind nginx, e.g. https://example.ru. */
 export function requestOrigin(req: Request) {
   const proto = req.get("x-forwarded-proto") ?? req.protocol;
   const host = req.get("x-forwarded-host") ?? req.get("host");

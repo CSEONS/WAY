@@ -1,10 +1,11 @@
 import { Money03Icon } from "@hugeicons/core-free-icons";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
+import { ReceiptLink } from "../components/ReceiptLink";
 import type { MonthRevenue, Payment, PaymentMethod, Store } from "../types/models";
 import { formatDate, formatMoney, formatMonthShort, plural } from "../utils/format";
-import { Button, Card, CardHeader, ConfirmModal, EmptyState, ErrorState, Field, LoadingState, Page, PageHeader, Select, useToast } from "../ui";
+import { Badge, Button, Card, CardHeader, ConfirmModal, EmptyState, ErrorState, Field, Input, LoadingState, Modal, Page, PageHeader, Select, useToast } from "../ui";
 import styles from "./AdminPaymentsPage.module.css";
 
 const methodLabels: Record<PaymentMethod, string> = { CASH: "наличные", TRANSFER: "перевод", OTHER: "другое" };
@@ -19,6 +20,8 @@ export function AdminPaymentsPage() {
   const [storeId, setStoreId] = useState("");
   const [payStore, setPayStore] = useState<Store | null>(null);
   const [toCancel, setToCancel] = useState<Payment | null>(null);
+  const [receiptFor, setReceiptFor] = useState<Payment | null>(null);
+  const [receiptValue, setReceiptValue] = useState("");
 
   function load() {
     Promise.all([api.get<{ payments: Payment[]; byMonth: MonthRevenue[] }>("/admin/payments"), api.get<Store[]>("/admin/stores")])
@@ -49,6 +52,21 @@ export function AdminPaymentsPage() {
   // Months before the first payment are just empty rows.
   const firstPaid = byMonth.findIndex((month) => month.total > 0);
   const chartMonths = firstPaid < 0 ? byMonth.slice(-1) : byMonth.slice(firstPaid);
+  async function saveReceipt(event: FormEvent) {
+    event.preventDefault();
+    if (!receiptFor) return;
+    try {
+      await api.patch(`/admin/payments/${receiptFor.id}`, { receipt: receiptValue });
+      toast.show(receiptValue.trim() ? "Чек сохранён" : "Чек убран", { tone: "success" });
+      setReceiptFor(null);
+      load();
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не удалось сохранить чек", { tone: "danger" });
+    }
+  }
+
+  // Money taken without a receipt: the self-employed must issue one for every payment.
+  const withoutReceipt = payments.filter((payment) => payment.amount > 0 && !payment.receipt).length;
   const maxTotal = Math.max(1, ...chartMonths.map((month) => month.total));
   const yearTotal = byMonth.reduce((sum, month) => sum + month.total, 0);
 
@@ -94,7 +112,10 @@ export function AdminPaymentsPage() {
           </Card>
 
           <Card as="section" padding="lg">
-            <CardHeader title="Все оплаты" />
+            <CardHeader
+              title="Все оплаты"
+              description={withoutReceipt ? `Без чека: ${withoutReceipt} — самозанятому и ИП чек нужен на каждую оплату` : undefined}
+            />
             {payments.length ? (
               <div className={styles.list}>
                 {payments.map((payment) => (
@@ -105,6 +126,25 @@ export function AdminPaymentsPage() {
                         {payment.storeName} · {payment.months} мес. · {methodLabels[payment.method]}
                       </span>
                       {payment.comment && <small>{payment.comment}</small>}
+                      <span className={styles.receipt}>
+                        {payment.receipt ? (
+                          <ReceiptLink receipt={payment.receipt} />
+                        ) : (
+                          payment.amount > 0 && <Badge tone="warning">Без чека</Badge>
+                        )}
+                        {payment.amount > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setReceiptFor(payment);
+                              setReceiptValue(payment.receipt ?? "");
+                            }}
+                          >
+                            {payment.receipt ? "Изменить чек" : "Добавить чек"}
+                          </Button>
+                        )}
+                      </span>
                     </div>
                     <div className={styles.rowMeta}>
                       <span>{formatDate(payment.createdAt)}</span>
@@ -133,6 +173,29 @@ export function AdminPaymentsPage() {
             load();
           }}
         />
+      )}
+      {receiptFor && (
+        <Modal
+          size="sm"
+          title="Чек об оплате"
+          description={`${receiptFor.storeName}, ${formatMoney(receiptFor.amount)} от ${formatDate(receiptFor.createdAt)}`}
+          onClose={() => setReceiptFor(null)}
+          onSubmit={saveReceipt}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setReceiptFor(null)}>
+                Отмена
+              </Button>
+              <Button type="submit" variant="primary">
+                Сохранить
+              </Button>
+            </>
+          }
+        >
+          <Field label="Ссылка или номер чека" hint="В «Мой налог»: чек → «Поделиться» → скопировать ссылку. Пусто — убрать чек.">
+            <Input value={receiptValue} onChange={(e) => setReceiptValue(e.target.value)} placeholder="https://lknpd.nalog.ru/…" />
+          </Field>
+        </Modal>
       )}
       {toCancel && (
         <ConfirmModal

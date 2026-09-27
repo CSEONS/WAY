@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Product } from "../../types/models";
+import { parsePrice } from "../../utils/price";
 import {
   ASK_SELLER,
   LONG_PRESS_MS,
@@ -181,8 +182,9 @@ export function useVariantBuilder(initial: Product | undefined, savedDraft: Save
   }
 
   function submitNewPrice() {
-    const value = draftPrice.trim();
-    if (!value) return;
+    const amount = parsePrice(draftPrice);
+    if (amount == null || Number.isNaN(amount)) return;
+    const value = String(amount);
     rememberPrice(value);
     setSelectedPrice(value);
     closeModal();

@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { api } from "../../api/client";
 import type { Product } from "../../types/models";
+import { PRICE_ERROR, parsePrice } from "../../utils/price";
 import { Button, Field, Input, Modal, Notice, useToast } from "../../ui";
 import { variantPriceRange } from "./productLabels";
 
@@ -17,11 +18,16 @@ export function PriceModal({ product, storeId, onClose, onSaved }: PriceModalPro
   const firstVariantPrice = product.variants.find((variant) => variant.price != null)?.price;
   const [value, setValue] = useState(() => String(product.price ?? firstVariantPrice ?? ""));
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
   const range = variantPriceRange(product);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const price = value.trim() ? Number(value) : null;
+    const price = parsePrice(value);
+    if (Number.isNaN(price)) {
+      setError(PRICE_ERROR);
+      return;
+    }
     setIsSaving(true);
     try {
       const { data } = await api.patch<Product>(`/owner/stores/${storeId}/products/${product.id}`, {
@@ -59,8 +65,15 @@ export function PriceModal({ product, storeId, onClose, onSaved }: PriceModalPro
         </>
       }
     >
-      <Field label="Цена, ₽" hint="Оставьте пустым — покупатели увидят «Цена в магазине»">
-        <Input type="number" inputMode="numeric" min="0" value={value} onChange={(event) => setValue(event.target.value)} />
+      <Field label="Цена, ₽" hint="Оставьте пустым — покупатели увидят «Цена в магазине»" error={error}>
+        <Input
+          inputMode="decimal"
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            setError("");
+          }}
+        />
       </Field>
       {range && (
         <Notice tone="warning">

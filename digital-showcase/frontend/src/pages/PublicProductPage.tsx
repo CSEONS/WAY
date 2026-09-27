@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductPhoto } from "../components/ProductPhoto";
-import { ContactButtons, FavoriteButton, MobileContactBar, ShareButton } from "../components/storefront";
+import { ContactButtons, FavoriteButton, MobileContactBar, ShareButton, StorefrontFooter } from "../components/storefront";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { useFavorites } from "../hooks/useFavorites";
 import type { Product, Store } from "../types/models";
@@ -273,6 +273,7 @@ export function PublicProductPage() {
           )}
         </div>
       </Card>
+      <StorefrontFooter />
       <MobileContactBar store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} whatsappLabel="Спросить в WhatsApp" />
     </Page>
   );

@@ -1,4 +1,5 @@
 import type { Product } from "../../types/models";
+import { parsePrice } from "../../utils/price";
 import { ASK_SELLER, createId, initialVariants, normalizeHex } from "./helpers";
 import type { ProductDraft, VariantFormRow } from "./types";
 
@@ -142,7 +143,8 @@ export function simpleFromDraft(draft: ProductDraft): SimpleDetails | null {
 
 /** What the API gets for a simple product: one price; variants only when both colors and sizes are set. */
 export function simplePayload(simple: SimpleDetails) {
-  const price = simple.price.trim() ? Number(simple.price) : null;
+  const parsed = parsePrice(simple.price);
+  const price = Number.isNaN(parsed) ? null : parsed;
   const colors = simple.colors.map((color) => ({ name: color.name, hex: color.hex || null }));
   const variants =
     colors.length && simple.sizes.length

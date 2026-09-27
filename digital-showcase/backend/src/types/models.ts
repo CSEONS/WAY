@@ -123,6 +123,8 @@ export interface Payment {
   /** Subscription end after this payment. */
   periodEnd: string;
   createdBy: string | null;
+  /** Receipt link («Мой налог») or number; null — not issued yet. */
+  receipt: string | null;
   createdAt: string;
 }
 

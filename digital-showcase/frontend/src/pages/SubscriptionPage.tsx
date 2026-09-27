@@ -7,6 +7,7 @@ import { phoneUrl, telegramUrl, whatsappUrl } from "../utils/contact";
 import { formatDate, formatMoney, formatMonth } from "../utils/format";
 import { subscriptionNotice } from "../utils/subscription";
 import { Badge, ButtonLink, Card, CardHeader, ErrorState, Icon, LoadingState, Notice, Page, PageHeader, ProgressBar } from "../ui";
+import { ReceiptLink } from "../components/ReceiptLink";
 import styles from "./SubscriptionPage.module.css";
 
 /** «Оплачено до 12 октября», the AI left this month, results of the last months and payments — for the owner. */
@@ -166,6 +167,12 @@ export function SubscriptionPage() {
                 <strong>{payment.amount ? formatMoney(payment.amount) : "Бесплатно"}</strong>
                 <small>
                   {payment.months} мес., до {formatDate(payment.periodEnd)}
+                  {payment.receipt && (
+                    <>
+                      {" · "}
+                      <ReceiptLink receipt={payment.receipt} />
+                    </>
+                  )}
                 </small>
               </div>
             ))}

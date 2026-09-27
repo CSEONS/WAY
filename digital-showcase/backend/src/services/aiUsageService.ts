@@ -24,9 +24,10 @@ export async function measureTokens<T>(run: () => Promise<T>) {
 export function reportTokens(usage: unknown) {
   const current = scope.getStore();
   if (!current || !usage || typeof usage !== "object") return;
-  const { input_tokens, output_tokens } = usage as { input_tokens?: unknown; output_tokens?: unknown };
-  current.inputTokens += Number(input_tokens) || 0;
-  current.outputTokens += Number(output_tokens) || 0;
+  // Responses API: input/output_tokens; Chat Completions: prompt/completion_tokens.
+  const { input_tokens, output_tokens, prompt_tokens, completion_tokens } = usage as Record<string, unknown>;
+  current.inputTokens += Number(input_tokens ?? prompt_tokens) || 0;
+  current.outputTokens += Number(output_tokens ?? completion_tokens) || 0;
 }
 
 /** AI cards a store may create per calendar month («Витрина + ИИ»). */

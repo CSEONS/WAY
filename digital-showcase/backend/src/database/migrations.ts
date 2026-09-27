@@ -260,6 +260,14 @@ export const migrations: Migration[] = [
         );
       `);
     }
+  },
+  {
+    version: 5,
+    name: "receipts for payments",
+    up(db) {
+      // Link to the receipt in «Мой налог» (self-employed) or a receipt number.
+      addColumn(db, "payments", "receipt", "TEXT");
+    }
   }
 ];
 

@@ -12,6 +12,7 @@ export interface PaymentInput {
   months: number;
   method: PaymentMethod;
   comment?: string | null;
+  receipt?: string | null;
 }
 
 /** «Принять оплату»: records the money and extends the subscription by whole months in one step. */
@@ -35,12 +36,13 @@ export async function acceptPayment(storeId: string, input: PaymentInput, adminI
     periodStart: store.subscriptionEndsAt,
     periodEnd,
     createdBy: adminId,
+    receipt: input.receipt?.trim() || null,
     createdAt: new Date().toISOString()
   };
   const db = await getDb();
   await db.run(
-    `INSERT INTO payments (id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO payments (id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, receipt, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     payment.id,
     payment.storeId,
     payment.storeName,
@@ -51,6 +53,7 @@ export async function acceptPayment(storeId: string, input: PaymentInput, adminI
     payment.periodStart,
     payment.periodEnd,
     payment.createdBy,
+    payment.receipt,
     payment.createdAt
   );
   const updated = await updateStore(storeId, { subscriptionEndsAt: periodEnd, isActive: 1 });
@@ -71,6 +74,15 @@ export async function cancelPayment(paymentId: string) {
   await db.run("DELETE FROM payments WHERE id = ?", paymentId);
   if (store && rolledBack) await updateStore(store.id, { subscriptionEndsAt: payment.periodStart });
   return { payment, rolledBack };
+}
+
+/** A receipt issued after the payment was recorded (or a corrected one). */
+export async function setReceipt(paymentId: string, receipt: string | null) {
+  const db = await getDb();
+  const payment = await db.get<Payment>("SELECT * FROM payments WHERE id = ?", paymentId);
+  if (!payment) throw new HttpError(404, "Оплата не найдена");
+  await db.run("UPDATE payments SET receipt = ? WHERE id = ?", receipt?.trim() || null, paymentId);
+  return { ...payment, receipt: receipt?.trim() || null };
 }
 
 export async function listPayments(filter: { storeId?: string; limit?: number } = {}) {

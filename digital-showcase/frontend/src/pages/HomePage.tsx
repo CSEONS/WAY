@@ -12,6 +12,7 @@ import {
   WhatsappIcon
 } from "@hugeicons/core-free-icons";
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { LeadForm } from "../components/landing/LeadForm";
 import { DEMO_STORE_SLUG, PLANS, SALES_CONTACTS, type Plan } from "../components/landing/config";
 import { PhoneMock } from "../components/landing/PhoneMock";
@@ -189,9 +190,11 @@ export function HomePage() {
 
       <footer className={styles.footer}>
         <span>Витрины — каталог магазина по ссылке</span>
-        <ButtonLink variant="ghost" size="sm" to="/login">
-          Вход для владельцев
-        </ButtonLink>
+        <nav className={styles.footerLinks} aria-label="Документы">
+          <Link to="/offer">Оферта</Link>
+          <Link to="/privacy">Политика конфиденциальности</Link>
+          <Link to="/login">Вход для владельцев</Link>
+        </nav>
       </footer>
     </Page>
   );

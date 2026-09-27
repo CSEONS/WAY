@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigationType, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductCard } from "../components/ProductCard";
-import { MobileContactBar, StoreHeader } from "../components/storefront";
+import { MobileContactBar, StoreHeader, StorefrontFooter } from "../components/storefront";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { useFavorites } from "../hooks/useFavorites";
 import type { Product, Store, StoreFacets } from "../types/models";
@@ -356,6 +356,7 @@ export function PublicStorePage() {
         />
       </section>
 
+      <StorefrontFooter />
       <MobileContactBar store={store} storeSlug={storeSlug} />
     </Page>
   );

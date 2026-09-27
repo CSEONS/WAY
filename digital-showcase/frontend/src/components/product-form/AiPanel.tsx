@@ -19,7 +19,8 @@ interface AiPanelProps {
   prompt: string;
   onPromptChange: (prompt: string) => void;
   images: ProductFormImage[];
-  aiDraftPath?: string;
+  /** POST endpoint of the store the product belongs to. */
+  aiDraftPath: string;
   onDraft: (draft: ProductDraft) => void;
 }
 
@@ -47,7 +48,7 @@ export function AiPanel({ prompt, onPromptChange, images, aiDraftPath, onDraft }
         formData.append("voice", recorder.blob, "product-voice.webm");
       }
 
-      const { data } = await api.post<ProductDraft>(aiDraftPath ?? "/owner/products/ai-draft", formData);
+      const { data } = await api.post<ProductDraft>(aiDraftPath, formData);
       onDraft(data);
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message ?? "Не удалось заполнить форму");

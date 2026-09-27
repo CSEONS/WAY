@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "admin:reset-password": "node dist/scripts/resetAdminPassword.js",
     "backup": "node dist/scripts/backupNow.js",
-    "backup:restore": "node dist/scripts/restoreBackup.js"
+    "backup:restore": "node dist/scripts/restoreBackup.js",
+    "demo:seed": "node dist/scripts/seedDemo.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

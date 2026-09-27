@@ -1,10 +1,14 @@
-import { Logout01Icon, ShieldUserIcon } from "@hugeicons/core-free-icons";
+import { HelpCircleIcon, Logout01Icon, ShieldUserIcon } from "@hugeicons/core-free-icons";
+import { lazy, Suspense, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Button, Icon } from "../ui";
 import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
 import type { User } from "../types/models";
 import { stopImpersonation } from "../utils/impersonation";
 import styles from "./Layout.module.css";
+
+// Only owners open it: a separate chunk, buyers don't download it.
+const HelpModal = lazy(() => import("./help/HelpModal").then((m) => ({ default: m.HelpModal })));
 
 interface Props {
   user: User | null;
@@ -20,6 +24,7 @@ export function Layout({ user, onLogout }: Props) {
   const isInAdmin = location.pathname.startsWith("/admin");
   const isInAccount = location.pathname === "/account";
   const storeSlug = location.pathname.match(/^\/m\/([^/]+)/)?.[1];
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   function logout() {
     if (user?.impersonatedBy) {
       stopImpersonation();
@@ -47,6 +52,12 @@ export function Layout({ user, onLogout }: Props) {
               <NavLink to="/dashboard" className={styles.navLink}>
                 Кабинет
               </NavLink>
+            )}
+            {user?.role === "OWNER" && (
+              <button type="button" className={`${styles.navLink} ${styles.navButton}`} onClick={() => setIsHelpOpen(true)} aria-label="Помощь">
+                <Icon icon={HelpCircleIcon} size="sm" />
+                <span className={styles.navLabel}>Помощь</span>
+              </button>
             )}
             {user && !isInAccount && (
               <NavLink to="/account" className={styles.navLink}>
@@ -77,6 +88,11 @@ export function Layout({ user, onLogout }: Props) {
             Вернуться в админку
           </Button>
         </div>
+      )}
+      {isHelpOpen && (
+        <Suspense fallback={null}>
+          <HelpModal onClose={() => setIsHelpOpen(false)} />
+        </Suspense>
       )}
       <BackgroundJobsWidget />
     </>

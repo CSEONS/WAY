@@ -106,7 +106,14 @@ export function LeadForm() {
             if (value) setErrors((current) => ({ ...current, consent: undefined }));
           }}
           invalid={Boolean(errors.consent)}
-          label="Согласен на обработку персональных данных, чтобы со мной связались по заявке"
+          label={
+            <>
+              Согласен на обработку персональных данных, чтобы со мной связались по заявке, по{" "}
+              <a href="/privacy" target="_blank" rel="noreferrer">
+                политике конфиденциальности
+              </a>
+            </>
+          }
         />
         {errors.consent && <small className={styles.consentError}>{errors.consent}</small>}
       </div>

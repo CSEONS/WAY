@@ -24,6 +24,8 @@ const AdminConnectPage = lazy(() => import("../pages/AdminConnectPage").then((m)
 const AdminPaymentsPage = lazy(() => import("../pages/AdminPaymentsPage").then((m) => ({ default: m.AdminPaymentsPage })));
 const AdminReportsPage = lazy(() => import("../pages/AdminReportsPage").then((m) => ({ default: m.AdminReportsPage })));
 const AdminJournalPage = lazy(() => import("../pages/AdminJournalPage").then((m) => ({ default: m.AdminJournalPage })));
+const PrivacyPage = lazy(() => import("../pages/legal/PrivacyPage").then((m) => ({ default: m.PrivacyPage })));
+const OfferPage = lazy(() => import("../pages/legal/OfferPage").then((m) => ({ default: m.OfferPage })));
 const SubscriptionPage = lazy(() => import("../pages/SubscriptionPage").then((m) => ({ default: m.SubscriptionPage })));
 
 // UI-kit catalog. `import.meta.env.DEV` is false in production builds, so the
@@ -40,6 +42,8 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
           <Route path="/m/:storeSlug" element={<PublicStorePage />} />
           <Route path="/m/:storeSlug/p/:productId" element={<PublicProductPage />} />
           <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/offer" element={<OfferPage />} />
           {DevUiPage && <Route path="/dev/ui" element={<DevUiPage />} />}
           <Route element={<ProtectedRoute user={user} role="OWNER" isLoading={isAuthLoading} />}>
             <Route path="/dashboard" element={<DashboardPage />} />

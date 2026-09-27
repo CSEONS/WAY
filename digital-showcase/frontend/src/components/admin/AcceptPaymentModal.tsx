@@ -40,6 +40,7 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
   const [period, setPeriod] = useState<Period>("1");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [comment, setComment] = useState("");
+  const [receipt, setReceipt] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const months = Number(period);
@@ -54,7 +55,7 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
     }
     setIsSaving(true);
     try {
-      const { data } = await api.post<{ store: Store }>(`/admin/stores/${store.id}/payments`, { amount: rubles, months, method, comment });
+      const { data } = await api.post<{ store: Store }>(`/admin/stores/${store.id}/payments`, { amount: rubles, months, method, comment, receipt });
       toast.show(`${formatMoney(rubles)} принято. Оплачено до ${formatDate(data.store.subscriptionEndsAt)}`, { tone: "success" });
       onPaid(data.store);
     } catch (err: any) {
@@ -107,6 +108,9 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
           <Select value={method} onChange={(value) => setMethod(value as PaymentMethod)} options={methodOptions} />
         </Field>
       </div>
+      <Field label="Чек" hint="Ссылка на чек из «Мой налог» или номер чека. Можно добавить позже в «Оплатах». Владелец увидит его в своей истории оплат.">
+        <Input value={receipt} onChange={(e) => setReceipt(e.target.value)} placeholder="https://lknpd.nalog.ru/…" />
+      </Field>
       <Field label="Комментарий" hint="Видно только в админке">
         <Textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
       </Field>

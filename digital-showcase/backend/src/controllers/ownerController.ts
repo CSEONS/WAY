@@ -10,20 +10,11 @@ import { GRACE_DAYS, withSubscription } from "../services/subscriptionService.js
 import { asyncHandler, HttpError } from "../utils/http.js";
 import { imageOrderSchema, parseBody, productCreateSchema, productUpdateSchema, storeDetailsSchema } from "../utils/validation.js";
 
-async function firstOwnerStore(ownerId: string) {
-  const store = await storeService.getOwnerStore(ownerId);
-  if (!store) throw new HttpError(404, "Для владельца еще не создан магазин");
-  return store;
-}
-
-async function ownerStore(ownerId: string, storeId: string) {
-  const store = await storeService.getOwnerStoreById(ownerId, storeId);
+/** The store from the URL, only if it belongs to the signed-in owner; someone else's store is «not found». */
+async function scopedStore(req: Request) {
+  const store = await storeService.getOwnerStoreById(req.user!.userId, String(req.params.storeId));
   if (!store) throw new HttpError(404, "Магазин не найден");
   return store;
-}
-
-async function scopedStore(req: Request) {
-  return req.params.storeId ? ownerStore(req.user!.userId, String(req.params.storeId)) : firstOwnerStore(req.user!.userId);
 }
 
 function uploadedAiDraftFiles(req: Request) {
@@ -56,6 +47,11 @@ function supportContacts() {
   };
 }
 
+/** «Помощь» in the owner's app: who to write or call. */
+export const getSupport = asyncHandler(async (_req, res) => {
+  res.json(supportContacts());
+});
+
 /** «Подписка и итоги»: paid date, tariff, AI left this month, payments and month results. */
 export const getSubscription = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
@@ -75,7 +71,7 @@ export const getSubscription = asyncHandler(async (req, res) => {
     graceDays: GRACE_DAYS,
     ai,
     // Admin comments stay in the admin panel.
-    payments: payments.map(({ id, amount, months, method, periodEnd, createdAt }) => ({ id, amount, months, method, periodEnd, createdAt })),
+    payments: payments.map(({ id, amount, months, method, periodEnd, receipt, createdAt }) => ({ id, amount, months, method, periodEnd, receipt, createdAt })),
     reports,
     support: supportContacts()
   });

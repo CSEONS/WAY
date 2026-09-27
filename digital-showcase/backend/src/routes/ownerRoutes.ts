@@ -5,6 +5,7 @@ import { aiDraftUpload, bulkAiDraftUpload, upload } from "../middleware/upload.j
 
 export const ownerRoutes = Router();
 ownerRoutes.use(authMiddleware, ownerOnly, logActionsAsOwner);
+ownerRoutes.get("/support", controller.getSupport);
 ownerRoutes.get("/stores", controller.listStores);
 ownerRoutes.get("/stores/:storeId", controller.getStore);
 ownerRoutes.patch("/stores/:storeId", controller.updateStore);
@@ -21,15 +22,3 @@ ownerRoutes.delete("/stores/:storeId/products/:id", controller.deleteProduct);
 ownerRoutes.post("/stores/:storeId/products/:id/images", upload.single("image"), controller.addImage);
 ownerRoutes.patch("/stores/:storeId/products/:id/images/order", controller.reorderImages);
 ownerRoutes.delete("/stores/:storeId/products/:id/images/:imageId", controller.deleteImage);
-
-ownerRoutes.get("/store", controller.getStore);
-ownerRoutes.patch("/store", controller.updateStore);
-ownerRoutes.get("/products", controller.listProducts);
-ownerRoutes.post("/products/ai-draft", aiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 8 }]), controller.createProductDraft);
-ownerRoutes.post("/products", controller.createProduct);
-ownerRoutes.get("/products/:id", controller.getProduct);
-ownerRoutes.patch("/products/:id", controller.updateProduct);
-ownerRoutes.delete("/products/:id", controller.deleteProduct);
-ownerRoutes.post("/products/:id/images", upload.single("image"), controller.addImage);
-ownerRoutes.patch("/products/:id/images/order", controller.reorderImages);
-ownerRoutes.delete("/products/:id/images/:imageId", controller.deleteImage);

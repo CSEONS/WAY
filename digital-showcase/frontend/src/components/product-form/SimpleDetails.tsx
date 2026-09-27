@@ -3,6 +3,7 @@ import { FormEvent, useState } from "react";
 import { Button, Card, CardHeader, Chip, ChipGroup, ColorSwatch, Field, Input, Modal, SectionLabel, SegmentedControl } from "../../ui";
 import { AiBadge } from "./AiBadge";
 import { sortSizes } from "../../utils/format";
+import { PRICE_ERROR, isValidPrice } from "../../utils/price";
 import { normalizeSize } from "./helpers";
 import { LETTER_SIZES, NAMED_COLORS, NUMBER_SIZES, type SimpleDetails as SimpleDetailsValue } from "./simple";
 import styles from "./ProductForm.module.css";
@@ -78,11 +79,10 @@ export function SimpleDetails({ value, onChange, aiFilled, onSwitchToAdvanced }:
           </>
         }
         hint="Оставьте пустым, если цену лучше уточнять в магазине"
+        error={isValidPrice(value.price) ? undefined : PRICE_ERROR}
       >
         <Input
-          type="number"
-          inputMode="numeric"
-          min="0"
+          inputMode="decimal"
           value={value.price}
           onChange={(event) => {
             const price = event.target.value;

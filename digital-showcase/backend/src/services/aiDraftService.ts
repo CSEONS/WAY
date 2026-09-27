@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ProductStatus } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
-import { reportTokens } from "./aiUsageService.js";
+import { completeJson, isAiConfigured, transcribe } from "./aiProvider.js";
 import { optimizeImageForAi } from "./imageService.js";
 
 interface DraftVariant {
@@ -195,7 +195,7 @@ export async function createProductAiDraft(input: string | ProductAiDraftInput):
   const prompt = draftInput.prompt?.trim() ?? "";
   const hasRichInput = Boolean(draftInput.voice || draftInput.images?.length || draftInput.imageUrls?.length);
 
-  if (openAiApiKey()) {
+  if (isAiConfigured()) {
     try {
       return await createExternalProductAiDraft(draftInput);
     } catch (error) {
@@ -206,7 +206,7 @@ export async function createProductAiDraft(input: string | ProductAiDraftInput):
   }
 
   if (hasRichInput) {
-    throw new HttpError(503, "Для AI-черновика по изображениям или голосу настройте OPENAI_API_KEY на сервере");
+    throw new HttpError(503, "Для ИИ-черновика по фото или голосу настройте AI_API_KEY на сервере");
   }
 
   return createLocalProductAiDraft(prompt);
@@ -214,15 +214,12 @@ export async function createProductAiDraft(input: string | ProductAiDraftInput):
 
 export async function createBulkProductAiDraft(input: ProductAiDraftInput): Promise<BulkProductAiDraft[]> {
   if (!input.images?.length) throw new HttpError(400, "Добавьте изображения товаров");
-  if (!openAiApiKey()) throw new HttpError(503, "Для массовой группировки товаров настройте OPENAI_API_KEY на сервере");
+  if (!isAiConfigured()) throw new HttpError(503, "Для массовой группировки товаров настройте AI_API_KEY на сервере");
 
   const transcript = input.voice ? await transcribeVoice(input.voice) : "";
   const imageUrls = await collectImageInputs(input.images, []);
   const description = [input.prompt?.trim(), transcript ? `Голосовое описание: ${transcript}` : ""].filter(Boolean).join("\n\n");
-  const content = [
-    {
-      type: "input_text",
-      text: `
+  const text = `
         Перед созданием карточек сначала найди фотографии,
         относящиеся к одному физическому изделию.
 
@@ -237,25 +234,9 @@ export async function createBulkProductAiDraft(input: ProductAiDraftInput): Prom
         ${input.expectedCount ? `Владелец говорит, что на фотографиях примерно ${input.expectedCount} товаров. Ориентируйся на это число, но не объединяй разные изделия ради него.` : ""}
 
         ${description || "Дополнительное описание отсутствует."}
-        `
-    },
-    ...imageUrls.map((imageUrl) => ({ type: "input_image", image_url: imageUrl, detail: "low" }))
-  ];
-  const response = await fetch(`${openAiBaseUrl()}/responses`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${openAiApiKey()}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-5.6",
-      instructions: `${productDraftInstructions}\n${bulkDraftInstructions}`,
-      input: [{ role: "user", content }],
-      text: { format: { type: "json_object" } },
-      store: false
-    }),
-    signal: AbortSignal.timeout(openAiTimeoutMs())
-  });
-
-  const payload = await readOpenAiPayload(response);
-  return normalizeBulkProductDrafts(extractResponseText(payload), input.images.length, description);
+        `;
+  const answer = await completeJson({ instructions: `${productDraftInstructions}\n${bulkDraftInstructions}`, text, images: imageUrls });
+  return normalizeBulkProductDrafts(answer, input.images.length, description);
 }
 
 export function normalizeBulkProductDrafts(rawText: string, imageCount: number, fallbackPrompt = ""): BulkProductAiDraft[] {
@@ -287,50 +268,19 @@ async function createExternalProductAiDraft(input: ProductAiDraftInput) {
   const descriptionParts = [input.prompt?.trim(), transcript ? `Голосовое описание: ${transcript}` : ""].filter(Boolean);
   const text = descriptionParts.length ? descriptionParts.join("\n\n") : "Описание товара не задано. Используй изображения, если они приложены.";
 
-  const content = [
-    { type: "input_text", text: `Создай черновик карточки товара одежды в формате JSON.\n\n${text}` },
-    ...imageUrls.map((imageUrl) => ({ type: "input_image", image_url: imageUrl, detail: "low" }))
-  ];
-
-  const response = await fetch(`${openAiBaseUrl()}/responses`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openAiApiKey()}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-5.6",
-      instructions: productDraftInstructions,
-      input: [{ role: "user", content }],
-      text: { format: { type: "json_object" } },
-      store: false
-    }),
-    signal: AbortSignal.timeout(openAiTimeoutMs())
+  const answer = await completeJson({
+    instructions: productDraftInstructions,
+    text: `Создай черновик карточки товара одежды в формате JSON.\n\n${text}`,
+    images: imageUrls
   });
-
-  const payload = await readOpenAiPayload(response);
-  return normalizeAiDraft(extractResponseText(payload), [input.prompt, transcript].filter(Boolean).join("\n"));
+  return normalizeAiDraft(answer, [input.prompt, transcript].filter(Boolean).join("\n"));
 }
 
-async function transcribeVoice(file: AiDraftFile) {
-  const formData = new FormData();
-  const filename = audioFilename(file);
-  formData.append("file", new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || "audio/webm" }), filename);
-  formData.append("model", process.env.OPENAI_TRANSCRIBE_MODEL ?? "gpt-4o-mini-transcribe");
-  formData.append("response_format", "text");
-  formData.append("prompt", "Описание товара одежды для цифровой витрины. Сохрани размеры, цвета, цены и категории.");
-
-  const response = await fetch(`${openAiBaseUrl()}/audio/transcriptions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${openAiApiKey()}` },
-    body: formData,
-    signal: AbortSignal.timeout(openAiTimeoutMs())
-  });
-
-  const contentType = response.headers.get("content-type") ?? "";
-  const body = contentType.includes("application/json") ? await response.json() : await response.text();
-  if (!response.ok) throw new HttpError(502, openAiErrorMessage(body));
-  return typeof body === "string" ? body : String(body.text ?? "");
+function transcribeVoice(file: AiDraftFile) {
+  return transcribe(
+    { buffer: file.buffer, mimetype: file.mimetype, filename: audioFilename(file) },
+    "Описание товара одежды для цифровой витрины. Сохрани размеры, цвета, цены и категории."
+  );
 }
 
 async function collectImageInputs(files: AiDraftFile[], imageUrls: string[]) {
@@ -381,40 +331,6 @@ function mimeFromFilename(filename: string) {
   if (ext === ".png") return "image/png";
   if (ext === ".webp") return "image/webp";
   return "image/jpeg";
-}
-
-async function readOpenAiPayload(response: Response) {
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new HttpError(502, openAiErrorMessage(payload));
-  reportTokens(payload && typeof payload === "object" ? (payload as { usage?: unknown }).usage : null);
-  return payload;
-}
-
-function openAiErrorMessage(payload: unknown) {
-  if (payload && typeof payload === "object" && "error" in payload) {
-    const error = (payload as { error?: { message?: string } }).error;
-    if (error?.message) return `AI-провайдер вернул ошибку: ${error.message}`;
-  }
-  if (typeof payload === "string" && payload.trim()) return `AI-провайдер вернул ошибку: ${payload.trim()}`;
-  return "AI-провайдер временно недоступен";
-}
-
-function extractResponseText(payload: unknown) {
-  if (payload && typeof payload === "object" && "output_text" in payload && typeof (payload as { output_text?: unknown }).output_text === "string") {
-    return (payload as { output_text: string }).output_text;
-  }
-
-  const parts: string[] = [];
-  const output = payload && typeof payload === "object" && "output" in payload ? (payload as { output?: unknown[] }).output : [];
-  for (const item of output ?? []) {
-    const content = item && typeof item === "object" && "content" in item ? (item as { content?: unknown[] }).content : [];
-    for (const block of content ?? []) {
-      if (block && typeof block === "object" && "text" in block && typeof (block as { text?: unknown }).text === "string") {
-        parts.push((block as { text: string }).text);
-      }
-    }
-  }
-  return parts.join("\n");
 }
 
 function normalizeAiDraft(rawText: string, fallbackPrompt: string): ProductAiDraft {
@@ -513,19 +429,6 @@ function numberOrNull(value: unknown) {
 
 function normalizeStatus(value: unknown): ProductStatus {
   return value === "NOT_AVAILABLE" || value === "CHECK_IN_STORE" || value === "AVAILABLE" ? value : "AVAILABLE";
-}
-
-function openAiApiKey() {
-  return process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "";
-}
-
-function openAiBaseUrl() {
-  return (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
-}
-
-function openAiTimeoutMs() {
-  const value = Number(process.env.OPENAI_TIMEOUT_MS ?? 45000);
-  return Number.isFinite(value) && value > 0 ? value : 45000;
 }
 
 function createLocalProductAiDraft(prompt: string): ProductAiDraft {

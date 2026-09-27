@@ -1,0 +1,19 @@
+# The site's domain. Rendered by docker-entrypoint-site.sh into
+# /etc/nginx/site/site.conf: the domain and certificate paths are filled in,
+# nginx's own variables stay as they are.
+server {
+  listen 443 ssl;
+  server_name ${SITE_DOMAIN};
+  client_max_body_size 60m;
+
+  ssl_certificate     ${SITE_CERT};
+  ssl_certificate_key ${SITE_CERT_KEY};
+  ssl_protocols TLSv1.2 TLSv1.3;
+
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  add_header X-Frame-Options "SAMEORIGIN" always;
+  add_header Strict-Transport-Security "max-age=15768000" always;
+
+  include /etc/nginx/proxy-locations.conf;
+}

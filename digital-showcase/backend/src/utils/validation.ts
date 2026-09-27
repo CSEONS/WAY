@@ -167,8 +167,6 @@ const adminStoreFields = {
 export const storeCreateSchema = z.object(adminStoreFields);
 export const storeUpdateSchema = z.object(adminStoreFields).partial();
 
-export const extendSchema = z.object({ days: z.coerce.number().int().min(1).max(3650).default(30) });
-
 // Owners
 
 const emailField = z.preprocess((value) => (value === "" ? null : value), z.email().max(200).nullable().optional());
@@ -190,8 +188,11 @@ export const paymentSchema = z.object({
   amount: z.coerce.number().int().min(0).max(10_000_000),
   months: z.coerce.number().int().min(1).max(12),
   method: z.enum(["CASH", "TRANSFER", "OTHER"]),
-  comment: optionalText(500)
+  comment: optionalText(500),
+  receipt: optionalText(500)
 });
+
+export const receiptSchema = z.object({ receipt: optionalText(500) });
 
 export const connectSchema = z.object({
   ownerName: requiredText(100),

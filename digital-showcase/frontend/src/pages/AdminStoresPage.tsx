@@ -176,7 +176,7 @@ export function AdminStoresPage() {
   }
 
   async function toggle(store: Store) {
-    await run(() => api.post(`/admin/stores/${store.id}/${store.isActive ? "archive" : "restore"}`), "Не удалось изменить статус магазина");
+    await run(() => api.post(`/admin/stores/${store.id}/${store.isActive ? "disable" : "enable"}`), "Не удалось изменить статус магазина");
     setStoreToArchive(null);
   }
 

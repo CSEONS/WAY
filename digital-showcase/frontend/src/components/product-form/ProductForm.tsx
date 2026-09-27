@@ -1,6 +1,7 @@
 import { AiMagicIcon, Edit02Icon, InformationCircleIcon, LockKeyIcon } from "@hugeicons/core-free-icons";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Product, ProductStatus } from "../../types/models";
+import { PRICE_ERROR, isValidPrice, parsePrice } from "../../utils/price";
 import { Button, Card, CardHeader, Chip, ChipGroup, ConfirmModal, Field, Input, Notice, SegmentedControl, Textarea, useToast } from "../../ui";
 import { AiBadge } from "./AiBadge";
 import { AiPanel } from "./AiPanel";
@@ -27,7 +28,7 @@ import styles from "./ProductForm.module.css";
 
 interface ProductFormProps {
   initial?: Product;
-  aiDraftPath?: string;
+  aiDraftPath: string;
   aiFormEnabled: boolean;
   /** localStorage key for the unsaved draft and remembered values. */
   draftKey?: string;
@@ -163,7 +164,7 @@ export function ProductForm({ initial, aiDraftPath, aiFormEnabled, draftKey, onS
         colorName: variant.colorName.trim(),
         colorHex: variant.colorHex.trim() || null,
         size: variant.size.trim(),
-        price: variant.price && variant.price !== ASK_SELLER ? Number(variant.price) : null
+        price: variant.price && variant.price !== ASK_SELLER ? parsePrice(variant.price) : null
       }))
       .filter((variant) => variant.colorName && variant.size);
     const sizes = [...new Set(normalizedVariants.map((variant) => variant.size))];
@@ -185,6 +186,10 @@ export function ProductForm({ initial, aiDraftPath, aiFormEnabled, draftKey, onS
   function submit(event: FormEvent) {
     event.preventDefault();
     if (hasSubmittedRef.current) return;
+    if (mode === "simple" && !isValidPrice(simple.price)) {
+      toast.show(`Цена: ${PRICE_ERROR.toLowerCase()}`, { tone: "danger" });
+      return;
+    }
     hasSubmittedRef.current = true;
 
     onSubmit(

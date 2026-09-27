@@ -3,7 +3,7 @@ import type { Store } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
 import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "../utils/slug.js";
 import { deleteStoredImage, storeProductImage, type UploadedImage } from "./imageService.js";
-import { addDays, extensionBase, isStorefrontOpen, trialDays } from "./subscriptionService.js";
+import { addDays, isStorefrontOpen, trialDays } from "./subscriptionService.js";
 
 /** Buyers can open the storefront (paid, or within the grace days after the paid date). */
 export function isSubscriptionValid(store: Store) {
@@ -34,11 +34,6 @@ export async function getStore(id: string) {
 export async function listOwnerStores(ownerId: string) {
   const db = await getDb();
   return db.all<Store>("SELECT * FROM stores WHERE ownerId = ? ORDER BY createdAt DESC", ownerId);
-}
-
-export async function getOwnerStore(ownerId: string) {
-  const db = await getDb();
-  return db.get<Store>("SELECT * FROM stores WHERE ownerId = ? ORDER BY createdAt LIMIT 1", ownerId);
 }
 
 export async function getOwnerStoreById(ownerId: string, storeId: string) {
@@ -121,12 +116,6 @@ export async function deleteStore(id: string) {
   const images = await db.all<{ url: string }>("SELECT product_images.url FROM product_images JOIN products ON products.id = product_images.productId WHERE products.storeId = ?", id);
   await db.run("DELETE FROM stores WHERE id = ?", id);
   await Promise.all([deleteStoredImage(store?.logoUrl), ...images.map((image) => deleteStoredImage(image.url))]);
-}
-
-export async function extendSubscription(id: string, days: number) {
-  const store = await getStore(id);
-  if (!store) return null;
-  return updateStore(id, { subscriptionEndsAt: addDays(extensionBase(store), days).toISOString(), isActive: 1 });
 }
 
 export async function updateStoreLogo(id: string, file: UploadedImage) {

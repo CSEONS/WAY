@@ -125,6 +125,8 @@ export interface Payment {
   periodStart: string | null;
   periodEnd: string;
   createdBy: string | null;
+  /** Receipt link («Мой налог») or number. */
+  receipt: string | null;
   createdAt: string;
 }
 
@@ -162,7 +164,7 @@ export interface OwnerSubscription {
   subscription: SubscriptionInfo;
   graceDays: number;
   ai: AiStatus;
-  payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "createdAt">[];
+  payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "receipt" | "createdAt">[];
   reports: MonthReport[];
   support: SupportContacts;
 }

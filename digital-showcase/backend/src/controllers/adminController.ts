@@ -1,15 +1,16 @@
 import { asyncHandler, HttpError } from "../utils/http.js";
 import {
   connectSchema,
-  extendSchema,
   ownerCreateSchema,
   ownerPasswordSchema,
   ownerUpdateSchema,
   parseBody,
   paymentSchema,
+  receiptSchema,
   storeCreateSchema,
   storeUpdateSchema
 } from "../utils/validation.js";
+import * as aiProvider from "../services/aiProvider.js";
 import * as auditService from "../services/auditService.js";
 import * as authService from "../services/authService.js";
 import * as backupService from "../services/backupService.js";
@@ -105,6 +106,11 @@ export const acceptPayment = asyncHandler(async (req, res) => {
   res.status(201).json({ payment: result.payment, store: withSubscription(result.store) });
 });
 
+export const setPaymentReceipt = asyncHandler(async (req, res) => {
+  const { receipt } = parseBody(receiptSchema, req.body);
+  res.json(await paymentService.setReceipt(String(req.params.id), receipt ?? null));
+});
+
 export const cancelPayment = asyncHandler(async (req, res) => {
   const { payment, rolledBack } = await paymentService.cancelPayment(String(req.params.id));
   await auditService.logAction(
@@ -185,16 +191,6 @@ export const deleteStore = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-/** Extension without a payment record. The admin panel uses «Принять оплату» (0 ₽ for free) instead. */
-export const extendSubscription = asyncHandler(async (req, res) => {
-  const { days } = parseBody(extendSchema, req.body);
-  const before = await storeService.getStore(String(req.params.id));
-  const store = await storeService.extendSubscription(String(req.params.id), days);
-  if (!store || !before) throw new HttpError(404, "Магазин не найден");
-  await logStoreChanges(req.user!.userId, before, store);
-  res.json(withSubscription(store));
-});
-
 export const disableStore = asyncHandler(async (req, res) => {
   const store = await storeService.updateStore(String(req.params.id), { isActive: 0 });
   if (!store) throw new HttpError(404, "Магазин не найден");
@@ -207,25 +203,7 @@ export const enableStore = asyncHandler(async (req, res) => {
   res.json(store);
 });
 
-export const archiveStore = disableStore;
 
-export const restoreStore = enableStore;
-
-async function setAiForm(adminId: string, storeId: string, enabled: 0 | 1) {
-  const before = await storeService.getStore(storeId);
-  const store = await storeService.updateStore(storeId, { aiFormEnabled: enabled });
-  if (!store || !before) throw new HttpError(404, "Магазин не найден");
-  await logStoreChanges(adminId, before, store);
-  return withSubscription(store);
-}
-
-export const enableAiForm = asyncHandler(async (req, res) => {
-  res.json(await setAiForm(req.user!.userId, String(req.params.id), 1));
-});
-
-export const disableAiForm = asyncHandler(async (req, res) => {
-  res.json(await setAiForm(req.user!.userId, String(req.params.id), 0));
-});
 
 /** Backup status for the admin panel: settings (no secrets) and the latest runs. */
 export const listBackups = asyncHandler(async (_req, res) => {
@@ -247,4 +225,20 @@ export const startBackup = asyncHandler(async (req, res) => {
   void backupService.runBackup();
   await auditService.logAction(req.user!.userId, "BACKUP_STARTED");
   res.status(202).json({ started: true });
+});
+
+/** Where AI requests go (no key) — for the admin panel. */
+export const aiStatus = asyncHandler(async (_req, res) => {
+  res.json(aiProvider.aiSummary());
+});
+
+/** «Проверить»: one tiny request to the configured provider, e.g. right after switching it. */
+export const checkAi = asyncHandler(async (_req, res) => {
+  const startedAt = Date.now();
+  try {
+    const answer = await aiProvider.completeJson({ instructions: "Отвечай только JSON-объектом.", text: 'Верни {"ok": true}' });
+    res.json({ ok: /"ok"\s*:\s*true/.test(answer), ms: Date.now() - startedAt, answer: answer.slice(0, 200) });
+  } catch (error) {
+    res.json({ ok: false, ms: Date.now() - startedAt, message: error instanceof Error ? error.message : String(error) });
+  }
 });

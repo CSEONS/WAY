@@ -18,7 +18,7 @@ const { addMonths, subscriptionInfo, isStorefrontOpen } = await import("../src/s
 const { slugify } = await import("../src/utils/slug.js");
 const { createStore, getStore } = await import("../src/services/storeService.js");
 const { createOwner } = await import("../src/services/userService.js");
-const { acceptPayment, cancelPayment, revenueByMonth } = await import("../src/services/paymentService.js");
+const { acceptPayment, cancelPayment, revenueByMonth, setReceipt, listPayments } = await import("../src/services/paymentService.js");
 const aiUsage = await import("../src/services/aiUsageService.js");
 const { connectStore, suggestSlug } = await import("../src/services/onboardingService.js");
 const authService = await import("../src/services/authService.js");
@@ -88,6 +88,19 @@ test("оплата после отсрочки считается от сего�
   assert.ok(Date.parse(paid.subscriptionEndsAt!) > Date.now() + 27 * DAY);
   await assert.rejects(acceptPayment(store.id, { amount: -1, months: 1, method: "CASH" }, admin.id), (error: { status?: number }) => error.status === 400);
   await assert.rejects(acceptPayment(store.id, { amount: 100, months: 13, method: "CASH" }, admin.id), (error: { status?: number }) => error.status === 400);
+});
+
+test("чек сохраняется с оплатой и добавляется позже", async () => {
+  const store = (await createStore({ ownerId: owner.id, name: "Чеки", slug: "receipts-shop" }))!;
+  const withReceipt = await acceptPayment(store.id, { amount: 1500, months: 1, method: "TRANSFER", receipt: " https://lknpd.nalog.ru/r/1 " }, admin.id);
+  assert.equal(withReceipt.payment.receipt, "https://lknpd.nalog.ru/r/1");
+
+  const without = await acceptPayment(store.id, { amount: 1500, months: 1, method: "CASH" }, admin.id);
+  assert.equal(without.payment.receipt, null);
+  await setReceipt(without.payment.id, "20ab3c");
+  const saved = (await listPayments({ storeId: store.id })).find((payment) => payment.id === without.payment.id);
+  assert.equal(saved?.receipt, "20ab3c");
+  await assert.rejects(setReceipt("missing", "x"), (error: { status?: number }) => error.status === 404);
 });
 
 test("лимит ИИ: после исчерпания запрос не уходит к провайдеру", async () => {

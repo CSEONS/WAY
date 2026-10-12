@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { Logout } from "../components/Logout";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { HomePage } from "../pages/HomePage";
 import { LoginPage } from "../pages/LoginPage";
@@ -12,6 +13,7 @@ import { LoadingState } from "../ui";
 // Buyers only need the storefront: the owner's dashboard and the admin panel
 // load as separate chunks the first time someone opens them.
 const DashboardPage = lazy(() => import("../pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const BulkProductsPage = lazy(() => import("../pages/BulkProductsPage").then((m) => ({ default: m.BulkProductsPage })));
 const ProductEditorPage = lazy(() => import("../pages/ProductEditorPage").then((m) => ({ default: m.ProductEditorPage })));
 const SettingsPage = lazy(() => import("../pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const PosterPage = lazy(() => import("../pages/PosterPage").then((m) => ({ default: m.PosterPage })));
@@ -32,7 +34,14 @@ const SubscriptionPage = lazy(() => import("../pages/SubscriptionPage").then((m)
 // page and its chunk are dropped from the bundle.
 const DevUiPage = import.meta.env.DEV ? lazy(() => import("../pages/DevUiPage")) : null;
 
-export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null; isAuthLoading: boolean; onLogin: (user: User) => void }) {
+interface Props {
+  user: User | null;
+  isAuthLoading: boolean;
+  onLogin: (user: User) => void;
+  onLogout: () => void;
+}
+
+export function AppRoutes({ user, isAuthLoading, onLogin, onLogout }: Props) {
   const location = useLocation();
   return (
     <ErrorBoundary resetKey={location.pathname}>
@@ -42,6 +51,7 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
           <Route path="/m/:storeSlug" element={<PublicStorePage />} />
           <Route path="/m/:storeSlug/p/:productId" element={<PublicProductPage />} />
           <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
+          <Route path="/logout" element={<Logout isLoading={isAuthLoading} onLogout={onLogout} />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/offer" element={<OfferPage />} />
           {DevUiPage && <Route path="/dev/ui" element={<DevUiPage />} />}
@@ -50,6 +60,7 @@ export function AppRoutes({ user, isAuthLoading, onLogin }: { user: User | null;
             <Route path="/dashboard/stores/:storeId" element={<DashboardPage />} />
             <Route path="/dashboard/stores/:storeId/products" element={<DashboardPage />} />
             <Route path="/dashboard/stores/:storeId/products/new" element={<ProductEditorPage />} />
+            <Route path="/dashboard/stores/:storeId/products/bulk" element={<BulkProductsPage />} />
             <Route path="/dashboard/stores/:storeId/products/:id/edit" element={<ProductEditorPage />} />
             <Route path="/dashboard/stores/:storeId/settings" element={<SettingsPage />} />
             <Route path="/dashboard/stores/:storeId/poster" element={<PosterPage />} />

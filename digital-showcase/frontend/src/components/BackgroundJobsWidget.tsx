@@ -1,15 +1,20 @@
-import { Cancel01Icon, CancelCircleIcon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CancelCircleIcon, CheckmarkCircle02Icon, Clock01Icon } from "@hugeicons/core-free-icons";
 import { useBackgroundJobs } from "../state/backgroundJobs";
-import { Icon, IconButton, ProgressBar, cx } from "../ui";
+import { Button, Icon, IconButton, ProgressBar, cx } from "../ui";
+import { plural } from "../utils/format";
 import styles from "./BackgroundJobsWidget.module.css";
 
 export function BackgroundJobsWidget() {
-  const { jobs, dismissJob } = useBackgroundJobs();
+  const { jobs, dismissJob, retryJob } = useBackgroundJobs();
   if (!jobs.length) return null;
+
+  // Bulk adding queues many products: one line for those still waiting, not a card each.
+  const waiting = jobs.filter((job) => job.status === "waiting");
+  const shown = jobs.filter((job) => job.status !== "waiting");
 
   return (
     <div className={styles.dock} role="status" aria-live="polite">
-      {jobs.map((job) => (
+      {shown.map((job) => (
         <div className={styles.card} key={job.id}>
           <div className={styles.head}>
             <strong className={styles.title}>{job.title}</strong>
@@ -30,13 +35,24 @@ export function BackgroundJobsWidget() {
             </p>
           )}
           {job.status === "error" && (
-            <p className={cx(styles.message, styles.error)}>
-              <Icon icon={CancelCircleIcon} size="xs" />
-              {job.message}
-            </p>
+            <>
+              <p className={cx(styles.message, styles.error)}>
+                <Icon icon={CancelCircleIcon} size="xs" />
+                {job.message}
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => retryJob(job.id)}>
+                Повторить
+              </Button>
+            </>
           )}
         </div>
       ))}
+      {waiting.length > 0 && (
+        <div className={cx(styles.card, styles.waiting)}>
+          <Icon icon={Clock01Icon} size="sm" />
+          В очереди: ещё {waiting.length} {plural(waiting.length, ["товар", "товара", "товаров"])}
+        </div>
+      )}
     </div>
   );
 }

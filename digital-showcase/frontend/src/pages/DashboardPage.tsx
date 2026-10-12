@@ -24,13 +24,13 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { BulkProductCreator } from "../components/BulkProductCreator";
 import { InstallHint } from "../components/dashboard/InstallHint";
 import { LaunchChecklist } from "../components/dashboard/LaunchChecklist";
 import { OwnerProductItem } from "../components/dashboard/OwnerProductItem";
 import { PriceModal } from "../components/dashboard/PriceModal";
 import { markStoreShared } from "../components/dashboard/shareState";
 import { QrShareButton } from "../components/QrShareButton";
+import { useSavedProductCount } from "../state/backgroundJobs";
 import type { Product, Store } from "../types/models";
 import { plural } from "../utils/format";
 import { subscriptionBadge, subscriptionNotice } from "../utils/subscription";
@@ -69,6 +69,10 @@ const filterMatchers: Record<ListFilter, (product: Product) => boolean> = {
   hidden: (product) => !product.isVisible,
   unavailable: (product) => product.status === "NOT_AVAILABLE"
 };
+
+function fetchProducts(storeId: string) {
+  return Promise.all([api.get<Product[]>(`/owner/stores/${storeId}/products`), api.get<StoreAnalytics>(`/owner/stores/${storeId}/analytics`)]);
+}
 
 function formatStoreDate(value?: string | null) {
   if (!value) return "Дата создания не указана";
@@ -165,7 +169,6 @@ export function DashboardPage() {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [productToReprice, setProductToReprice] = useState<Product | null>(null);
-  const [bulkCreatorOpen, setBulkCreatorOpen] = useState(false);
   const selectedStore = stores.find((store) => store.id === storeId);
   const publicStoreUrl = selectedStore ? `${location.origin}/m/${selectedStore.slug}` : "";
   const subscription = selectedStore?.subscription;
@@ -237,7 +240,7 @@ export function DashboardPage() {
 
     let ignore = false;
     setProductsState("loading");
-    Promise.all([api.get<Product[]>(`/owner/stores/${storeId}/products`), api.get<StoreAnalytics>(`/owner/stores/${storeId}/analytics`)])
+    fetchProducts(storeId)
       .then(([productsRes, analyticsRes]) => {
         if (ignore) return;
         setProducts(productsRes.data);
@@ -253,6 +256,23 @@ export function DashboardPage() {
   }, [storeId]);
 
   useEffect(() => loadProducts(), [loadProducts]);
+
+  // Products saved in the background (the editor, bulk adding) appear on their own, without the list blinking.
+  const savedProductCount = useSavedProductCount(storeId);
+  useEffect(() => {
+    if (!storeId || !savedProductCount) return;
+    let ignore = false;
+    fetchProducts(storeId)
+      .then(([productsRes, analyticsRes]) => {
+        if (ignore) return;
+        setProducts(productsRes.data);
+        setAnalytics(analyticsRes.data);
+      })
+      .catch(() => undefined);
+    return () => {
+      ignore = true;
+    };
+  }, [storeId, savedProductCount]);
 
   function replaceProduct(updated: Product) {
     setProducts((current) => current.map((product) => (product.id === updated.id ? updated : product)));
@@ -358,9 +378,9 @@ export function DashboardPage() {
             Добавить товар
           </ButtonLink>
           {Boolean(selectedStore.aiFormEnabled) && (
-            <Button variant="secondary" size="lg" icon={PlusSignIcon} onClick={() => setBulkCreatorOpen(true)}>
+            <ButtonLink variant="secondary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/bulk`}>
               Добавить много товаров
-            </Button>
+            </ButtonLink>
           )}
         </div>
         <div className={styles.heroLink}>
@@ -524,7 +544,6 @@ export function DashboardPage() {
       {productToReprice && (
         <PriceModal product={productToReprice} storeId={selectedStore.id} onClose={() => setProductToReprice(null)} onSaved={replaceProduct} />
       )}
-      {bulkCreatorOpen && <BulkProductCreator storeId={selectedStore.id} onClose={() => setBulkCreatorOpen(false)} onComplete={loadProducts} />}
     </Page>
   );
 }

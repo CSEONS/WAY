@@ -7,7 +7,7 @@ const RESTORE_TIMEOUT_MS = 1500;
 
 /**
  * A new page opens at the top; «Назад» returns to where the buyer was in
- * the catalog. BrowserRouter does neither by itself.
+ * the catalog. The router does neither by itself.
  */
 export function ScrollManager() {
   const location = useLocation();

@@ -108,14 +108,14 @@ Backend реализован на Express. Сервер принимает HTTP-
 - `AppRoutes.tsx` определяет маршруты SPA.
 - `ProtectedRoute.tsx` блокирует доступ на основе роли `OWNER` или `ADMIN`.
 - Публичные маршруты доступны без авторизации.
-- Владелец получает доступ к `/dashboard`, `/dashboard/stores/:storeId`, `/dashboard/stores/:storeId/products/new`, `/dashboard/stores/:storeId/products/:id/edit`, `/dashboard/stores/:storeId/settings`.
+- Владелец получает доступ к `/dashboard`, `/dashboard/stores/:storeId`, `/dashboard/stores/:storeId/products/new`, `/dashboard/stores/:storeId/products/bulk`, `/dashboard/stores/:storeId/products/:id/edit`, `/dashboard/stores/:storeId/settings`.
 - Администратор получает доступ к `/admin`, `/admin/owners`, `/admin/stores`.
 - Публичная витрина доступна по `/m/:storeSlug` и `/m/:storeSlug/p/:productId`.
 
 ### Компоненты
 
 - `ProductForm.tsx` — форма товара с поддержкой AI-режима, голосового ввода, загрузки картинок, редактирования вариантов, цен и категорий.
-- `BulkProductCreator.tsx` — массовая загрузка изображений, AI-группировка, проверка предложений и подтверждённое создание товаров.
+- `bulk/BulkProductCreator.tsx` — содержимое страницы `pages/BulkProductsPage.tsx` (`…/products/bulk`), массовое добавление в три шага: фото (голос и текст по желанию) → «Правильно разложил?» (перенос фото между товарами, объединение, удаление; логика в `bulk/grouping.ts`) → названия и цены. Шаг хранится в адресе (`?step=groups`), поэтому «Назад» в телефоне возвращает на предыдущий шаг. Сохранение уходит в фоновую очередь `state/backgroundJobs.tsx`.
 - `ProductCard.tsx` — отображение товара на публичной витрине.
 - `ConfirmModal.tsx` — подтверждение опасных действий.
 - `EmptyState.tsx` — отображение пустых состояний.
@@ -199,7 +199,7 @@ Backend реализован на Express. Сервер принимает HTTP-
 
 ### Массовый AI Draft
 
-Владелец → `BulkProductCreator.tsx` → `api/client.ts` → `POST /api/owner/stores/:storeId/products/bulk-ai-draft` → `ownerController.ts` → `aiDraftService.ts` / `imageService.ts` → список редактируемых предложений → подтверждение владельца → существующие маршруты создания товаров и загрузки изображений.
+Владелец → `pages/BulkProductsPage.tsx` → `bulk/BulkProductCreator.tsx` → `api/client.ts` → `POST /api/owner/stores/:storeId/products/bulk-ai-draft` → `ownerController.ts` → `aiDraftService.ts` / `imageService.ts` → раскладка фото по товарам → владелец поправляет раскладку и ставит цены → `queueProductBatch` в `state/backgroundJobs.tsx`: товары сохраняются по одному существующими маршрутами создания товара и загрузки изображений, владелец при этом уже вернулся в кабинет. Сбой одного товара не останавливает остальные; «Повторить» продолжает с места сбоя и не создаёт дубль.
 
 ### Загрузка изображения товара
 

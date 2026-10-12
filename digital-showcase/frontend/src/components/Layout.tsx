@@ -10,12 +10,7 @@ import styles from "./Layout.module.css";
 // Only owners open it: a separate chunk, buyers don't download it.
 const HelpModal = lazy(() => import("./help/HelpModal").then((m) => ({ default: m.HelpModal })));
 
-interface Props {
-  user: User | null;
-  onLogout: () => void;
-}
-
-export function Layout({ user, onLogout }: Props) {
+export function Layout({ user }: { user: User | null }) {
   const navigate = useNavigate();
   const location = useLocation();
   const hidePublicStoreNav = !user && location.pathname.startsWith("/m/");
@@ -30,9 +25,8 @@ export function Layout({ user, onLogout }: Props) {
       stopImpersonation();
       return;
     }
-    localStorage.removeItem("token");
-    onLogout();
-    navigate("/");
+    // The session ends on that page, not here: a screen with unsaved work may ask first and stay.
+    navigate("/logout");
   }
 
   return (

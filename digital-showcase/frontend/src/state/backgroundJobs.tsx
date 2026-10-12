@@ -4,7 +4,8 @@ import { api } from "../api/client";
 import type { ProductImageSelection, ProductPayload } from "../components/product-form";
 import type { Product } from "../types/models";
 
-export type BackgroundJobStatus = "running" | "done" | "error";
+/** waiting — queued behind another product of the same batch. */
+export type BackgroundJobStatus = "waiting" | "running" | "done" | "error";
 
 export interface BackgroundJob {
   id: string;
@@ -15,7 +16,7 @@ export interface BackgroundJob {
   message: string;
 }
 
-interface QueueProductSaveArgs {
+export interface QueueProductSaveArgs {
   storeId: string;
   productId?: string;
   payload: ProductPayload;
@@ -23,9 +24,24 @@ interface QueueProductSaveArgs {
   existingImageIds: string[];
 }
 
+/**
+ * What a save has already done on the server. A retry continues from here:
+ * the product isn't created twice and uploaded photos aren't sent again.
+ */
+interface SaveProgress {
+  productId?: string;
+  /** Form image id → id of the uploaded image on the server. */
+  uploaded: Map<string, string>;
+  deleted: Set<string>;
+}
+
 interface BackgroundJobsContextValue {
   jobs: BackgroundJob[];
   queueProductSave: (args: QueueProductSaveArgs) => string;
+  /** Several products saved one after another (bulk adding), so a phone's connection isn't split ten ways. */
+  queueProductBatch: (items: QueueProductSaveArgs[]) => string[];
+  /** Runs a failed job again from where it stopped. */
+  retryJob: (id: string) => void;
   dismissJob: (id: string) => void;
 }
 
@@ -43,48 +59,71 @@ const WEIGHT_ORDER = 10;
 export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
   const counterRef = useRef(0);
+  // Kept outside React state: files and progress aren't for rendering.
+  const runsRef = useRef(new Map<string, { args: QueueProductSaveArgs; progress: SaveProgress }>());
 
   const updateJob = useCallback((id: string, patch: Partial<BackgroundJob>) => {
     setJobs((current) => current.map((job) => (job.id === id ? { ...job, ...patch } : job)));
   }, []);
 
   const dismissJob = useCallback((id: string) => {
+    runsRef.current.delete(id);
     setJobs((current) => current.filter((job) => job.id !== id));
   }, []);
 
-  const queueProductSave = useCallback(
-    ({ storeId, productId, payload, imageSelection, existingImageIds }: QueueProductSaveArgs) => {
-      const id = `job-${Date.now()}-${counterRef.current++}`;
-      const job: BackgroundJob = {
-        id,
-        title: payload.title || "Новый товар",
-        storeId,
-        status: "running",
-        percent: 1,
-        message: "Сохраняем товар…"
-      };
-      setJobs((current) => [...current, job]);
+  const addJob = useCallback((args: QueueProductSaveArgs, status: BackgroundJobStatus) => {
+    const id = `job-${Date.now()}-${counterRef.current++}`;
+    runsRef.current.set(id, { args, progress: { productId: args.productId, uploaded: new Map(), deleted: new Set() } });
+    setJobs((current) => [
+      ...current,
+      { id, title: args.payload.title || "Новый товар", storeId: args.storeId, status, percent: 1, message: status === "waiting" ? "В очереди" : "Сохраняем товар…" }
+    ]);
+    return id;
+  }, []);
 
-      runProductSave({ storeId, productId, payload, imageSelection, existingImageIds }, (patch) => updateJob(id, patch))
-        .then(() => {
-          updateJob(id, { status: "done", percent: 100, message: "Товар сохранён" });
-          window.setTimeout(() => dismissJob(id), 6000);
-        })
-        .catch((err: any) => {
-          updateJob(id, {
-            status: "error",
-            message: err?.response?.data?.message ?? "Не удалось сохранить товар"
-          });
-        });
-
-      return id;
+  const run = useCallback(
+    async (id: string) => {
+      const entry = runsRef.current.get(id);
+      if (!entry) return;
+      updateJob(id, { status: "running", percent: 1, message: "Сохраняем товар…" });
+      try {
+        await runProductSave(entry.args, entry.progress, (patch) => updateJob(id, patch));
+        runsRef.current.delete(id);
+        updateJob(id, { status: "done", percent: 100, message: "Товар сохранён" });
+        window.setTimeout(() => dismissJob(id), 6000);
+      } catch (err: any) {
+        updateJob(id, { status: "error", message: err?.response?.data?.message ?? "Не удалось сохранить товар. Проверьте интернет." });
+      }
     },
     [updateJob, dismissJob]
   );
 
-  const hasRunningJobs = jobs.some((job) => job.status === "running");
+  const queueProductSave = useCallback(
+    (args: QueueProductSaveArgs) => {
+      const id = addJob(args, "running");
+      void run(id);
+      return id;
+    },
+    [addJob, run]
+  );
+
+  const queueProductBatch = useCallback(
+    (items: QueueProductSaveArgs[]) => {
+      const ids = items.map((args) => addJob(args, "waiting"));
+      void (async () => {
+        // A failed product doesn't stop the rest; it stays in the dock with «Повторить».
+        for (const id of ids) await run(id);
+      })();
+      return ids;
+    },
+    [addJob, run]
+  );
+
+  const retryJob = useCallback((id: string) => void run(id), [run]);
+
+  const hasUnfinishedJobs = jobs.some((job) => job.status === "running" || job.status === "waiting");
   useEffect(() => {
-    if (!hasRunningJobs) return;
+    if (!hasUnfinishedJobs) return;
     function warn(event: BeforeUnloadEvent) {
       event.preventDefault();
       // Older browsers need returnValue set to show the «Leave site?» dialog.
@@ -92,9 +131,12 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [hasRunningJobs]);
+  }, [hasUnfinishedJobs]);
 
-  const value = useMemo(() => ({ jobs, queueProductSave, dismissJob }), [jobs, queueProductSave, dismissJob]);
+  const value = useMemo(
+    () => ({ jobs, queueProductSave, queueProductBatch, retryJob, dismissJob }),
+    [jobs, queueProductSave, queueProductBatch, retryJob, dismissJob]
+  );
 
   return <BackgroundJobsContext.Provider value={value}>{children}</BackgroundJobsContext.Provider>;
 }
@@ -105,8 +147,25 @@ export function useBackgroundJobs() {
   return ctx;
 }
 
+/** Grows each time a product of this store finishes saving: a cue for a list to reload itself. */
+export function useSavedProductCount(storeId: string | undefined) {
+  const { jobs } = useBackgroundJobs();
+  const seenRef = useRef(new Set<string>());
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const fresh = jobs.filter((job) => job.status === "done" && job.storeId === storeId && !seenRef.current.has(job.id));
+    if (!fresh.length) return;
+    fresh.forEach((job) => seenRef.current.add(job.id));
+    setCount((current) => current + fresh.length);
+  }, [jobs, storeId]);
+
+  return count;
+}
+
 async function runProductSave(
-  { storeId, productId, payload, imageSelection, existingImageIds }: QueueProductSaveArgs,
+  { storeId, payload, imageSelection, existingImageIds }: QueueProductSaveArgs,
+  progress: SaveProgress,
   onProgress: (patch: Partial<BackgroundJob>) => void
 ) {
   const basePath = `/owner/stores/${storeId}/products`;
@@ -117,8 +176,8 @@ async function runProductSave(
     return 0;
   });
   const keptExistingIds = new Set(imageSelection.images.map((image) => image.existingId).filter(Boolean));
-  const imagesToDelete = existingImageIds.filter((imageId) => !keptExistingIds.has(imageId));
-  const imagesToUpload = orderedImages.filter((image) => image.file);
+  const imagesToDelete = existingImageIds.filter((imageId) => !keptExistingIds.has(imageId) && !progress.deleted.has(imageId));
+  const imagesToUpload = orderedImages.filter((image) => image.file && !progress.uploaded.has(image.id));
 
   const weightDelete = imagesToDelete.length ? WEIGHT_DELETE : 0;
   const weightUpload = imagesToUpload.length ? WEIGHT_UPLOAD : 0;
@@ -131,9 +190,11 @@ async function runProductSave(
 
   onProgress({ message: "Сохраняем товар…" });
   setPercent();
-  const { data } = productId
-    ? await api.patch<Product>(`${basePath}/${productId}`, payload)
+  // After a failed first attempt the product may already exist: update it instead of creating a twin.
+  const { data } = progress.productId
+    ? await api.patch<Product>(`${basePath}/${progress.productId}`, payload)
     : await api.post<Product>(basePath, payload);
+  progress.productId = data.id;
   doneWeight += WEIGHT_SAVE;
   setPercent();
 
@@ -142,12 +203,12 @@ async function runProductSave(
       message: imagesToDelete.length > 1 ? `Удаляем старые фото… (${index + 1}/${imagesToDelete.length})` : "Удаляем старые фото…"
     });
     await api.delete(`${basePath}/${data.id}/images/${imageId}`);
+    progress.deleted.add(imageId);
     doneWeight += weightDelete / imagesToDelete.length;
     setPercent();
   }
 
-  const uploadedIds = new Map<string, string>();
-  const knownImageIds = new Set(existingImageIds.filter((imageId) => keptExistingIds.has(imageId)));
+  const knownImageIds = new Set([...existingImageIds.filter((imageId) => keptExistingIds.has(imageId)), ...progress.uploaded.values()]);
 
   for (const [index, image] of imagesToUpload.entries()) {
     onProgress({
@@ -165,14 +226,14 @@ async function runProductSave(
     doneWeight += perImageWeight;
     const uploaded = response.data.images.find((item) => !knownImageIds.has(item.id));
     if (uploaded) {
-      uploadedIds.set(image.id, uploaded.id);
+      progress.uploaded.set(image.id, uploaded.id);
       knownImageIds.add(uploaded.id);
     }
     setPercent();
   }
 
   const imageIds = orderedImages
-    .map((image) => image.existingId ?? uploadedIds.get(image.id))
+    .map((image) => image.existingId ?? progress.uploaded.get(image.id))
     .filter((imageId): imageId is string => Boolean(imageId));
   if (imageIds.length) {
     onProgress({ message: "Сохраняем порядок фото…" });

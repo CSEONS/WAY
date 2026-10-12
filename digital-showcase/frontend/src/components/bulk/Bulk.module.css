@@ -1,0 +1,327 @@
+/* Bulk adding (BulkProductCreator on BulkProductsPage): photos → sorting → prices. */
+
+/* Blocks of one step, top to bottom. */
+.flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+/* «Назад» / «Дальше» under the step. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actions > * {
+  flex: 1 1 0%;
+}
+
+.lead {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-snug);
+}
+
+/* A square photo. */
+.photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--color-surface-muted);
+}
+
+/* ---------- Step 1: photos ---------- */
+
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pickerHint {
+  display: inline-flex;
+  flex: 1 1 180px;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-snug);
+}
+
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: var(--space-2);
+}
+
+.photoItem {
+  position: relative;
+}
+
+/* Small «×» in the corner of a photo. */
+.photoRemove {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 0;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hover);
+  cursor: pointer;
+}
+
+.photoRemove:hover {
+  color: var(--color-danger-strong);
+}
+
+.photoRemove:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.voiceText {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.voiceTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-ink);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.optional {
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+}
+
+.moreToggle {
+  justify-self: start;
+}
+
+.chevronOpen svg:last-child {
+  transform: rotate(180deg);
+}
+
+/* ---------- Step 2: sorting ---------- */
+
+/* A product card the chosen photo (or product) can go into. */
+.group.groupTarget {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.groupHead {
+  display: grid;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.groupMeta {
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.groupTitle {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.untitled {
+  color: var(--color-ink-muted);
+}
+
+.thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: var(--space-2);
+}
+
+.thumb {
+  position: relative;
+  display: block;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.thumbSelected {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* While one photo is being moved, the others step back. */
+.thumbDimmed {
+  opacity: 0.55;
+}
+
+.cover {
+  position: absolute;
+  bottom: var(--space-1);
+  left: var(--space-1);
+  border-radius: var(--radius-sm);
+  padding: var(--space-0-5) var(--space-1);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.groupActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0 calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
+}
+
+.unused {
+  display: grid;
+  gap: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.unusedTitle {
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* What to do with the chosen photo: stays at the bottom of the screen while the list scrolls. */
+.bar {
+  position: sticky;
+  bottom: calc(var(--space-3) + var(--safe-bottom));
+  z-index: var(--z-sticky);
+  display: grid;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-hover);
+}
+
+.barHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.barPhoto {
+  flex: 0 0 40px;
+  width: 40px;
+  border-radius: var(--radius-sm);
+}
+
+.barText {
+  display: grid;
+  flex: 1;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.barTitle {
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.barHint {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-snug);
+}
+
+.barActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.barActions > button {
+  flex: 1 1 auto;
+  padding: 0 var(--space-2);
+}
+
+/* ---------- Step 3: prices ---------- */
+
+.priceAll {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.priceAll > :first-child {
+  flex: 1 1 160px;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.itemFields {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.itemMore {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: var(--space-3);
+}
+
+.itemMoreFields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 720px) {
+  .itemFields {
+    grid-template-columns: minmax(0, 1fr) 180px;
+  }
+
+  .itemMoreFields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+}

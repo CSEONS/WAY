@@ -10,7 +10,7 @@ import * as paymentService from "../services/paymentService.js";
 import * as productService from "../services/productService.js";
 import * as reportService from "../services/reportService.js";
 import * as storeService from "../services/storeService.js";
-import { GRACE_DAYS, withSubscription } from "../services/subscriptionService.js";
+import { addingProductsBlocked, GRACE_DAYS, withSubscription } from "../services/subscriptionService.js";
 import { asyncHandler, HttpError } from "../utils/http.js";
 import { imageOrderSchema, parseBody, productCreateSchema, productUpdateSchema, storeDetailsSchema } from "../utils/validation.js";
 
@@ -18,6 +18,14 @@ import { imageOrderSchema, parseBody, productCreateSchema, productUpdateSchema, 
 async function scopedStore(req: Request) {
   const store = await storeService.getOwnerStoreById(req.user!.userId, String(req.params.storeId));
   if (!store) throw new HttpError(404, "Магазин не найден");
+  return store;
+}
+
+/** The store, if new products can go on it now: not while the subscription is unpaid (see addingProductsBlocked). */
+async function storeForNewProducts(req: Request) {
+  const store = await scopedStore(req);
+  const reason = addingProductsBlocked(store);
+  if (reason) throw new HttpError(403, reason);
   return store;
 }
 
@@ -111,12 +119,12 @@ export const getProduct = asyncHandler(async (req, res) => {
 
 export const createProduct = asyncHandler(async (req, res) => {
   const input = parseBody(productCreateSchema, req.body);
-  const store = await scopedStore(req);
+  const store = await storeForNewProducts(req);
   res.status(201).json(await productService.createProduct({ ...input, storeId: store.id }));
 });
 
 export const createProductDraft = asyncHandler(async (req, res) => {
-  const store = await scopedStore(req);
+  const store = await storeForNewProducts(req);
   if (!store.aiFormEnabled) throw new HttpError(403, "ИИ-заполнение формы не подключено");
 
   const { voice, images } = uploadedAiDraftFiles(req);
@@ -131,7 +139,7 @@ export const createProductDraft = asyncHandler(async (req, res) => {
 
 /** «Превью с ИИ»: a storefront cover drawn from one photo of the product. */
 export const createPreview = asyncHandler(async (req, res) => {
-  const store = await scopedStore(req);
+  const store = await storeForNewProducts(req);
   if (!store.aiFormEnabled) throw new HttpError(403, "ИИ не подключён для этого магазина");
   const options = parsePreviewOptions(req.body.options);
   // A new photo comes as a file; one already saved with the product — as its address.
@@ -145,7 +153,7 @@ export const createPreview = asyncHandler(async (req, res) => {
 });
 
 export const createBulkProductDraft = asyncHandler(async (req, res) => {
-  const store = await scopedStore(req);
+  const store = await storeForNewProducts(req);
   if (!store.aiFormEnabled) throw new HttpError(403, "ИИ-заполнение формы не подключено");
   const { voice, images } = uploadedAiDraftFiles(req);
   if (images.length < 2) throw new HttpError(400, "Для массовой группировки добавьте минимум два изображения");

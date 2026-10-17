@@ -25,6 +25,11 @@ export function subscriptionBadge(info: SubscriptionInfo | undefined): { tone: T
   }
 }
 
+/** Same rule as the server: nothing new goes on the storefront until the subscription is paid; editing stays open. */
+export function canAddProducts(info: SubscriptionInfo | undefined) {
+  return !info || !["grace", "expired", "disabled"].includes(info.state);
+}
+
 /** The owner's banner. null — nothing to warn about. */
 export function subscriptionNotice(info: SubscriptionInfo | undefined): { tone: "warning" | "danger"; title: string; text: string } | null {
   if (!info) return null;
@@ -36,11 +41,15 @@ export function subscriptionNotice(info: SubscriptionInfo | undefined): { tone: 
     return {
       tone: "danger",
       title: "Подписка закончилась",
-      text: `Витрина пока работает, но ${formatDate(info.graceEndsAt)} покупатели увидят «Магазин недоступен». Продлите подписку у администратора.`
+      text: `Витрина пока работает, но ${formatDate(info.graceEndsAt)} покупатели увидят «Магазин недоступен». Новые товары можно добавлять после продления — продлите подписку у администратора.`
     };
   }
   if (info.state === "expired") {
-    return { tone: "danger", title: "Витрина отключена", text: `Подписка закончилась ${formatDate(info.endsAt)}. Покупатели не могут открыть витрину, пока подписка не продлена.` };
+    return {
+      tone: "danger",
+      title: "Витрина отключена",
+      text: `Подписка закончилась ${formatDate(info.endsAt)}. Покупатели не могут открыть витрину, а новые товары нельзя добавить, пока подписка не продлена.`
+    };
   }
   return null;
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { AiSpend } from "../../types/models";
 import { Badge, Button, ButtonLink, Card, CardHeader, Notice } from "../../ui";
-import { formatMoney } from "../../utils/format";
+import { formatMoney, plural } from "../../utils/format";
 import styles from "./AiProviderCard.module.css";
 
 interface AiSummary {
@@ -88,6 +88,14 @@ export function AiProviderCard({ spend }: { spend: AiSpend }) {
           <div>
             <dt>Превью</dt>
             <dd>{summary.preview ?? "отключено"}</dd>
+          </div>
+          <div>
+            <dt>За месяц</dt>
+            <dd>
+              {spend.cards} {plural(spend.cards, ["карточка", "карточки", "карточек"])}
+              {spend.previews ? ` · ${spend.previews} превью` : ""}
+              {spend.costRub != null ? ` · ≈${formatMoney(spend.costRub)}` : ""}
+            </dd>
           </div>
           {spend.rubPerUsd != null && (
             <>

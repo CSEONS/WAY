@@ -33,7 +33,7 @@ import { QrShareButton } from "../components/QrShareButton";
 import { useSavedProductCount } from "../state/backgroundJobs";
 import type { Product, Store } from "../types/models";
 import { plural } from "../utils/format";
-import { subscriptionBadge, subscriptionNotice } from "../utils/subscription";
+import { canAddProducts, subscriptionBadge, subscriptionNotice } from "../utils/subscription";
 import {
   Breadcrumbs,
   Button,
@@ -176,6 +176,8 @@ export function DashboardPage() {
     ? subscription.state === "expired"
     : Boolean(selectedStore?.subscriptionEndsAt && new Date(selectedStore.subscriptionEndsAt).getTime() < Date.now());
   const notice = subscriptionNotice(subscription);
+  // Unpaid: the buttons stay visible but inactive, the banner above says why.
+  const addingAllowed = canAddProducts(subscription);
 
   const categories = useMemo(
     () => [...new Set(products.map((product) => product.category).filter((category): category is string => Boolean(category)))],
@@ -374,14 +376,25 @@ export function DashboardPage() {
           </div>
         </div>
         <div className={styles.primaryActions}>
-          <ButtonLink variant="primary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
-            Добавить товар
-          </ButtonLink>
-          {Boolean(selectedStore.aiFormEnabled) && (
-            <ButtonLink variant="secondary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/bulk`}>
-              Добавить много товаров
+          {addingAllowed ? (
+            <ButtonLink variant="primary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
+              Добавить товар
             </ButtonLink>
+          ) : (
+            <Button variant="primary" size="lg" icon={PlusSignIcon} disabled title="Новые товары можно добавлять после продления подписки">
+              Добавить товар
+            </Button>
           )}
+          {Boolean(selectedStore.aiFormEnabled) &&
+            (addingAllowed ? (
+              <ButtonLink variant="secondary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/bulk`}>
+                Добавить много товаров
+              </ButtonLink>
+            ) : (
+              <Button variant="secondary" size="lg" icon={PlusSignIcon} disabled>
+                Добавить много товаров
+              </Button>
+            ))}
         </div>
         <div className={styles.heroLink}>
           <span className={styles.linkLabel}>
@@ -521,7 +534,8 @@ export function DashboardPage() {
               title={products.length ? "Ничего не найдено" : "Товаров пока нет"}
               description={products.length ? "Измените поиск или фильтры." : "Сфотографируйте первый товар — это займёт минуту."}
               action={
-                !products.length && (
+                !products.length &&
+                addingAllowed && (
                   <ButtonLink variant="primary" size="lg" icon={PlusSignIcon} to={`/dashboard/stores/${selectedStore.id}/products/new`}>
                     Добавить товар
                   </ButtonLink>

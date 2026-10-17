@@ -54,6 +54,24 @@ export function subscriptionInfo(store: Pick<Store, "isActive" | "subscriptionEn
   return { state, endsAt: new Date(endsAtMs).toISOString(), graceEndsAt: new Date(graceEndsAtMs).toISOString(), daysLeft };
 }
 
+const dayMonth = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
+
+/**
+ * Why the owner can't add products now, or null when they can. New products
+ * need a paid subscription: during the grace days buyers still see the
+ * storefront, but nothing new goes on it until it's renewed. Editing what's
+ * already there stays open.
+ */
+export function addingProductsBlocked(store: Pick<Store, "isActive" | "subscriptionEndsAt">, now = Date.now()) {
+  const info = subscriptionInfo(store, now);
+  if (info.state === "grace") {
+    return `Подписка закончилась — новые товары можно добавлять после продления. Покупатели видят витрину до ${dayMonth.format(new Date(info.graceEndsAt!))}.`;
+  }
+  if (info.state === "expired") return "Подписка закончилась, и витрина отключена. Новые товары можно добавлять после продления.";
+  if (info.state === "disabled") return "Магазин отключён администратором — новые товары добавить нельзя.";
+  return null;
+}
+
 /** Buyers can open the storefront. */
 export function isStorefrontOpen(store: Pick<Store, "isActive" | "subscriptionEndsAt">, now = Date.now()) {
   const { state } = subscriptionInfo(store, now);

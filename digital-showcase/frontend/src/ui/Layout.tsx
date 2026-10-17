@@ -119,7 +119,8 @@ export function SectionLabel({ children, className }: { children: ReactNode; cla
   return <span className={cx(styles.sectionLabel, className)}>{children}</span>;
 }
 
-export function Stat({ icon, label, value }: { icon?: IconSvgElement; label: ReactNode; value: ReactNode }) {
+/** hint — one short line under the number: what it counts. */
+export function Stat({ icon, label, value, hint }: { icon?: IconSvgElement; label: ReactNode; value: ReactNode; hint?: ReactNode }) {
   return (
     <div className={styles.stat}>
       {icon && (
@@ -129,6 +130,7 @@ export function Stat({ icon, label, value }: { icon?: IconSvgElement; label: Rea
       )}
       <span className={styles.statLabel}>{label}</span>
       <strong className={styles.statValue}>{value}</strong>
+      {hint && <span className={styles.statHint}>{hint}</span>}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   ArrowRight01Icon,
   Call02Icon,
   DatabaseRestoreIcon,
+  HourglassIcon,
   InboxIcon,
   Invoice01Icon,
   Money03Icon,
@@ -11,6 +12,7 @@ import {
   PlusSignIcon,
   Settings02Icon,
   Store01Icon,
+  StoreRemove01Icon,
   UserAccountIcon
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
@@ -21,7 +23,7 @@ import { AiProviderCard } from "../components/admin/AiProviderCard";
 import { BackupCard } from "../components/admin/BackupCard";
 import { useSiteSettings } from "../state/siteSettings";
 import type { AdminOverview, Lead, OverviewStore } from "../types/models";
-import { formatDate, formatLastSeen, formatMoney, formatMonth, plural } from "../utils/format";
+import { formatDate, formatLastSeen, plural } from "../utils/format";
 import { phoneUrl } from "../utils/contact";
 import { subscriptionBadge } from "../utils/subscription";
 import {
@@ -121,12 +123,16 @@ export function AdminPage() {
     );
   }
 
-  const workingStores = overview.stores.filter((store) => !["expired", "disabled"].includes(store.subscription.state)).length;
-  const currentMonth = overview.revenue.byMonth[overview.revenue.byMonth.length - 1];
+  // Paid and open — «Работает»; unpaid, but buyers still see it for the grace days — «Ждут оплаты»
+  // (no new products until paid); unpaid and closed to buyers — «Просрочено».
+  const working = overview.stores.filter((store) => ["active", "expiring", "unlimited"].includes(store.subscription.state));
+  const awaitingPayment = overview.overdue.filter((store) => store.subscription.state === "grace");
   const deleteAfter = Date.now() - keepDataDays * 24 * 60 * 60 * 1000;
   const dataToDelete = overview.overdue.filter((store) => store.subscription.endsAt && Date.parse(store.subscription.endsAt) < deleteAfter);
-  const overdue = overview.overdue.filter((store) => !dataToDelete.includes(store));
-  const urgentCount = overdue.length + overview.latestLeads.length + overview.expiring.length + dataToDelete.length + (overview.backupProblem ? 1 : 0);
+  const pastDue = overview.overdue.filter((store) => store.subscription.state === "expired");
+  const pastDueToCall = pastDue.filter((store) => !dataToDelete.includes(store));
+  const urgentCount =
+    awaitingPayment.length + pastDueToCall.length + overview.latestLeads.length + overview.expiring.length + dataToDelete.length + (overview.backupProblem ? 1 : 0);
 
   return (
     <Page className={styles.page}>
@@ -136,7 +142,8 @@ export function AdminPage() {
         <Card as="section" padding="lg" className={styles.attention}>
           <CardHeader title="Нужно сделать сейчас" description="Оплаты, заявки и всё, что не может ждать" />
           {overview.backupProblem && <BackupAlert problem={overview.backupProblem} onOpen={() => openTab("system")} />}
-          <AttentionGroup title="Подписка закончилась" stores={overdue} onPay={setPayTarget} />
+          <AttentionGroup title="Ждут оплаты — витрина ещё видна покупателям" stores={awaitingPayment} onPay={setPayTarget} />
+          <AttentionGroup title="Просрочено — витрина закрыта" stores={pastDueToCall} onPay={setPayTarget} />
           <LeadGroup leads={overview.latestLeads} total={overview.newLeads} />
           <AttentionGroup title="Подписка скоро закончится" stores={overview.expiring} onPay={setPayTarget} />
           <AttentionGroup
@@ -155,14 +162,10 @@ export function AdminPage() {
 
       {tab === "overview" && (
         <div className={styles.stats}>
-          <Stat icon={Store01Icon} label="Витрин работает" value={`${workingStores} из ${overview.stores.length}`} />
-          <Stat icon={Money03Icon} label={`Выручка, ${currentMonth ? formatMonth(currentMonth.month) : "месяц"}`} value={formatMoney(overview.revenue.thisMonth)} />
-          <Stat icon={InboxIcon} label="Новых заявок" value={overview.newLeads} />
-          <Stat
-            icon={AiMagicIcon}
-            label="ИИ за месяц"
-            value={`${overview.ai.cards} ${plural(overview.ai.cards, ["карточка", "карточки", "карточек"])}${overview.ai.previews ? ` · ${overview.ai.previews} превью` : ""}${overview.ai.costRub != null ? ` · ≈${formatMoney(overview.ai.costRub)}` : ""}`}
-          />
+          <Stat icon={InboxIcon} label="Новые заявки" value={overview.newLeads} hint="С лендинга, ещё не обработаны" />
+          <Stat icon={Store01Icon} label="Работает" value={working.length} hint="Оплачены, витрина открыта" />
+          <Stat icon={HourglassIcon} label="Ждут оплаты" value={awaitingPayment.length} hint="Покупатели видят витрину, новые товары добавить нельзя" />
+          <Stat icon={StoreRemove01Icon} label="Просрочено" value={pastDue.length} hint="Не оплачены, витрина закрыта для покупателей" />
         </div>
       )}
 

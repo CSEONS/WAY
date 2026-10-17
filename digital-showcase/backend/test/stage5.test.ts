@@ -14,7 +14,7 @@ process.env.JWT_SECRET = "test-secret-test-secret-test-secret";
 process.env.TRIAL_DAYS = "14";
 
 const { closeDb, getDb, initDatabase } = await import("../src/database/db.js");
-const { addMonths, subscriptionInfo, isStorefrontOpen } = await import("../src/services/subscriptionService.js");
+const { addMonths, addingProductsBlocked, subscriptionInfo, isStorefrontOpen } = await import("../src/services/subscriptionService.js");
 const { slugify } = await import("../src/utils/slug.js");
 const { createStore, getStore } = await import("../src/services/storeService.js");
 const { createOwner } = await import("../src/services/userService.js");
@@ -42,6 +42,13 @@ test("подписка: предупреждение за 7 дней, 3 дня �
   assert.equal(isStorefrontOpen(store(-4), now), false);
   assert.equal(subscriptionInfo({ isActive: 1, subscriptionEndsAt: null }, now).state, "unlimited");
   assert.equal(isStorefrontOpen({ isActive: 0, subscriptionEndsAt: null }, now), false);
+
+  // «Ждут оплаты»: buyers still see the storefront, but nothing new goes on it until it's paid.
+  assert.equal(addingProductsBlocked(store(7), now), null);
+  assert.equal(addingProductsBlocked({ isActive: 1, subscriptionEndsAt: null }, now), null);
+  assert.match(addingProductsBlocked(store(-2), now) ?? "", /новые товары можно добавлять после продления.*видят витрину до/);
+  assert.match(addingProductsBlocked(store(-4), now) ?? "", /витрина отключена/);
+  assert.match(addingProductsBlocked({ isActive: 0, subscriptionEndsAt: null }, now) ?? "", /отключён администратором/);
 });
 
 test("месяцы календарные: 31 января + 1 месяц = конец февраля", () => {

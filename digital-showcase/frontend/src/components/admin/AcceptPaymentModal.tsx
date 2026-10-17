@@ -35,7 +35,7 @@ interface AcceptPaymentModalProps {
   onPaid: (store: Store) => void;
 }
 
-/** «Принять оплату»: records the money and extends the subscription in one step. */
+/** «Продлить»: extends the subscription and records the payment in one step (0 ₽ — a free extension). */
 export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModalProps) {
   const toast = useToast();
   const [amount, setAmount] = useState("");
@@ -63,7 +63,7 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
     setIsSaving(true);
     try {
       const { data } = await api.post<{ store: Store }>(`/admin/stores/${store.id}/payments`, { amount: rubles, months, method, comment, receipt });
-      toast.show(`${formatMoney(rubles)} принято. Оплачено до ${formatDate(data.store.subscriptionEndsAt)}`, { tone: "success" });
+      toast.show(`Продлено до ${formatDate(data.store.subscriptionEndsAt)} · ${formatMoney(rubles)}`, { tone: "success" });
       onPaid(data.store);
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Не удалось сохранить оплату");
@@ -74,7 +74,7 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
 
   return (
     <Modal
-      title="Принять оплату"
+      title="Продлить подписку"
       description={store.name}
       onClose={onClose}
       closeOnBackdrop={false}
@@ -85,7 +85,7 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
             Отмена
           </Button>
           <Button type="submit" variant="primary" loading={isSaving}>
-            Принять
+            Продлить
           </Button>
         </>
       }

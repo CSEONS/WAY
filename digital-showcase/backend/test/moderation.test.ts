@@ -16,7 +16,7 @@ process.env.ADMIN_PASSWORD = "test-password";
 process.env.JWT_SECRET = "test-secret-test-secret-test-secret";
 
 // The AI model: answers who is on the picture with whatever the test puts here.
-let answer = '{"found": [], "faces": []}';
+let answer = '{"found": []}';
 const ai = http.createServer((req, res) => {
   req.resume();
   req.on("end", () => {
@@ -45,39 +45,19 @@ async function photo(width = 200, height = 200) {
   return { buffer, mimetype: "image/png", originalname: "photo.png", size: buffer.length };
 }
 
-async function pixel(image: Buffer, x: number, y: number) {
-  const { data, info } = await sharp(image).raw().toBuffer({ resolveWithObject: true });
-  const offset = (y * info.width + x) * info.channels;
-  return data[offset];
-}
-
-test("ответ ИИ: доли зажимаются в 0–1, мусор отбрасывается, лицо без слов — всё равно находка", () => {
-  const parsed = moderation.parseLivingBeings('Вот: {"found": ["лицо человека"], "faces": [{"x": -0.2, "y": 0.5, "width": 0.4, "height": 2}, {"x": "a"}]}');
-  assert.deepEqual(parsed, { found: ["лицо человека"], faces: [{ x: 0, y: 0.5, width: 0.4, height: 0.5 }] });
-  assert.deepEqual(moderation.parseLivingBeings('{"faces": [{"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2}]}').found, ["лицо"]);
-  assert.deepEqual(moderation.parseLivingBeings('{"found": [], "faces": []}'), { found: [], faces: [] });
+test("ответ ИИ: короткие строки, мусор отбрасывается", () => {
+  assert.deepEqual(moderation.parseLivingBeings('Вот: {"found": ["лицо человека", "", 5]}'), { found: ["лицо человека", "5"] });
+  assert.deepEqual(moderation.parseLivingBeings('{"found": []}'), { found: [] });
+  assert.deepEqual(moderation.cleanFindings(["x".repeat(200), ...Array(20).fill("кот")]).length, 10);
+  assert.equal(moderation.cleanFindings("не список").length, 0);
   assert.throws(() => moderation.parseLivingBeings("никого нет"), /не JSON/);
-});
-
-test("маркер закрывает лицо целиком и не трогает остальное", async () => {
-  const { buffer } = await photo();
-  const covered = await moderation.coverWithMarker(buffer, [{ x: 0.3, y: 0.3, width: 0.4, height: 0.4 }]);
-  for (const [x, y] of [
-    [100, 100],
-    [62, 62],
-    [138, 138],
-    [62, 138]
-  ]) {
-    assert.ok((await pixel(covered, x, y)) < 60, `точка ${x},${y} закрашена`);
-  }
-  assert.ok((await pixel(covered, 5, 5)) > 240, "угол остался белым");
 });
 
 test("фото с живыми существами скрыто от покупателей, пока модератор не решит", async () => {
   const product = (await productService.createProduct({ storeId: store.id, title: "Платье", isVisible: 1 }))!;
   const added = (await productService.addProductImage(product.id, store.id, await photo()))!;
 
-  answer = '{"found": ["лицо человека"], "faces": [{"x": 0.3, "y": 0.1, "width": 0.3, "height": 0.3}]}';
+  answer = '{"found": ["лицо человека"]}';
   const result = await moderation.checkImage({ url: added.url, kind: "PRODUCT", storeId: store.id, productId: product.id }, (await photo()).buffer);
   assert.deepEqual(result?.found, ["лицо человека"]);
 
@@ -104,13 +84,24 @@ test("фото с живыми существами скрыто от покуп
 });
 
 test("без живых существ фото не помечается; логотип с ними скрыт от покупателей", async () => {
-  answer = '{"found": [], "faces": []}';
+  answer = '{"found": []}';
   assert.equal(await moderation.checkImage({ url: "/uploads/clean.webp", kind: "LOGO", storeId: store.id }, (await photo()).buffer), null);
   assert.equal(await moderation.publicLogo("/uploads/clean.webp"), "/uploads/clean.webp");
 
-  answer = '{"found": ["кот на логотипе"], "faces": [{"x": 0.4, "y": 0.4, "width": 0.2, "height": 0.2}]}';
+  answer = '{"found": ["кот на логотипе"]}';
   await moderation.checkImage({ url: "/uploads/cat-logo.webp", kind: "LOGO", storeId: store.id }, (await photo()).buffer);
   assert.equal(await moderation.publicLogo("/uploads/cat-logo.webp"), null);
+});
+
+test("превью с людьми: товар уходит на проверку сразу при сохранении, без повторного запроса к ИИ", async () => {
+  const product = (await productService.createProduct({ storeId: store.id, title: "Куртка", isVisible: 1 }))!;
+  const added = (await productService.addProductImage(product.id, store.id, await photo()))!;
+  // The AI would say «nobody» — but the preview's findings already decide.
+  answer = '{"found": []}';
+  await moderation.flagImage({ url: added.url, kind: "PRODUCT", storeId: store.id, productId: product.id }, ["человек в куртке"]);
+  const image = (await productService.getProduct(product.id, store.id))!.images[0];
+  assert.deepEqual(image.moderation, { status: "PENDING", findings: "человек в куртке" });
+  assert.equal((await productService.getProduct(product.id, store.id, true))!.images.length, 0);
 });
 
 test.after(() => {

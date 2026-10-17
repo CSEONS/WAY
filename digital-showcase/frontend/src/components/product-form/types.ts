@@ -59,6 +59,8 @@ export interface ProductFormImage {
   url: string;
   /** A saved photo with people or animals on it: on moderation or hidden. */
   moderation?: ImageModeration | null;
+  /** A new cover from «Превью с ИИ» with people or animals on it: sent with the upload, the product goes to moderation. */
+  livingBeings?: string[];
 }
 
 export interface ProductImageSelection {

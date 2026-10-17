@@ -8,6 +8,7 @@ import { AiPanel } from "./AiPanel";
 import { ASK_SELLER, hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
 import { PreviewGenerator } from "./PreviewGenerator";
+import { usePreviewDrawing } from "./usePreviewDrawing";
 import {
   CATEGORY_PRESETS,
   emptySimpleDetails,
@@ -74,6 +75,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   const [simple, setSimple] = useState<SimpleDetailsValue>(savedDraft?.simple ?? initialSimple ?? emptySimpleDetails);
   const [isSimplifyConfirmOpen, setIsSimplifyConfirmOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const previewDrawing = usePreviewDrawing(aiPreviewPath ?? null, isPreviewOpen);
   const hasSubmittedRef = useRef(false);
   const imageManager = useImageManager(initial);
   const builder = useVariantBuilder(initial, savedDraft, draftKey);
@@ -267,7 +269,20 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
         </Notice>
       )}
 
-      <ImageManager manager={imageManager} onCreatePreview={aiFormEnabled && aiPreviewPath ? () => setIsPreviewOpen(true) : undefined} />
+      <ImageManager
+        manager={imageManager}
+        onCreatePreview={aiFormEnabled && aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
+        previewLabel={
+          previewDrawing.isDrawing
+            ? `Рисуем превью… ${previewDrawing.seconds} с`
+            : previewDrawing.hasUnseen
+              ? "Превью готово — посмотреть"
+              : previewDrawing.results.length
+                ? "Посмотреть превью"
+                : undefined
+        }
+        previewReady={previewDrawing.hasUnseen}
+      />
 
       {aiMode && !aiDraftApplied && (
         <AiPanel prompt={aiPrompt} onPromptChange={setAiPrompt} images={imageManager.images} aiDraftPath={aiDraftPath} onDraft={applyDraft} />
@@ -331,6 +346,11 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
             onStatusChange={(status) => updateForm({ status })}
           />
 
+          {previewDrawing.isDrawing && (
+            <Notice tone="accent" icon={AiMagicIcon}>
+              Превью ещё рисуется. Если сохранить сейчас, оно не попадёт в товар — лучше дождаться и сделать его обложкой.
+            </Notice>
+          )}
           <Button type="submit" variant="primary" size="lg" block>
             {submitLabel}
           </Button>
@@ -339,7 +359,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       <VariantModal builder={builder} images={imageManager.images} />
       {isPreviewOpen && aiPreviewPath && (
         <PreviewGenerator
-          path={aiPreviewPath}
+          drawing={previewDrawing}
           images={imageManager.images}
           coverId={imageManager.previewImageId}
           product={{

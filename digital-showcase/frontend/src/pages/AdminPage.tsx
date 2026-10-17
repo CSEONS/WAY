@@ -2,18 +2,22 @@ import {
   AiMagicIcon,
   ArrowRight01Icon,
   Call02Icon,
+  ContactBookIcon,
   DatabaseRestoreIcon,
   HourglassIcon,
   ImageNotFound01Icon,
   InboxIcon,
   Invoice01Icon,
+  LegalDocument01Icon,
   Money03Icon,
   Note01Icon,
   Package01Icon,
+  PlayCircleIcon,
   PlusSignIcon,
   Settings02Icon,
   Store01Icon,
   StoreRemove01Icon,
+  Tag01Icon,
   UserAccountIcon
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
@@ -21,6 +25,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
 import { AiProviderCard } from "../components/admin/AiProviderCard";
+import { AiSpendTab } from "../components/admin/AiSpendTab";
 import { BackupCard } from "../components/admin/BackupCard";
 import { useSiteSettings } from "../state/siteSettings";
 import type { AdminOverview, Lead, OverviewStore } from "../types/models";
@@ -53,16 +58,21 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/leads", label: "Заявки с сайта", icon: InboxIcon },
   { to: "/admin/journal", label: "Журнал действий", icon: Note01Icon },
   { to: "/admin/moderation", label: "Проверка фото", icon: ImageNotFound01Icon },
-  { to: "/admin/settings", label: "Настройки: тарифы, контакты, ИИ", icon: Settings02Icon }
+  { to: "/admin/plans", label: "Тарифы и цены", icon: Tag01Icon },
+  { to: "/admin/contacts", label: "Контакты", icon: ContactBookIcon },
+  { to: "/admin/videos", label: "Видеоинструкции", icon: PlayCircleIcon },
+  { to: "/admin/legal", label: "Реквизиты", icon: LegalDocument01Icon },
+  { to: "/admin/settings", label: "Настройки ИИ", icon: Settings02Icon }
 ];
 
 type PayTarget = Pick<OverviewStore, "id" | "name" | "subscriptionEndsAt" | "subscription" | "aiFormEnabled">;
 
-type Tab = "overview" | "stores" | "system" | "sections";
+type Tab = "overview" | "stores" | "ai" | "system" | "sections";
 
 const tabs: { value: Tab; label: string }[] = [
   { value: "overview", label: "Обзор" },
   { value: "stores", label: "Магазины" },
+  { value: "ai", label: "Расходы на ИИ" },
   { value: "system", label: "Система" },
   { value: "sections", label: "Разделы" }
 ];
@@ -78,7 +88,7 @@ export function AdminPage() {
   const [overview, setOverview] = useState<AdminOverview>();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
-  // The privacy policy promises to delete a store's data this long after the paid date («Настройки» → «Реквизиты»).
+  // The privacy policy promises to delete a store's data this long after the paid date (admin panel → «Реквизиты»).
   const keepDataDays = useSiteSettings()?.legal.keepDataDays ?? 90;
 
   function load() {
@@ -213,10 +223,12 @@ export function AdminPage() {
         </>
       )}
 
+      {tab === "ai" && <AiSpendTab summary={overview.ai} />}
+
       {tab === "system" && (
         <>
           <BackupCard />
-          <AiProviderCard spend={overview.ai} />
+          <AiProviderCard />
         </>
       )}
 
@@ -286,7 +298,7 @@ function AttentionGroup({
               {store.ownerPhone && <CallButton phone={store.ownerPhone} />}
               {onPay && (
                 <Button variant="secondary" size="sm" icon={Money03Icon} onClick={() => onPay(store)}>
-                  Принять оплату
+                  Продлить
                 </Button>
               )}
             </div>
@@ -392,7 +404,7 @@ function StoreRow({ store, onPay }: { store: OverviewStore; onPay: () => void })
         )}
       </div>
       <Button variant="secondary" size="sm" icon={Money03Icon} onClick={onPay} className={styles.payButton}>
-        Принять оплату
+        Продлить
       </Button>
     </div>
   );

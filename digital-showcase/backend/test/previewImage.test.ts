@@ -25,6 +25,17 @@ test("выбранные сцена, тема, заголовок и преим�
   assert.doesNotMatch(prompt, /Choose automatically/);
 });
 
+test("новые цвета оформления: неоновая и эко-зелёная попадают в промпт", () => {
+  const neon = buildPreviewPrompt(options({ theme: "neon" }));
+  assert.match(neon, /bold 3D text in hot pink/);
+  assert.match(neon, /glowing neon circles on a dark background/);
+  assert.match(neon, /vibrant color mood/);
+  const eco = buildPreviewPrompt(options({ theme: "eco", text: "no_text" }));
+  assert.match(eco, /natural color mood/);
+  // The scene is still the model's choice, the colors are not.
+  assert.doesNotMatch(eco, /Choose automatically[^\n]*color mood/);
+});
+
 test("без надписей — ни текста, ни иконок", () => {
   const prompt = buildPreviewPrompt(options({ text: "no_text", scene: "studio", features: ["warm"], headline: "Не попадёт" }));
   assert.match(prompt, /No text, letters, numbers, icons or badges anywhere in the image/);

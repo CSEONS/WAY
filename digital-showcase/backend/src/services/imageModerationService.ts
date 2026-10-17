@@ -8,22 +8,12 @@ import { measureTokens } from "./aiUsageService.js";
 // on prints, drawings or toys, and faces of mannequins and dolls. Every
 // uploaded product photo and logo is checked by the AI model; a photo where
 // it finds any goes to moderation and buyers don't see it until a moderator
-// (the admin, for now) approves it. Previews drawn by AI get the faces
-// covered with marker strokes before the owner even sees them.
-
-/** Part of a picture, in fractions of its width and height (0–1). */
-export interface Box {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+// (the admin, for now) approves it. Nothing is painted over: the product
+// just waits for the moderator's decision.
 
 export interface LivingBeings {
   /** Short Russian descriptions: «лицо человека», «кот на принте». Empty — nothing found. */
   found: string[];
-  /** Faces or heads to cover. */
-  faces: Box[];
 }
 
 export type ImageKind = "PRODUCT" | "LOGO";
@@ -31,15 +21,10 @@ export type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 const INSTRUCTIONS = `Ты проверяешь фото для витрины магазина одежды. Найди на изображении живых существ: людей и животных (включая птиц, рыб и насекомых) — настоящих или изображённых на фото, рисунках, принтах и вышивке на одежде, игрушках, а также лица и головы манекенов и кукол. Части тела человека (руки, ноги, силуэт) тоже считаются. Растения не считаются.
 Ответ — только JSON-объект:
-{"found": ["коротко по-русски, что найдено, например «лицо человека», «кот на принте футболки»"], "faces": [{"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.25}]}
-faces — прямоугольники лиц или голов всех найденных существ: x и y — левый верхний угол, все числа — доли от ширины и высоты изображения (от 0 до 1). Если никого нет — {"found": [], "faces": []}.`;
+{"found": ["коротко по-русски, что найдено, например «лицо человека», «кот на принте футболки»"]}
+Если никого нет — {"found": []}.`;
 
-function fraction(value: unknown) {
-  const number = Number(value);
-  return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : null;
-}
-
-/** The model's answer, made safe: short strings and boxes inside the picture. */
+/** The model's answer, made safe: a few short strings. */
 export function parseLivingBeings(answer: string): LivingBeings {
   let data: unknown;
   try {
@@ -47,20 +32,16 @@ export function parseLivingBeings(answer: string): LivingBeings {
   } catch {
     throw new Error("ИИ ответил не JSON-объектом");
   }
-  const raw = (data && typeof data === "object" ? data : {}) as { found?: unknown; faces?: unknown };
-  const found = (Array.isArray(raw.found) ? raw.found : [])
+  const raw = (data && typeof data === "object" ? data : {}) as { found?: unknown };
+  return { found: cleanFindings(raw.found) };
+}
+
+/** At most 10 short descriptions — from the model or from the owner's form (see flagImage). */
+export function cleanFindings(value: unknown) {
+  return (Array.isArray(value) ? value : [])
     .map((item) => String(item).trim().slice(0, 80))
     .filter(Boolean)
     .slice(0, 10);
-  const faces: Box[] = [];
-  for (const item of Array.isArray(raw.faces) ? raw.faces : []) {
-    const box = (item ?? {}) as Record<string, unknown>;
-    const [x, y, width, height] = [fraction(box.x), fraction(box.y), fraction(box.width), fraction(box.height)];
-    if (x == null || y == null || !width || !height) continue;
-    faces.push({ x, y, width: Math.min(width, 1 - x), height: Math.min(height, 1 - y) });
-  }
-  // A face without words still means someone is there.
-  return { found: found.length || !faces.length ? found : ["лицо"], faces: faces.slice(0, 20) };
 }
 
 /**
@@ -81,45 +62,30 @@ export async function findLivingBeings(image: Buffer): Promise<LivingBeings | nu
   return parseLivingBeings(result);
 }
 
-/**
- * Marker strokes over each box: a zigzag of thick rounded lines, close enough
- * to overlap, so nothing of the face shows through. Boxes get some margin.
- */
-export function markerSvg(width: number, height: number, boxes: Box[]) {
-  const paths = boxes.map((box) => {
-    const padX = box.width * 0.15;
-    const padY = box.height * 0.15;
-    const left = Math.max(0, (box.x - padX) * width);
-    const top = Math.max(0, (box.y - padY) * height);
-    const right = Math.min(width, (box.x + box.width + padX) * width);
-    const bottom = Math.min(height, (box.y + box.height + padY) * height);
-    const lines = Math.max(3, Math.round((bottom - top) / Math.max(12, (right - left) / 4)));
-    const step = (bottom - top) / lines;
-    const points: string[] = [];
-    for (let line = 0; line < lines; line += 1) {
-      const y = top + step * (line + 0.5);
-      points.push(line % 2 ? `${right} ${y} ${left} ${y}` : `${left} ${y} ${right} ${y}`);
-    }
-    return `<path d="M ${points.join(" L ")}" fill="none" stroke="#17171c" stroke-width="${step * 1.7}" stroke-linecap="round" stroke-linejoin="round"/>`;
-  });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${paths.join("")}</svg>`;
-}
-
-/** Covers the boxes with marker strokes. Returns WebP. */
-export async function coverWithMarker(image: Buffer, boxes: Box[]) {
-  const { width, height } = await sharp(image).metadata();
-  if (!width || !height || !boxes.length) return image;
-  return sharp(image)
-    .composite([{ input: Buffer.from(markerSvg(width, height, boxes)) }])
-    .webp({ quality: 90 })
-    .toBuffer();
-}
-
 export interface ImageRef {
   url: string;
   kind: ImageKind;
   storeId: string;
   productId?: string | null;
+}
+
+/**
+ * Sends a photo or logo to moderation with what was found on it. Used by the
+ * check below and right on upload, when «Превью с ИИ» already checked the picture.
+ */
+export async function flagImage(ref: ImageRef, found: string[]) {
+  const db = await getDb();
+  await db.run(
+    `INSERT INTO image_checks (id, url, kind, storeId, productId, status, findings, createdAt) VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)
+     ON CONFLICT(url) DO UPDATE SET status = 'PENDING', findings = excluded.findings, reviewedBy = NULL, reviewedAt = NULL`,
+    crypto.randomUUID(),
+    ref.url,
+    ref.kind,
+    ref.storeId,
+    ref.productId ?? null,
+    found.join(", "),
+    new Date().toISOString()
+  );
 }
 
 /**
@@ -131,18 +97,7 @@ export async function checkImage(ref: ImageRef, image: Buffer) {
   try {
     const result = await findLivingBeings(image);
     if (!result?.found.length) return null;
-    const db = await getDb();
-    await db.run(
-      `INSERT INTO image_checks (id, url, kind, storeId, productId, status, findings, createdAt) VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)
-       ON CONFLICT(url) DO UPDATE SET status = 'PENDING', findings = excluded.findings, reviewedBy = NULL, reviewedAt = NULL`,
-      crypto.randomUUID(),
-      ref.url,
-      ref.kind,
-      ref.storeId,
-      ref.productId ?? null,
-      result.found.join(", "),
-      new Date().toISOString()
-    );
+    await flagImage(ref, result.found);
     return result;
   } catch (error) {
     console.error(`Image check failed for ${ref.url}:`, error);

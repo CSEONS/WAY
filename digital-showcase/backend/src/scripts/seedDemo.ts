@@ -1,6 +1,6 @@
 // Creates the demo storefront the landing page links to («Посмотреть пример»):
 // store /m/demo with ten products, drawn illustrations instead of photos.
-// Its WhatsApp and phone are your contacts from «Настройки» (for owners), so a
+// Its WhatsApp and phone are your support contacts from «Контакты», so a
 // visitor who taps «Написать» in the example reaches you. Runs once; if the store
 // exists, nothing changes. Edit it afterwards via «Войти как владелец».
 //   Docker:  docker compose exec -u node backend npm run demo:seed
@@ -242,5 +242,5 @@ for (const [index, item] of products.entries()) {
   await db.run("UPDATE products SET createdAt = ?, updatedAt = ? WHERE id = ?", createdAt, createdAt, product!.id);
 }
 
-console.log(`Demo store is ready: /m/${SLUG} (${products.length} products).${contact ? "" : " Fill in WhatsApp or phone on «Настройки» → «Контакты для владельцев» to show contact buttons in it."}`);
+console.log(`Demo store is ready: /m/${SLUG} (${products.length} products).${contact ? "" : " Fill in support WhatsApp or phone on «Контакты» in the admin panel to show contact buttons in it."}`);
 closeDb();

@@ -4,7 +4,7 @@ import * as aiUsageService from "../services/aiUsageService.js";
 import { previewSettings } from "../services/aiProvider.js";
 import { settings } from "../services/settingsService.js";
 import * as analyticsService from "../services/analyticsService.js";
-import { checkImage } from "../services/imageModerationService.js";
+import { checkImage, cleanFindings, flagImage } from "../services/imageModerationService.js";
 import { readStoredImage } from "../services/imageService.js";
 import { createProductPreview, parsePreviewOptions } from "../services/previewImageService.js";
 import * as paymentService from "../services/paymentService.js";
@@ -38,6 +38,16 @@ function uploadedAiDraftFiles(req: Request) {
   };
 }
 
+/** A JSON array sent as a form field; anything else — empty. */
+function parseJsonList(value: unknown) {
+  if (typeof value !== "string") return [];
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return [];
+  }
+}
+
 function stringList(value: unknown) {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   return value ? [String(value)] : [];
@@ -52,7 +62,7 @@ export const getStore = asyncHandler(async (req, res) => {
   res.json({ ...withSubscription(await scopedStore(req)), aiPreviewEnabled: previewSettings() !== null });
 });
 
-/** Who to call about the subscription: contacts on «Настройки». */
+/** Who to call about the subscription: «Контакты» in the admin panel. */
 function supportContacts() {
   const { whatsapp, phone, telegram } = settings().support;
   return { whatsapp: whatsapp || null, phone: phone || null, telegram: telegram || null };
@@ -195,8 +205,16 @@ export const addImage = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
   const added = await productService.addProductImage(String(req.params.id), store.id, req.file);
   if (!added) throw new HttpError(404, "Товар не найден");
-  // People or animals on it: hidden from buyers until a moderator looks (after the answer, it takes a few seconds).
-  void checkImage({ url: added.url, kind: "PRODUCT", storeId: store.id, productId: added.product.id }, req.file.buffer);
+  const ref = { url: added.url, kind: "PRODUCT" as const, storeId: store.id, productId: added.product.id };
+  // «Превью с ИИ» already found people or animals on it: straight to moderation.
+  // Otherwise the AI checks it after the answer (a few seconds). Either way buyers don't see it until a moderator looks.
+  const previewFindings = cleanFindings(parseJsonList(req.body.livingBeings));
+  if (previewFindings.length) {
+    await flagImage(ref, previewFindings);
+    res.status(201).json(await productService.getProduct(added.product.id, store.id));
+    return;
+  }
+  void checkImage(ref, req.file.buffer);
   res.status(201).json(added.product);
 });
 

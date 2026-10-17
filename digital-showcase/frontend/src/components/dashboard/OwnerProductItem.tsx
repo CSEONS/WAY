@@ -25,6 +25,9 @@ export function OwnerProductItem({ product, storeId, storeSlug, onUpdated, onEdi
   const editUrl = `/dashboard/stores/${storeId}/products/${product.id}/edit`;
   const isVisible = Boolean(product.isVisible);
   const image = product.images[0];
+  // Photos with people or animals: the product waits for the moderator, or some of its photos stay hidden.
+  const onModeration = product.images.some((item) => item.moderation?.status === "PENDING");
+  const hasHiddenPhotos = product.images.some((item) => item.moderation?.status === "REJECTED");
 
   async function patch(body: Partial<Product>, message: string) {
     setIsSaving(true);
@@ -51,6 +54,8 @@ export function OwnerProductItem({ product, storeId, storeSlug, onUpdated, onEdi
         <span className={styles.price}>{productPrice(product)}</span>
         <div className={styles.badges}>
           {!isVisible && <Badge tone="warning">Скрыт с витрины</Badge>}
+          {onModeration && <Badge tone="warning">На проверке</Badge>}
+          {hasHiddenPhotos && <Badge tone="danger">Фото скрыто</Badge>}
           {product.status !== "AVAILABLE" && <Badge tone={availabilityTones[product.status]}>{availabilityLabels[product.status]}</Badge>}
           {product.category && <span className={styles.category}>{product.category}</span>}
         </div>

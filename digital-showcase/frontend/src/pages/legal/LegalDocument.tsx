@@ -8,7 +8,7 @@ import styles from "./Legal.module.css";
 
 const dateFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 
-/** A value from «Настройки» → «Реквизиты», or a highlighted gap to fill in. */
+/** A value from «Реквизиты» in the admin panel, or a highlighted gap to fill in. */
 export function Value({ value, placeholder }: { value: string; placeholder: string }) {
   return value ? <>{value}</> : <mark className={styles.gap}>[{placeholder}]</mark>;
 }
@@ -30,7 +30,7 @@ export function Site() {
   return <>{window.location.origin}</>;
 }
 
-/** Page shell for the privacy policy and the offer; the text gets the requisites from «Настройки». */
+/** Page shell for the privacy policy and the offer; the text gets the requisites from «Реквизиты» in the admin panel. */
 export function LegalDocument({ title, children }: { title: string; children: (legal: Legal) => ReactNode }) {
   useDocumentMeta(title);
   const site = useSiteSettings();
@@ -45,7 +45,7 @@ export function LegalDocument({ title, children }: { title: string; children: (l
         <p className={styles.meta}>Редакция от {dateFormat.format(new Date(legal.updatedAt))}</p>
         {!isLegalFilled(legal) && (
           <Notice tone="warning" title="Шаблон документа">
-            Реквизиты ещё не заполнены (админка → «Настройки» → «Реквизиты»), а текст стоит согласовать с юристом.
+            Реквизиты ещё не заполнены (админка → «Реквизиты»), а текст стоит согласовать с юристом.
           </Notice>
         )}
         {children(legal)}

@@ -1,5 +1,6 @@
 import { Delete02Icon, FloppyDiskIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { setSiteSettings } from "../state/siteSettings";
 import type { HelpVideo, Legal, Plan, PreviewQuality, Settings } from "../types/models";
@@ -55,12 +56,33 @@ function bind(value: string, onChange: (value: string) => void) {
   return { value, onChange: (event: { target: { value: string } }) => onChange(event.target.value) };
 }
 
+export type SettingsPart = "plans" | "ai" | "contacts" | "videos" | "legal";
+
+const BACK_TO_SECTIONS = { to: "/admin?tab=sections", label: "В админку" };
+
+/** Each part is its own section of the admin panel: title, what it's for, where «назад» leads. */
+const PARTS: Record<SettingsPart, { title: string; description: string; back: { to: string; label: string }; saved: string }> = {
+  plans: {
+    title: "Редактирование тарифов",
+    description: "Изменения сразу видны на лендинге и в «Продлить»",
+    back: { to: "/admin/plans", label: "К тарифам" },
+    saved: "Тарифы сохранены"
+  },
+  ai: { title: "Настройки ИИ", description: "Модели, курс рубля и превью. Сервер провайдера и ключ — в .env", back: BACK_TO_SECTIONS, saved: "Настройки ИИ сохранены" },
+  contacts: { title: "Контакты", description: "Куда пишут владельцы магазинов и те, кто хочет подключиться", back: BACK_TO_SECTIONS, saved: "Контакты сохранены" },
+  videos: { title: "Видеоинструкции", description: "Короткие видео в «Помощи» у владельцев", back: BACK_TO_SECTIONS, saved: "Видео сохранены" },
+  legal: { title: "Реквизиты", description: "Для оферты и политики конфиденциальности", back: BACK_TO_SECTIONS, saved: "Реквизиты сохранены" }
+};
+
 /**
- * «Настройки»: what used to need .env or a rebuild — plans and prices, the
- * trial, AI models and limits, contacts, help videos, requisites. Keys and
- * provider addresses stay in .env.
+ * What used to need .env or a rebuild — one form over the same settings, a
+ * page per part: «Тарифы и цены» → edit (plans, the AI limit, the trial),
+ * «Настройки ИИ» (models, the ruble rate, previews), «Контакты»,
+ * «Видеоинструкции», «Реквизиты». Saving sends all of it. Keys and provider
+ * addresses stay in .env.
  */
-export function AdminSettingsPage() {
+export function AdminSettingsPage({ part }: { part: SettingsPart }) {
+  const navigate = useNavigate();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>();
   const [models, setModels] = useState<SettingsResponse["models"]>({ text: [], image: [] });
@@ -117,7 +139,9 @@ export function AdminSettingsPage() {
       apply(data);
       const { plans, aiMonthlyLimit, demoStoreSlug, salesContacts, helpVideos, legal } = data.settings;
       setSiteSettings({ plans, aiMonthlyLimit, demoStoreSlug, salesContacts, helpVideos, legal });
-      toast.show("Настройки сохранены", { tone: "success" });
+      toast.show(PARTS[part].saved, { tone: "success" });
+      // Plans are edited from their cards: back to them to see the result.
+      if (part === "plans") navigate("/admin/plans");
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Не удалось сохранить настройки");
     } finally {
@@ -125,7 +149,7 @@ export function AdminSettingsPage() {
     }
   }
 
-  const header = <PageHeader title="Настройки" description="Тарифы, ИИ, контакты и реквизиты — без правки файлов и пересборки" back={{ to: "/admin", label: "В админку" }} />;
+  const header = <PageHeader title={PARTS[part].title} description={PARTS[part].description} back={PARTS[part].back} />;
 
   if (state === "error") {
     return (
@@ -148,138 +172,148 @@ export function AdminSettingsPage() {
     <Page width="narrow">
       {header}
       <form className={styles.form} onSubmit={submit}>
-        <Section title="Тарифы" description="На лендинге и в «Принять оплату». Пустая цена — «Цена по запросу».">
-          <div className={styles.plans}>
-            <PlanFields title="Без ИИ" plan={draft.plans.basic} onChange={(patch) => changePlan("basic", patch)} />
-            <PlanFields title="С ИИ-помощником" plan={draft.plans.ai} onChange={(patch) => changePlan("ai", patch)}>
-              <Field label="Карточек с ИИ в месяц" hint="На лендинге — строкой «До N карточек с ИИ в месяц». Магазину можно задать свой лимит">
-                <Input inputMode="numeric" {...bind(draft.aiMonthlyLimit, (aiMonthlyLimit) => change({ aiMonthlyLimit }))} />
-              </Field>
-            </PlanFields>
-          </div>
-          <Field label="Пробный период, дней" hint="Столько новый магазин работает бесплатно, от 1 до 60">
-            <Input inputMode="numeric" {...bind(draft.trialDays, (trialDays) => change({ trialDays }))} />
-          </Field>
-        </Section>
-
-        <Section title="ИИ" description="Сервер провайдера и ключ — в .env (AI_BASE_URL, AI_API_KEY)">
-          <datalist id="text-models">
-            {models.text.map((model) => (
-              <option key={model} value={model} />
-            ))}
-          </datalist>
-          <datalist id="image-models">
-            {models.image.map((model) => (
-              <option key={model} value={model} />
-            ))}
-          </datalist>
-          <Field label="Модель для карточек" hint="Название как у провайдера. Дешевле всех — gpt-5.6-luna: копейки за карточку">
-            <Input list="text-models" autoComplete="off" {...bind(draft.aiModel, (aiModel) => change({ aiModel }))} />
-          </Field>
-          <Field label="Курс, ₽ за $1" hint="Курс плюс комиссия посредника, если платите через него. По нему админка считает цену ИИ в рублях">
-            <Input inputMode="decimal" placeholder="85" {...bind(draft.aiRubPerUsd, (aiRubPerUsd) => change({ aiRubPerUsd }))} />
-          </Field>
-          <Switch
-            checked={draft.aiPreviewEnabled}
-            onChange={(aiPreviewEnabled) => change({ aiPreviewEnabled })}
-            label="Превью с ИИ"
-            description="Кнопка в форме товара: ИИ рисует обложку для витрины по фото"
-          />
-          {draft.aiPreviewEnabled && (
-            <>
-              <Field label="Модель для превью">
-                <Input list="image-models" autoComplete="off" {...bind(draft.aiPreviewModel, (aiPreviewModel) => change({ aiPreviewModel }))} />
-              </Field>
-              <div className={styles.group}>
-                <span className={styles.groupLabel}>Качество превью</span>
-                <SegmentedControl label="Качество превью" value={draft.aiPreviewQuality} onChange={(aiPreviewQuality) => change({ aiPreviewQuality })} options={qualityOptions} />
-                <span className={styles.groupHint}>Среднее — надписи на обложке читаются, около 2 ₽. Низкое размывает текст, высокое в несколько раз дороже</span>
-              </div>
-              <Field label="Одно превью списывает карточек" hint="Из месячного лимита магазина">
-                <Input inputMode="numeric" {...bind(draft.aiPreviewUnits, (aiPreviewUnits) => change({ aiPreviewUnits }))} />
-              </Field>
-            </>
-          )}
-        </Section>
-
-        <Section title="Контакты">
-          <div className={styles.fields}>
-            <Field label="WhatsApp поддержки" hint="Для владельцев: «Помощь» и «Подписка и итоги»">
-              <Input type="tel" {...bind(draft.support.whatsapp, (whatsapp) => change({ support: { ...draft.support, whatsapp } }))} />
-            </Field>
-            <Field label="Телефон поддержки">
-              <Input type="tel" {...bind(draft.support.phone, (phone) => change({ support: { ...draft.support, phone } }))} />
-            </Field>
-            <Field label="Telegram поддержки" hint="@имя или ссылка">
-              <Input {...bind(draft.support.telegram, (telegram) => change({ support: { ...draft.support, telegram } }))} />
-            </Field>
-          </div>
-          <div className={styles.fields}>
-            <Field label="WhatsApp для заявок" hint="На лендинге, рядом с формой заявки">
-              <Input type="tel" {...bind(draft.salesContacts.whatsapp, (whatsapp) => change({ salesContacts: { ...draft.salesContacts, whatsapp } }))} />
-            </Field>
-            <Field label="Телефон для заявок">
-              <Input type="tel" {...bind(draft.salesContacts.phone, (phone) => change({ salesContacts: { ...draft.salesContacts, phone } }))} />
-            </Field>
-            <Field label="Демо-магазин" hint="Адрес витрины для «Посмотреть пример». Пусто — без кнопки">
-              <Input autoComplete="off" {...bind(draft.demoStoreSlug, (demoStoreSlug) => change({ demoStoreSlug }))} />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="Видеоинструкции" description="В «Помощи» у владельцев. Лучше по 30–60 секунд, одна задача на видео">
-          {draft.helpVideos.map((video, index) => (
-            <div key={index} className={styles.video}>
-              <Field label="Название">
-                <Input {...bind(video.title, (title) => changeVideo(index, { title }))} />
-              </Field>
-              <Field label="Ссылка">
-                <Input type="url" placeholder="https://" {...bind(video.url, (url) => changeVideo(index, { url }))} />
-              </Field>
-              <IconButton
-                icon={Delete02Icon}
-                label="Убрать видео"
-                className={styles.remove}
-                onClick={() => change({ helpVideos: draft.helpVideos.filter((_, i) => i !== index) })}
-              />
+        {part === "plans" && (
+          <Section title="Тарифы" description="Пустая цена — «Цена по запросу».">
+            <div className={styles.plans}>
+              <PlanFields title="Без ИИ" plan={draft.plans.basic} onChange={(patch) => changePlan("basic", patch)} />
+              <PlanFields title="С ИИ-помощником" plan={draft.plans.ai} onChange={(patch) => changePlan("ai", patch)}>
+                <Field label="Карточек с ИИ в месяц" hint="На лендинге — строкой «До N карточек с ИИ в месяц». Магазину можно задать свой лимит">
+                  <Input inputMode="numeric" {...bind(draft.aiMonthlyLimit, (aiMonthlyLimit) => change({ aiMonthlyLimit }))} />
+                </Field>
+              </PlanFields>
             </div>
-          ))}
-          <Button variant="secondary" icon={PlusSignIcon} className={styles.add} onClick={() => change({ helpVideos: [...draft.helpVideos, { title: "", url: "" }] })}>
-            Добавить видео
-          </Button>
-        </Section>
+            <Field label="Пробный период, дней" hint="Столько новый магазин работает бесплатно, от 1 до 60">
+              <Input inputMode="numeric" {...bind(draft.trialDays, (trialDays) => change({ trialDays }))} />
+            </Field>
+          </Section>
+        )}
 
-        <Section title="Реквизиты" description="Для оферты и политики конфиденциальности. Тексты стоит показать юристу">
-          <div className={styles.fields}>
-            <Field label="Исполнитель" hint="ФИО, «ИП …» или название компании">
-              <Input {...bind(draft.legal.operator, (operator) => changeLegal({ operator }))} />
+        {part === "ai" && (
+          <Section title="ИИ" description="Сервер провайдера и ключ — в .env (AI_BASE_URL, AI_API_KEY)">
+            <datalist id="text-models">
+              {models.text.map((model) => (
+                <option key={model} value={model} />
+              ))}
+            </datalist>
+            <datalist id="image-models">
+              {models.image.map((model) => (
+                <option key={model} value={model} />
+              ))}
+            </datalist>
+            <Field label="Модель для карточек" hint="Название как у провайдера. Дешевле всех — gpt-5.6-luna: копейки за карточку">
+              <Input list="text-models" autoComplete="off" {...bind(draft.aiModel, (aiModel) => change({ aiModel }))} />
             </Field>
-            <Field label="Статус">
-              <Input {...bind(draft.legal.taxStatus, (taxStatus) => changeLegal({ taxStatus }))} />
+            <Field label="Курс, ₽ за $1" hint="Курс плюс комиссия посредника, если платите через него. По нему админка считает цену ИИ в рублях">
+              <Input inputMode="decimal" placeholder="85" {...bind(draft.aiRubPerUsd, (aiRubPerUsd) => change({ aiRubPerUsd }))} />
             </Field>
-            <Field label="ИНН">
-              <Input inputMode="numeric" {...bind(draft.legal.inn, (inn) => changeLegal({ inn }))} />
-            </Field>
-            <Field label="ОГРН или ОГРНИП" hint="Самозанятому — пусто">
-              <Input inputMode="numeric" {...bind(draft.legal.ogrn, (ogrn) => changeLegal({ ogrn }))} />
-            </Field>
-            <Field label="Почта" hint="Для вопросов о персональных данных">
-              <Input type="email" {...bind(draft.legal.email, (email) => changeLegal({ email }))} />
-            </Field>
-            <Field label="Телефон">
-              <Input type="tel" {...bind(draft.legal.phone, (phone) => changeLegal({ phone }))} />
-            </Field>
-            <Field label="Адрес" hint="Самозанятому достаточно города">
-              <Input {...bind(draft.legal.address, (address) => changeLegal({ address }))} />
-            </Field>
-            <Field label="Дата редакции документов">
-              <Input type="date" {...bind(draft.legal.updatedAt, (updatedAt) => changeLegal({ updatedAt }))} />
-            </Field>
-            <Field label="Хранить данные после оплаты, дней" hint="Потом админка напомнит удалить данные магазина">
-              <Input inputMode="numeric" {...bind(draft.legal.keepDataDays, (keepDataDays) => changeLegal({ keepDataDays }))} />
-            </Field>
-          </div>
-        </Section>
+            <Switch
+              checked={draft.aiPreviewEnabled}
+              onChange={(aiPreviewEnabled) => change({ aiPreviewEnabled })}
+              label="Превью с ИИ"
+              description="Кнопка в форме товара: ИИ рисует обложку для витрины по фото"
+            />
+            {draft.aiPreviewEnabled && (
+              <>
+                <Field label="Модель для превью">
+                  <Input list="image-models" autoComplete="off" {...bind(draft.aiPreviewModel, (aiPreviewModel) => change({ aiPreviewModel }))} />
+                </Field>
+                <div className={styles.group}>
+                  <span className={styles.groupLabel}>Качество превью</span>
+                  <SegmentedControl label="Качество превью" value={draft.aiPreviewQuality} onChange={(aiPreviewQuality) => change({ aiPreviewQuality })} options={qualityOptions} />
+                  <span className={styles.groupHint}>Среднее — надписи на обложке читаются, около 2 ₽. Низкое размывает текст, высокое в несколько раз дороже</span>
+                </div>
+                <Field label="Одно превью списывает карточек" hint="Из месячного лимита магазина">
+                  <Input inputMode="numeric" {...bind(draft.aiPreviewUnits, (aiPreviewUnits) => change({ aiPreviewUnits }))} />
+                </Field>
+              </>
+            )}
+          </Section>
+        )}
+
+        {part === "contacts" && (
+          <Section title="Контакты">
+            <div className={styles.fields}>
+              <Field label="WhatsApp поддержки" hint="Для владельцев: «Помощь» и «Подписка и итоги»">
+                <Input type="tel" {...bind(draft.support.whatsapp, (whatsapp) => change({ support: { ...draft.support, whatsapp } }))} />
+              </Field>
+              <Field label="Телефон поддержки">
+                <Input type="tel" {...bind(draft.support.phone, (phone) => change({ support: { ...draft.support, phone } }))} />
+              </Field>
+              <Field label="Telegram поддержки" hint="@имя или ссылка">
+                <Input {...bind(draft.support.telegram, (telegram) => change({ support: { ...draft.support, telegram } }))} />
+              </Field>
+            </div>
+            <div className={styles.fields}>
+              <Field label="WhatsApp для заявок" hint="На лендинге, рядом с формой заявки">
+                <Input type="tel" {...bind(draft.salesContacts.whatsapp, (whatsapp) => change({ salesContacts: { ...draft.salesContacts, whatsapp } }))} />
+              </Field>
+              <Field label="Телефон для заявок">
+                <Input type="tel" {...bind(draft.salesContacts.phone, (phone) => change({ salesContacts: { ...draft.salesContacts, phone } }))} />
+              </Field>
+              <Field label="Демо-магазин" hint="Адрес витрины для «Посмотреть пример». Пусто — без кнопки">
+                <Input autoComplete="off" {...bind(draft.demoStoreSlug, (demoStoreSlug) => change({ demoStoreSlug }))} />
+              </Field>
+            </div>
+          </Section>
+        )}
+
+        {part === "videos" && (
+          <Section title="Видеоинструкции" description="В «Помощи» у владельцев. Лучше по 30–60 секунд, одна задача на видео">
+            {draft.helpVideos.map((video, index) => (
+              <div key={index} className={styles.video}>
+                <Field label="Название">
+                  <Input {...bind(video.title, (title) => changeVideo(index, { title }))} />
+                </Field>
+                <Field label="Ссылка">
+                  <Input type="url" placeholder="https://" {...bind(video.url, (url) => changeVideo(index, { url }))} />
+                </Field>
+                <IconButton
+                  icon={Delete02Icon}
+                  label="Убрать видео"
+                  className={styles.remove}
+                  onClick={() => change({ helpVideos: draft.helpVideos.filter((_, i) => i !== index) })}
+                />
+              </div>
+            ))}
+            <Button variant="secondary" icon={PlusSignIcon} className={styles.add} onClick={() => change({ helpVideos: [...draft.helpVideos, { title: "", url: "" }] })}>
+              Добавить видео
+            </Button>
+          </Section>
+        )}
+
+        {part === "legal" && (
+          <Section title="Реквизиты" description="Для оферты и политики конфиденциальности. Тексты стоит показать юристу">
+            <div className={styles.fields}>
+              <Field label="Исполнитель" hint="ФИО, «ИП …» или название компании">
+                <Input {...bind(draft.legal.operator, (operator) => changeLegal({ operator }))} />
+              </Field>
+              <Field label="Статус">
+                <Input {...bind(draft.legal.taxStatus, (taxStatus) => changeLegal({ taxStatus }))} />
+              </Field>
+              <Field label="ИНН">
+                <Input inputMode="numeric" {...bind(draft.legal.inn, (inn) => changeLegal({ inn }))} />
+              </Field>
+              <Field label="ОГРН или ОГРНИП" hint="Самозанятому — пусто">
+                <Input inputMode="numeric" {...bind(draft.legal.ogrn, (ogrn) => changeLegal({ ogrn }))} />
+              </Field>
+              <Field label="Почта" hint="Для вопросов о персональных данных">
+                <Input type="email" {...bind(draft.legal.email, (email) => changeLegal({ email }))} />
+              </Field>
+              <Field label="Телефон">
+                <Input type="tel" {...bind(draft.legal.phone, (phone) => changeLegal({ phone }))} />
+              </Field>
+              <Field label="Адрес" hint="Самозанятому достаточно города">
+                <Input {...bind(draft.legal.address, (address) => changeLegal({ address }))} />
+              </Field>
+              <Field label="Дата редакции документов">
+                <Input type="date" {...bind(draft.legal.updatedAt, (updatedAt) => changeLegal({ updatedAt }))} />
+              </Field>
+              <Field label="Хранить данные после оплаты, дней" hint="Потом админка напомнит удалить данные магазина">
+                <Input inputMode="numeric" {...bind(draft.legal.keepDataDays, (keepDataDays) => changeLegal({ keepDataDays }))} />
+              </Field>
+            </div>
+          </Section>
+        )}
 
         {error && <Notice tone="danger">{error}</Notice>}
         <Button type="submit" variant="primary" size="lg" icon={FloppyDiskIcon} block loading={isSaving}>

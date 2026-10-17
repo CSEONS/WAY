@@ -294,6 +294,16 @@ export interface Settings extends SiteSettings {
   aiRubPerUsd: number | null;
 }
 
+/** GET /admin/ai/spend — «Расходы на ИИ». Ruble sums are null until the rate is set on «Настройки». */
+export interface AiSpendReport {
+  rubPerUsd: number | null;
+  /** The last six months, oldest first; months without AI are there too. */
+  months: { month: string; cards: number; previews: number; costRub: number | null }[];
+  /** This month by store, most expensive first. `used` counts previews too, like the limit. */
+  stores: { storeId: string; name: string; cards: number; previews: number; used: number; limit: number; costRub: number | null }[];
+  unpricedModels: string[];
+}
+
 /** This month's AI, in cards and rubles. Ruble sums are null until the rate is set on «Настройки». */
 export interface AiSpend {
   /** Cards used by all stores; previews are part of them too. */

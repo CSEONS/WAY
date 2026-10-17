@@ -42,8 +42,7 @@
 }
 
 .heroPoints,
-.leadPoints,
-.planFeatures {
+.leadPoints {
   display: grid;
   gap: var(--space-2);
   margin: 0;
@@ -60,15 +59,13 @@
 }
 
 .heroPoints li,
-.leadPoints li,
-.planFeatures li {
+.leadPoints li {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
 }
 
-.heroPoints svg,
-.planFeatures svg {
+.heroPoints svg {
   flex-shrink: 0;
   margin-top: var(--space-0-5);
   color: var(--color-success);
@@ -205,39 +202,6 @@
 .plans {
   display: grid;
   gap: var(--space-4);
-}
-
-.plan {
-  align-content: start;
-  gap: var(--space-5);
-}
-
-.planHighlighted {
-  border-color: var(--color-accent);
-  box-shadow: var(--focus-ring);
-}
-
-.planHead {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.planPrice {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-}
-
-.planPrice small {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-regular);
-}
-
-.planFeatures {
-  color: var(--color-ink);
-  font-size: var(--font-size-md);
 }
 
 @media (min-width: 720px) {

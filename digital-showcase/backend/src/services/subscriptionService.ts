@@ -8,7 +8,7 @@ export const GRACE_DAYS = 3;
 /** Warn the owner this many days before the paid date. */
 export const WARNING_DAYS = 7;
 
-/** Free period for a newly connected store («Настройки»). */
+/** Free period for a newly connected store («Тарифы и цены»). */
 export function trialDays() {
   return settings().trialDays;
 }

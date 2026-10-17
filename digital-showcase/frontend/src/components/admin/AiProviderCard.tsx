@@ -1,9 +1,7 @@
 import { AiMagicIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
-import type { AiSpend } from "../../types/models";
-import { Badge, Button, ButtonLink, Card, CardHeader, Notice } from "../../ui";
-import { formatMoney, plural } from "../../utils/format";
+import { Badge, Button, Card, CardHeader, Notice } from "../../ui";
 import styles from "./AiProviderCard.module.css";
 
 interface AiSummary {
@@ -18,17 +16,11 @@ interface AiSummary {
 
 type Check = { ok: boolean; ms: number; message?: string } | null;
 
-const NOT_YET = "в этом месяце не было";
-
-function rubles(value: number | null) {
-  return value == null ? NOT_YET : `≈${formatMoney(value)}`;
-}
-
 /**
- * Where AI drafts go, whether the provider answers — handy right after
- * switching providers in .env — and what a card and a preview cost this month.
+ * Where AI drafts go and whether the provider answers — handy right after
+ * switching providers in .env. What it costs is on the «Расходы на ИИ» tab.
  */
-export function AiProviderCard({ spend }: { spend: AiSpend }) {
+export function AiProviderCard() {
   const [summary, setSummary] = useState<AiSummary>();
   const [check, setCheck] = useState<Check>(null);
   const [isChecking, setIsChecking] = useState(false);
@@ -58,7 +50,7 @@ export function AiProviderCard({ spend }: { spend: AiSpend }) {
     <Card as="section" padding="lg" className={styles.card}>
       <CardHeader
         title="ИИ-провайдер"
-        description="Сервер и ключ — в .env (AI_BASE_URL, AI_API_KEY), модели и курс — в «Настройках»"
+        description="Сервер и ключ — в .env (AI_BASE_URL, AI_API_KEY), модели и курс — в «Настройках ИИ»"
         actions={
           summary.configured && (
             <Button variant="secondary" size="sm" icon={AiMagicIcon} loading={isChecking} onClick={runCheck}>
@@ -89,56 +81,10 @@ export function AiProviderCard({ spend }: { spend: AiSpend }) {
             <dt>Превью</dt>
             <dd>{summary.preview ?? "отключено"}</dd>
           </div>
-          <div>
-            <dt>За месяц</dt>
-            <dd>
-              {spend.cards} {plural(spend.cards, ["карточка", "карточки", "карточек"])}
-              {spend.previews ? ` · ${spend.previews} превью` : ""}
-              {spend.costRub != null ? ` · ≈${formatMoney(spend.costRub)}` : ""}
-            </dd>
-          </div>
-          {spend.rubPerUsd != null && (
-            <>
-              <div>
-                <dt>Карточка, в среднем</dt>
-                <dd>{rubles(spend.cardRub)}</dd>
-              </div>
-              <div>
-                <dt>Превью, в среднем</dt>
-                <dd>{rubles(spend.previewRub)}</dd>
-              </div>
-              <div>
-                <dt>Превью, дороже всего</dt>
-                <dd>{rubles(spend.previewMaxRub)}</dd>
-              </div>
-              <div>
-                <dt>Курс</dt>
-                <dd>{formatMoney(spend.rubPerUsd)} за $1</dd>
-              </div>
-            </>
-          )}
         </dl>
       ) : (
         <Notice tone="warning" title="ИИ не настроен">
           Укажите AI_API_KEY в .env — без него карточки по фото и голосу не работают, остаётся простой черновик по тексту.
-        </Notice>
-      )}
-      {summary.configured && spend.rubPerUsd == null && (
-        <Notice
-          title="Сколько стоит ИИ в рублях"
-          action={
-            <ButtonLink variant="secondary" size="sm" to="/admin/settings">
-              Указать курс
-            </ButtonLink>
-          }
-        >
-          Укажите в «Настройках», сколько рублей вы платите за $1 (курс плюс комиссия посредника, если платите через него). Тогда здесь будет цена одной карточки
-          и одного превью.
-        </Notice>
-      )}
-      {spend.unpricedModels.length > 0 && (
-        <Notice tone="warning" title="Цена модели неизвестна">
-          {spend.unpricedModels.join(", ")} — эти запросы не вошли в суммы. Цены моделей — в backend/src/services/aiPrices.ts.
         </Notice>
       )}
       {check &&

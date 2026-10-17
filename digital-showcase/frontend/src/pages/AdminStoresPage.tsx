@@ -252,7 +252,7 @@ export function AdminStoresPage() {
                   </div>
                   <div className={styles.rowActions}>
                     <Button variant="primary" size="sm" icon={Money03Icon} onClick={() => setStoreToPay(store)}>
-                      Принять оплату
+                      Продлить
                     </Button>
                     <Button variant="secondary" size="sm" icon={Edit02Icon} onClick={() => openEditStore(store)}>
                       Редактировать
@@ -323,7 +323,7 @@ export function AdminStoresPage() {
           <Field label="Telegram">
             <Input placeholder="@Name" {...field("telegram")} />
           </Field>
-          <Field label="Подписка до" hint="Для оплаты используйте «Принять оплату» — так платёж попадёт в учёт">
+          <Field label="Подписка до" hint="Чтобы продлить с оплатой, нажмите «Продлить» у магазина — так платёж попадёт в учёт">
             <Input type="datetime-local" {...field("subscriptionEndsAt")} />
           </Field>
           <div className={styles.tariff}>

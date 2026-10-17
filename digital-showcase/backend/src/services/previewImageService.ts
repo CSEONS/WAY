@@ -3,7 +3,7 @@ import { z } from "zod";
 import { HttpError } from "../utils/http.js";
 import { parseBody } from "../utils/validation.js";
 import { editImage } from "./aiProvider.js";
-import { coverWithMarker, findLivingBeings } from "./imageModerationService.js";
+import { findLivingBeings } from "./imageModerationService.js";
 import type { UploadedImage } from "./imageService.js";
 
 // «Превью с ИИ» in the product form: the owner's photo turned into a storefront
@@ -43,7 +43,13 @@ export const THEMES = {
   gold: { head: "dark navy", accent: "gold", sub: "gold", icon: "black circles with gold rim", mood: "warm" },
   premium: { head: "black", accent: "white", sub: "black", icon: "minimal white line icons on black circles", mood: "neutral" },
   bright: { head: "bright red", accent: "yellow", sub: "yellow", icon: "colorful flat circles", mood: "warm" },
-  pastel: { head: "dusty pink", accent: "mint", sub: "mint", icon: "soft pastel circles", mood: "neutral" }
+  pastel: { head: "dusty pink", accent: "mint", sub: "mint", icon: "soft pastel circles", mood: "neutral" },
+  eco: { head: "deep forest green", accent: "sage green", sub: "warm beige", icon: "beige circles with forest-green line icons", mood: "natural" },
+  burgundy: { head: "deep burgundy", accent: "cream", sub: "burgundy", icon: "burgundy circles with cream line icons", mood: "rich warm" },
+  sea: { head: "deep teal", accent: "turquoise", sub: "white", icon: "turquoise circles with white line icons", mood: "fresh" },
+  lavender: { head: "deep violet", accent: "lavender", sub: "silver", icon: "lavender circles with violet line icons", mood: "soft" },
+  terracotta: { head: "terracotta", accent: "sand", sub: "terracotta", icon: "sand-colored circles with terracotta line icons", mood: "earthy warm" },
+  neon: { head: "hot pink", accent: "electric cyan", sub: "black", icon: "glowing neon circles on a dark background", mood: "vibrant" }
 } satisfies Record<string, Theme | null>;
 
 /** Benefit → [icon for the model, caption on the picture]. */
@@ -168,9 +174,10 @@ export function buildPreviewPrompt(options: PreviewOptions) {
 
 /**
  * Draws the cover. Returns it as a data: URL; it becomes a product photo only
- * when the owner saves the product. Living beings the model drew anyway get
- * their faces covered with marker strokes (`livingBeings` says who was found); if the
- * picture can't be checked, it isn't shown at all.
+ * when the owner saves the product. `livingBeings` — who the model drew
+ * anyway: nothing is painted over, the product goes to moderation when saved
+ * (the form sends this list with the photo). If the check fails, the list is
+ * empty and the photo is checked again on upload.
  */
 export async function createProductPreview(options: PreviewOptions, photo: UploadedImage) {
   let reference: Buffer;
@@ -188,14 +195,6 @@ export async function createProductPreview(options: PreviewOptions, photo: Uploa
     prompt: buildPreviewPrompt(options),
     images: [{ buffer: reference, mimetype: "image/jpeg", filename: "product.jpg" }]
   });
-  const drawn = Buffer.from(base64, "base64");
-  let beings: Awaited<ReturnType<typeof findLivingBeings>>;
-  try {
-    beings = await findLivingBeings(drawn);
-  } catch {
-    throw new HttpError(502, "Не удалось проверить превью на лица и живых существ — нажмите «Нарисовать ещё»");
-  }
-  if (!beings?.faces.length) return { image: `data:${mimetype};base64,${base64}`, livingBeings: beings?.found ?? [] };
-  const covered = await coverWithMarker(drawn, beings.faces);
-  return { image: `data:image/webp;base64,${covered.toString("base64")}`, livingBeings: beings.found };
+  const beings = await findLivingBeings(Buffer.from(base64, "base64")).catch(() => null);
+  return { image: `data:${mimetype};base64,${base64}`, livingBeings: beings?.found ?? [] };
 }

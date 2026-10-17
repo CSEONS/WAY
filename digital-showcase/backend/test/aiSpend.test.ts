@@ -16,7 +16,7 @@ const { closeDb, getDb, initDatabase } = await import("../src/database/db.js");
 const { createStore } = await import("../src/services/storeService.js");
 const { createOwner } = await import("../src/services/userService.js");
 const { modelPrice, requestCostUsd } = await import("../src/services/aiPrices.js");
-const { monthSpend, recordUsage } = await import("../src/services/aiUsageService.js");
+const { monthSpend, recordUsage, spendReport } = await import("../src/services/aiUsageService.js");
 
 await initDatabase();
 const db = await getDb();
@@ -66,6 +66,31 @@ test("расход за месяц в рублях: карточка, превь
   assert.equal(withoutRate.cardRub, null);
   assert.equal(withoutRate.previewMaxRub, null);
   assert.equal(withoutRate.previews, 2);
+});
+
+test("«Расходы на ИИ»: полгода по месяцам и этот месяц по магазинам", async () => {
+  process.env.AI_RUB_PER_USD = "100";
+  const store = (await db.get<{ id: string }>("SELECT id FROM stores WHERE slug = 'ai-spend'"))!;
+  const now = new Date();
+  // Two months ago: one card on Luna, 0.15 ₽.
+  await db.run(
+    "INSERT INTO ai_usage (id, storeId, kind, units, inputTokens, outputTokens, model, createdAt) VALUES ('past', ?, 'DRAFT', 1, 1500, 1000, 'gpt-5.6-luna', ?)",
+    store.id,
+    new Date(now.getFullYear(), now.getMonth() - 2, 15).toISOString()
+  );
+
+  const report = await spendReport(current, now);
+  assert.equal(report.months.length, 6);
+  const [lastMonth, twoMonthsAgo, oneMonthAgo] = [report.months[5], report.months[3], report.months[4]];
+  // This month (from the test above): 6 cards — drafts, a bulk of 2, the unpriced and the empty one — and 2 previews.
+  assert.deepEqual(lastMonth, { month: lastMonth.month, cards: 6, previews: 2, costRub: 4.54 });
+  assert.deepEqual(twoMonthsAgo, { month: twoMonthsAgo.month, cards: 1, previews: 0, costRub: 0.15 });
+  assert.deepEqual(oneMonthAgo, { month: oneMonthAgo.month, cards: 0, previews: 0, costRub: 0 });
+
+  assert.deepEqual(report.stores, [{ storeId: store.id, name: "ИИ", cards: 6, previews: 2, used: 8, limit: 100, costRub: 4.54 }]);
+  assert.deepEqual(report.unpricedModels, ["yandexgpt"]);
+  delete process.env.AI_RUB_PER_USD;
+  assert.equal((await spendReport(current, now)).months[5].costRub, null);
 });
 
 test.after(() => {

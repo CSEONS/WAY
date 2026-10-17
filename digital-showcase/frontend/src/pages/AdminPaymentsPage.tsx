@@ -10,7 +10,7 @@ import styles from "./AdminPaymentsPage.module.css";
 
 const methodLabels: Record<PaymentMethod, string> = { CASH: "наличные", TRANSFER: "перевод", OTHER: "другое" };
 
-/** Money received: by month and every payment, with «Принять оплату» and cancelling a mistake. */
+/** Money received: by month and every payment, with «Продлить» and cancelling a mistake. */
 export function AdminPaymentsPage() {
   const toast = useToast();
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -80,7 +80,7 @@ export function AdminPaymentsPage() {
       ) : (
         <>
           <Card as="section" padding="lg" className={styles.accept}>
-            <Field label="Принять оплату от магазина" className={styles.storeField}>
+            <Field label="Продлить подписку магазина" className={styles.storeField}>
               <Select
                 placeholder="Выберите магазин"
                 value={storeId}
@@ -89,7 +89,7 @@ export function AdminPaymentsPage() {
               />
             </Field>
             <Button variant="primary" icon={Money03Icon} disabled={!storeId} onClick={() => setPayStore(stores.find((store) => store.id === storeId) ?? null)}>
-              Принять оплату
+              Продлить
             </Button>
           </Card>
 
@@ -157,7 +157,7 @@ export function AdminPaymentsPage() {
                 ))}
               </div>
             ) : (
-              <EmptyState icon={Money03Icon} title="Оплат пока нет" description="Нажмите «Принять оплату», когда магазин заплатит за подписку." />
+              <EmptyState icon={Money03Icon} title="Оплат пока нет" description="Нажмите «Продлить», когда магазин заплатит за подписку." />
             )}
           </Card>
         </>

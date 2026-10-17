@@ -2,7 +2,19 @@
 // (backend/src/services/previewImageService.ts), which turns them into the prompt.
 
 export type PreviewScene = "auto" | "studio" | "city" | "nature" | "interior" | "winter" | "beach" | "sport";
-export type PreviewTheme = "auto" | "cold" | "gold" | "premium" | "bright" | "pastel";
+export type PreviewTheme =
+  | "auto"
+  | "cold"
+  | "gold"
+  | "premium"
+  | "bright"
+  | "pastel"
+  | "eco"
+  | "burgundy"
+  | "sea"
+  | "lavender"
+  | "terracotta"
+  | "neon";
 export type PreviewFeature = "warm" | "water" | "wind" | "light" | "breath" | "strong" | "eco" | "hypo" | "size" | "fast";
 
 export interface PreviewOptions {
@@ -33,7 +45,13 @@ export const THEMES: { value: PreviewTheme; label: string; colors?: [string, str
   { value: "gold", label: "Тёплая золотая", colors: ["#13224A", "#D9A43A"] },
   { value: "premium", label: "Премиум чёрная", colors: ["#111111", "#F2F2F2"] },
   { value: "bright", label: "Яркая", colors: ["#D62839", "#FFD23F"] },
-  { value: "pastel", label: "Пастельная", colors: ["#C47A8A", "#9FDCC6"] }
+  { value: "pastel", label: "Пастельная", colors: ["#C47A8A", "#9FDCC6"] },
+  { value: "eco", label: "Эко зелёная", colors: ["#2F5D3A", "#A9C5A0"] },
+  { value: "burgundy", label: "Бордовая", colors: ["#6D1A2C", "#F3E6CF"] },
+  { value: "sea", label: "Морская", colors: ["#0F5257", "#3FD0C9"] },
+  { value: "lavender", label: "Лавандовая", colors: ["#4B2E83", "#C9B6F2"] },
+  { value: "terracotta", label: "Терракотовая", colors: ["#B5532E", "#E8CFA4"] },
+  { value: "neon", label: "Неоновая", colors: ["#FF2E9A", "#1FE5FF"] }
 ];
 
 export const FEATURES: { value: PreviewFeature; label: string }[] = [

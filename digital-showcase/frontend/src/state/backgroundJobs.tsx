@@ -216,6 +216,8 @@ async function runProductSave(
     });
     const formData = new FormData();
     formData.append("image", image.file as File);
+    // A cover from «Превью с ИИ» with people or animals on it: the server sends the product to moderation at once.
+    if (image.livingBeings?.length) formData.append("livingBeings", JSON.stringify(image.livingBeings));
     const perImageWeight = weightUpload / imagesToUpload.length;
     const response = await api.post<Product>(`${basePath}/${data.id}/images`, formData, {
       onUploadProgress: (event) => {

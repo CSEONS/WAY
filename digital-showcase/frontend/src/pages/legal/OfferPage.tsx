@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { LegalDocument, Operator, Site, Value } from "./LegalDocument";
 
-/** Публичная оферта на подписку. A template: requisites are filled in on «Настройки» in the admin panel. */
+/** Публичная оферта на подписку. A template: requisites are filled in on «Реквизиты» in the admin panel. */
 export function OfferPage() {
   return (
     <LegalDocument title="Публичная оферта">

@@ -15,11 +15,11 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LeadForm } from "../components/landing/LeadForm";
 import { PhoneMock } from "../components/landing/PhoneMock";
+import { PlanCard } from "../components/landing/PlanCard";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { useSiteSettings } from "../state/siteSettings";
-import type { Plan } from "../types/models";
 import { phoneUrl, whatsappUrl } from "../utils/contact";
-import { Badge, Button, ButtonLink, Card, Icon, Page, cx, type IconSvgElement } from "../ui";
+import { Badge, Button, ButtonLink, Card, Icon, Page, type IconSvgElement } from "../ui";
 import styles from "./HomePage.module.css";
 
 const steps = [
@@ -70,7 +70,7 @@ function scrollToLead() {
 
 export function HomePage() {
   useDocumentMeta(null);
-  // Plans, prices and contacts come from «Настройки» in the admin panel.
+  // Plans and prices («Тарифы и цены») and contacts («Контакты») come from the admin panel.
   const site = useSiteSettings();
   const sales = site?.salesContacts;
 
@@ -136,11 +136,12 @@ export function HomePage() {
       {site && (
         <Section id="pricing" eyebrow="Тарифы" title="Стоимость">
           <div className={styles.plans}>
-            <PlanCard plan={site.plans.basic} />
+            <PlanCard plan={site.plans.basic} action={<PlanButton price={site.plans.basic.price} />} />
             <PlanCard
               plan={site.plans.ai}
               extra={site.aiMonthlyLimit > 0 ? `До ${site.aiMonthlyLimit} карточек с ИИ в месяц` : undefined}
               highlighted
+              action={<PlanButton price={site.plans.ai.price} highlighted />}
             />
           </div>
         </Section>
@@ -221,35 +222,11 @@ function Section({ id, eyebrow, title, children }: { id?: string; eyebrow: strin
   );
 }
 
-/** highlighted — the plan most people should pick; extra — a feature line made from settings, e.g. the AI limit. */
-function PlanCard({ plan, highlighted = false, extra }: { plan: Plan; highlighted?: boolean; extra?: string }) {
-  const features = extra ? [...plan.features, extra] : plan.features;
+/** Under a plan card: leads to the request form. */
+function PlanButton({ price, highlighted = false }: { price: number | null; highlighted?: boolean }) {
   return (
-    <Card padding="lg" className={cx(styles.plan, highlighted && styles.planHighlighted)}>
-      <div className={styles.planHead}>
-        <h3 className={styles.cardTitle}>{plan.name}</h3>
-        <p className={styles.cardText}>{plan.description}</p>
-      </div>
-      <p className={styles.planPrice}>
-        {plan.price != null ? (
-          <>
-            {plan.price.toLocaleString("ru-RU")} ₽ <small>в месяц</small>
-          </>
-        ) : (
-          "Цена по запросу"
-        )}
-      </p>
-      <ul className={styles.planFeatures}>
-        {features.map((feature) => (
-          <li key={feature}>
-            <Icon icon={CheckmarkCircle02Icon} size="sm" />
-            {feature}
-          </li>
-        ))}
-      </ul>
-      <Button variant={highlighted ? "primary" : "outline"} size="lg" block onClick={scrollToLead}>
-        {plan.price != null ? "Подключить" : "Узнать цену"}
-      </Button>
-    </Card>
+    <Button variant={highlighted ? "primary" : "outline"} size="lg" block onClick={scrollToLead}>
+      {price != null ? "Подключить" : "Узнать цену"}
+    </Button>
   );
 }

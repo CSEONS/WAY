@@ -41,7 +41,7 @@ const QUESTIONS = [
 /** «Помощь»: write or call support, short videos, answers to the usual questions. */
 export function HelpModal({ onClose }: { onClose: () => void }) {
   const [support, setSupport] = useState<SupportContacts | null>();
-  // Links to the videos are on «Настройки» in the admin panel.
+  // Links to the videos are on «Видеоинструкции» in the admin panel.
   const videos = useSiteSettings()?.helpVideos ?? [];
 
   useEffect(() => {

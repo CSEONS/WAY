@@ -24,8 +24,8 @@ export function useImageManager(initial?: Product) {
   }
 
   /** A picture drawn by «Превью с ИИ»: added to the photos and made the cover. */
-  function addCover(file: File) {
-    const image = { id: createId(), existingId: null, file, name: file.name, url: URL.createObjectURL(file) };
+  function addCover(file: File, livingBeings: string[] = []) {
+    const image = { id: createId(), existingId: null, file, name: file.name, url: URL.createObjectURL(file), livingBeings };
     setImages((current) => [...current, image]);
     setPreviewImageId(image.id);
   }
@@ -45,8 +45,22 @@ export function useImageManager(initial?: Product) {
 
 export type ImageManagerState = ReturnType<typeof useImageManager>;
 
-/** «Фото товара»: take or pick photos, choose the cover, remove extras. `onCreatePreview` — the store has AI: «Превью с ИИ». */
-export function ImageManager({ manager, onCreatePreview }: { manager: ImageManagerState; onCreatePreview?: () => void }) {
+/**
+ * «Фото товара»: take or pick photos, choose the cover, remove extras.
+ * `onCreatePreview` — the store has AI: «Превью с ИИ»; `previewLabel` says how
+ * the drawing goes, `previewReady` — a finished picture waits to be seen.
+ */
+export function ImageManager({
+  manager,
+  onCreatePreview,
+  previewLabel = "Сделать превью с ИИ",
+  previewReady = false
+}: {
+  manager: ImageManagerState;
+  onCreatePreview?: () => void;
+  previewLabel?: string;
+  previewReady?: boolean;
+}) {
   const { images, previewImage, setPreviewImageId, addImages, removeImage } = manager;
 
   return (
@@ -98,8 +112,8 @@ export function ImageManager({ manager, onCreatePreview }: { manager: ImageManag
             </Notice>
           )}
           {onCreatePreview && (
-            <Button variant="secondary" icon={AiMagicIcon} block onClick={onCreatePreview}>
-              Сделать превью с ИИ
+            <Button variant={previewReady ? "primary" : "secondary"} icon={AiMagicIcon} block onClick={onCreatePreview}>
+              {previewLabel}
             </Button>
           )}
         </>

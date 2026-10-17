@@ -7,7 +7,7 @@ import styles from "./AdminJournalPage.module.css";
 
 const actions: Record<string, { label: string; tone: Tone }> = {
   STORE_CONNECTED: { label: "Подключён магазин", tone: "success" },
-  PAYMENT_ACCEPTED: { label: "Принята оплата", tone: "success" },
+  PAYMENT_ACCEPTED: { label: "Подписка продлена", tone: "success" },
   PAYMENT_CANCELLED: { label: "Отменена оплата", tone: "warning" },
   SUBSCRIPTION_CHANGED: { label: "Изменена дата подписки", tone: "warning" },
   PLAN_CHANGED: { label: "Изменён тариф", tone: "accent" },

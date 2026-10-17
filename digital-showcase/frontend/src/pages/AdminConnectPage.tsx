@@ -201,7 +201,7 @@ export function AdminConnectPage() {
               Скопировать
             </Button>
             <Button variant="outline" icon={Money03Icon} onClick={() => setIsPaying(true)}>
-              Принять оплату
+              Продлить
             </Button>
             <Button variant="ghost" icon={PlusSignIcon} onClick={startOver}>
               Подключить ещё

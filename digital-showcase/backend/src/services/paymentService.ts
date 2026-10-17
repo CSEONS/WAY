@@ -15,7 +15,7 @@ export interface PaymentInput {
   receipt?: string | null;
 }
 
-/** «Принять оплату»: records the money and extends the subscription by whole months in one step. */
+/** «Продлить»: extends the subscription by whole months and records the money in one step. */
 export async function acceptPayment(storeId: string, input: PaymentInput, adminId: string | null) {
   if (!Number.isInteger(input.amount) || input.amount < 0) throw new HttpError(400, "Сумма — целое число рублей, 0 для бесплатного продления");
   if (!Number.isInteger(input.months) || input.months < 1 || input.months > MAX_MONTHS) throw new HttpError(400, `Период — от 1 до ${MAX_MONTHS} месяцев`);

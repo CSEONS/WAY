@@ -1,7 +1,6 @@
 import { AiMagicIcon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from "react";
-import { api } from "../../api/client";
-import { Button, Checkbox, Chip, ChipGroup, ColorSwatch, Field, Input, Modal, Notice, SectionLabel, SegmentedControl, cx } from "../../ui";
+import { Button, Checkbox, Chip, ChipGroup, ColorSwatch, Field, Input, Modal, Notice, SectionLabel, SegmentedControl, cx, useToast } from "../../ui";
 import { ProductPhoto } from "../ProductPhoto";
 import {
   FEATURES,
@@ -9,32 +8,25 @@ import {
   MAX_HEADLINE,
   SCENES,
   THEMES,
-  dataUrlToFile,
   readPreviewOptions,
   savePreviewOptions,
   type PreviewFeature,
   type PreviewOptions
 } from "./previewOptions";
 import type { ProductFormImage } from "./types";
+import type { PreviewDrawing } from "./usePreviewDrawing";
 import styles from "./PreviewGenerator.module.css";
 
 interface PreviewGeneratorProps {
-  /** POST endpoint of the store the product belongs to. */
-  path: string;
+  /** The drawing itself lives in the form (usePreviewDrawing), so this window can be closed while it runs. */
+  drawing: PreviewDrawing;
   images: ProductFormImage[];
   /** The current cover: the photo to draw from by default. */
   coverId: string | null;
   product: { title: string; category: string; colors: string[] };
-  /** The owner liked a picture: it becomes the cover. */
-  onUse: (file: File) => void;
+  /** The owner liked a picture: it becomes the cover (with who is on it, for moderation). */
+  onUse: (file: File, livingBeings: string[]) => void;
   onClose: () => void;
-}
-
-interface Result {
-  file: File;
-  url: string;
-  /** Living beings the model drew anyway; their faces are covered with marker. */
-  livingBeings: string[];
 }
 
 /**
@@ -43,36 +35,17 @@ interface Result {
  * «Генератор карточек товара» template (its simple mode); the server builds
  * the prompt and calls the image model.
  */
-export function PreviewGenerator({ path, images, coverId, product, onUse, onClose }: PreviewGeneratorProps) {
+export function PreviewGenerator({ drawing, images, coverId, product, onUse, onClose }: PreviewGeneratorProps) {
+  const toast = useToast();
+  const { results, selected, setSelected, isDrawing, seconds, error } = drawing;
   const [photoId, setPhotoId] = useState(() => (images.some((image) => image.id === coverId) ? coverId : images[0]?.id ?? null));
   const [options, setOptions] = useState<PreviewOptions>(readPreviewOptions);
   const [isHeadlineOpen, setIsHeadlineOpen] = useState(false);
-  const [results, setResults] = useState<Result[]>([]);
-  const [selected, setSelected] = useState(0);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [error, setError] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
-  const resultsRef = useRef(results);
   const photo = images.find((image) => image.id === photoId);
   const colors = [...new Set(product.colors.map((color) => color.trim()).filter(Boolean))];
   const chosen = results[selected];
   const withText = options.text === "with_text";
-
-  useEffect(() => {
-    resultsRef.current = results;
-  }, [results]);
-
-  useEffect(() => () => resultsRef.current.forEach((result) => URL.revokeObjectURL(result.url)), []);
-
-  // Drawing takes a while: a running count shows it's alive.
-  useEffect(() => {
-    if (!isDrawing) return;
-    const startedAt = Date.now();
-    setSeconds(0);
-    const timer = window.setInterval(() => setSeconds(Math.round((Date.now() - startedAt) / 1000)), 1000);
-    return () => window.clearInterval(timer);
-  }, [isDrawing]);
 
   // A new picture shows up at the top of the window.
   useEffect(() => {
@@ -91,41 +64,34 @@ export function PreviewGenerator({ path, images, coverId, product, onUse, onClos
     });
   }
 
-  async function draw() {
+  function draw() {
     if (!photo) return;
-    setError("");
-    setIsDrawing(true);
     savePreviewOptions(options);
-    try {
-      const formData = new FormData();
-      // A new photo goes as a file; a saved one — by its address.
-      if (photo.file) formData.append("image", photo.file);
-      else formData.append("imageUrl", photo.url);
-      formData.append(
-        "options",
-        JSON.stringify({
-          ...options,
-          headline: withText ? options.headline.trim() : "",
-          showColors: options.showColors && colors.length > 1,
-          title: product.title.trim(),
-          category: product.category.trim(),
-          colors
-        })
-      );
-      const { data } = await api.post<{ image: string; livingBeings: string[] }>(path, formData);
-      const file = dataUrlToFile(data.image, `ai-preview-${Date.now()}`);
-      setSelected(results.length);
-      setResults((current) => [...current, { file, url: URL.createObjectURL(file), livingBeings: data.livingBeings ?? [] }]);
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? "Не удалось нарисовать превью. Проверьте интернет и попробуйте ещё раз.");
-    } finally {
-      setIsDrawing(false);
-    }
+    const formData = new FormData();
+    // A new photo goes as a file; a saved one — by its address.
+    if (photo.file) formData.append("image", photo.file);
+    else formData.append("imageUrl", photo.url);
+    formData.append(
+      "options",
+      JSON.stringify({
+        ...options,
+        headline: withText ? options.headline.trim() : "",
+        showColors: options.showColors && colors.length > 1,
+        title: product.title.trim(),
+        category: product.category.trim(),
+        colors
+      })
+    );
+    void drawing.draw(formData);
+    // The request is on its way: the window folds away, the owner keeps filling in the product.
+    // When the picture is ready, a toast and the button under the photos say so (usePreviewDrawing).
+    toast.show("Рисуем превью — будет готово в течение минуты. Можно заполнять товар дальше", { duration: 5000 });
+    onClose();
   }
 
   function applyChosen() {
     if (!chosen) return;
-    onUse(chosen.file);
+    onUse(chosen.file, chosen.livingBeings);
     onClose();
   }
 
@@ -137,10 +103,7 @@ export function PreviewGenerator({ path, images, coverId, product, onUse, onClos
       icon={AiMagicIcon}
       title="Превью с ИИ"
       description="ИИ нарисует обложку для витрины по фото товара: красивый фон, а если хотите — заголовок и преимущества. Сам товар останется как на фото."
-      onClose={() => {
-        if (!isDrawing) onClose();
-      }}
-      hideCloseButton={isDrawing}
+      onClose={onClose}
       closeOnBackdrop={false}
       footer={
         results.length ? (
@@ -154,8 +117,8 @@ export function PreviewGenerator({ path, images, coverId, product, onUse, onClos
           </>
         ) : (
           <>
-            <Button variant="neutral" disabled={isDrawing} onClick={onClose}>
-              Отмена
+            <Button variant="neutral" onClick={onClose}>
+              {isDrawing ? "Закрыть" : "Отмена"}
             </Button>
             <Button variant="primary" icon={AiMagicIcon} loading={isDrawing} disabled={!photo} onClick={draw}>
               {drawLabel}
@@ -184,9 +147,9 @@ export function PreviewGenerator({ path, images, coverId, product, onUse, onClos
             </div>
           )}
           {chosen.livingBeings.length > 0 && (
-            <Notice tone="warning" title="ИИ нарисовал живых существ">
-              {chosen.livingBeings.join(", ")} — лица замазаны маркером. Такую обложку покупатели увидят только после проверки администратором; лучше нарисовать
-              ещё раз.
+            <Notice tone="warning" title="На превью есть живые существа">
+              {chosen.livingBeings.join(", ")}. С этой обложкой товар после сохранения уйдёт на проверку администратору, и до его решения покупатели её не
+              увидят. Можно нарисовать ещё раз.
             </Notice>
           )}
           <p className={styles.hint}>Нравится — нажмите «Сделать обложкой». Нет — поменяйте настройки ниже и нарисуйте ещё.</p>
@@ -195,7 +158,7 @@ export function PreviewGenerator({ path, images, coverId, product, onUse, onClos
 
       {isDrawing && (
         <Notice tone="accent" icon={AiMagicIcon}>
-          Рисуем превью — обычно это до минуты. Не закрывайте окно.
+          Рисуем превью — обычно это до минуты. Окно можно закрыть и заполнять товар дальше: когда превью будет готово, придёт уведомление.
         </Notice>
       )}
       {error && <Notice tone="danger">{error}</Notice>}

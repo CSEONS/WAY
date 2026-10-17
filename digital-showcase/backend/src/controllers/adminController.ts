@@ -13,6 +13,7 @@ import {
 } from "../utils/validation.js";
 import { knownModels } from "../services/aiPrices.js";
 import * as aiProvider from "../services/aiProvider.js";
+import * as aiUsageService from "../services/aiUsageService.js";
 import * as auditService from "../services/auditService.js";
 import * as authService from "../services/authService.js";
 import * as backupService from "../services/backupService.js";
@@ -235,6 +236,11 @@ export const startBackup = asyncHandler(async (req, res) => {
 /** Where AI requests go (no key) — for the admin panel. */
 export const aiStatus = asyncHandler(async (_req, res) => {
   res.json(aiProvider.aiSummary());
+});
+
+/** «Расходы на ИИ»: the last 6 months and this month by store. */
+export const aiSpend = asyncHandler(async (_req, res) => {
+  res.json(await aiUsageService.spendReport({ text: aiProvider.aiSettings().model, preview: aiProvider.previewSettings()?.model ?? null }));
 });
 
 /** «Настройки»: plans, contacts, requisites, the trial and AI — plus priced model names to pick from. */

@@ -35,7 +35,7 @@ export function reportTokens(usage: unknown, model?: string) {
   current.outputTokens += Number(output_tokens ?? completion_tokens) || 0;
 }
 
-/** AI cards a store may create per calendar month («Витрина + ИИ»): its own limit or the one on «Настройки». */
+/** AI cards a store may create per calendar month («Витрина + ИИ»): its own limit or the one on «Тарифы и цены». */
 export function monthlyLimit(store: Pick<Store, "aiMonthlyLimit">) {
   if (store.aiMonthlyLimit != null && store.aiMonthlyLimit >= 0) return store.aiMonthlyLimit;
   return settings().aiMonthlyLimit;
@@ -107,26 +107,42 @@ export interface CurrentModels {
  * ruble rate is set on «Настройки»; requests to models without a known price are left
  * out of them and named in `unpricedModels`.
  */
+type UsageRow = { kind: AiUsageKind; units: number; inputTokens: number; outputTokens: number; model: string | null };
+
+/**
+ * Dollars one ai_usage row cost. `unpriced` — the model has no known price;
+ * null usd without it — nothing to price (a provider that doesn't report
+ * usage leaves zeros).
+ */
+function rowCost(row: UsageRow, current: CurrentModels): { usd: number | null; unpriced: string | null } {
+  const model = row.model ?? (row.kind === "PREVIEW" ? current.preview : current.text);
+  if (!model || (!row.inputTokens && !row.outputTokens)) return { usd: null, unpriced: null };
+  const usd = requestCostUsd(model, row.inputTokens, row.outputTokens);
+  return usd == null ? { usd: null, unpriced: model } : { usd, unpriced: null };
+}
+
+/** Rubles from dollars at the rate on «Настройки», to kopecks; null when no rate is set. */
+function toRubles(usd: number) {
+  const rate = rublesPerDollar();
+  return rate == null ? null : Math.round(usd * rate * 100) / 100;
+}
+
 export async function monthSpend(current: CurrentModels, now = new Date()) {
   const db = await getDb();
-  const rows = await db.all<{ kind: AiUsageKind; units: number; inputTokens: number; outputTokens: number; model: string | null }>(
-    "SELECT kind, units, inputTokens, outputTokens, model FROM ai_usage WHERE createdAt >= ?",
-    monthStart(now)
-  );
+  const rows = await db.all<UsageRow>("SELECT kind, units, inputTokens, outputTokens, model FROM ai_usage WHERE createdAt >= ?", monthStart(now));
   const rate = rublesPerDollar();
-  const rub = (usd: number) => (rate == null ? null : Math.round(usd * rate * 100) / 100);
+  const rub = toRubles;
 
   let cardsUsd = 0;
   let cardUnits = 0;
   const previewsUsd: number[] = [];
   const unpriced = new Set<string>();
   for (const row of rows) {
-    const model = row.model ?? (row.kind === "PREVIEW" ? current.preview : current.text);
-    // A provider that doesn't report usage leaves zeros — no price to learn from them.
-    if (!model || (!row.inputTokens && !row.outputTokens)) continue;
-    const usd = requestCostUsd(model, row.inputTokens, row.outputTokens);
-    if (usd == null) {
+    const { usd, unpriced: model } = rowCost(row, current);
+    if (model) {
       unpriced.add(model);
+    } else if (usd == null) {
+      continue;
     } else if (row.kind === "PREVIEW") {
       previewsUsd.push(usd);
     } else {
@@ -144,6 +160,69 @@ export async function monthSpend(current: CurrentModels, now = new Date()) {
     cardRub: cardUnits ? rub(cardsUsd / cardUnits) : null,
     previewRub: previewsUsd.length ? rub(previewTotal / previewsUsd.length) : null,
     previewMaxRub: previewsUsd.length ? rub(Math.max(...previewsUsd)) : null,
+    unpricedModels: [...unpriced]
+  };
+}
+
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * «Расходы на ИИ» in the admin panel: the last `months` months (oldest
+ * first, empty months included) and this month by store, most expensive
+ * first. Cards are drafts and products of bulk uploads; `used` also counts
+ * previews, as the store's limit does. Ruble sums are null until the rate is set.
+ */
+export async function spendReport(current: CurrentModels, now = new Date(), months = 6) {
+  const db = await getDb();
+  const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+  const rows = await db.all<UsageRow & { createdAt: string; storeId: string; storeName: string; aiMonthlyLimit: number | null }>(
+    `SELECT u.kind, u.units, u.inputTokens, u.outputTokens, u.model, u.createdAt, u.storeId, s.name as storeName, s.aiMonthlyLimit
+     FROM ai_usage u JOIN stores s ON s.id = u.storeId WHERE u.createdAt >= ?`,
+    from.toISOString()
+  );
+
+  const byMonth = new Map<string, { month: string; cards: number; previews: number; usd: number }>();
+  for (let index = 0; index < months; index += 1) {
+    const month = monthKey(new Date(from.getFullYear(), from.getMonth() + index, 1));
+    byMonth.set(month, { month, cards: 0, previews: 0, usd: 0 });
+  }
+  const thisMonth = monthKey(now);
+  const byStore = new Map<string, { storeId: string; name: string; cards: number; previews: number; used: number; limit: number; usd: number }>();
+  const unpriced = new Set<string>();
+
+  for (const row of rows) {
+    const { usd, unpriced: model } = rowCost(row, current);
+    if (model) unpriced.add(model);
+    const isPreview = row.kind === "PREVIEW";
+    const month = byMonth.get(monthKey(new Date(row.createdAt)));
+    if (month) {
+      month.cards += isPreview ? 0 : row.units;
+      month.previews += isPreview ? 1 : 0;
+      month.usd += usd ?? 0;
+    }
+    if (monthKey(new Date(row.createdAt)) !== thisMonth) continue;
+    const store = byStore.get(row.storeId) ?? {
+      storeId: row.storeId,
+      name: row.storeName,
+      cards: 0,
+      previews: 0,
+      used: 0,
+      limit: monthlyLimit({ aiMonthlyLimit: row.aiMonthlyLimit }),
+      usd: 0
+    };
+    store.cards += isPreview ? 0 : row.units;
+    store.previews += isPreview ? 1 : 0;
+    store.used += row.units;
+    store.usd += usd ?? 0;
+    byStore.set(row.storeId, store);
+  }
+
+  return {
+    rubPerUsd: rublesPerDollar(),
+    months: [...byMonth.values()].map(({ usd, ...month }) => ({ ...month, costRub: toRubles(usd) })),
+    stores: [...byStore.values()].sort((a, b) => b.usd - a.usd || b.used - a.used).map(({ usd, ...store }) => ({ ...store, costRub: toRubles(usd) })),
     unpricedModels: [...unpriced]
   };
 }

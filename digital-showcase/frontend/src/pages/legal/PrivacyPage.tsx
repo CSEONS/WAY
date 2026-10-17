@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { LegalDocument, Operator, Site, Value } from "./LegalDocument";
 
-/** Политика обработки персональных данных (152-ФЗ). A template: requisites are filled in on «Настройки» in the admin panel. */
+/** Политика обработки персональных данных (152-ФЗ). A template: requisites are filled in on «Реквизиты» in the admin panel. */
 export function PrivacyPage() {
   return (
     <LegalDocument title="Политика обработки персональных данных">

@@ -150,7 +150,10 @@
 }
 
 .payButton {
+  display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--space-1);
 }
 
 .muted {

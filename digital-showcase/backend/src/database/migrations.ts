@@ -419,6 +419,111 @@ export const migrations: Migration[] = [
       }
       db.prepare("DELETE FROM settings WHERE key = 'trialDays'").run();
     }
+  },
+  {
+    version: 12,
+    name: "add-on packages",
+    // Packages bought on top of a plan (see packageService): AI previews and AI
+    // cards that don't burn at the month's end, a service the admin does, or both.
+    // A sale is also a payment, but extends nothing: payments get packageName and
+    // an empty paid date is allowed (the table is rebuilt, SQLite can't drop NOT NULL).
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS packages (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          price INTEGER NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          previews INTEGER NOT NULL DEFAULT 0,
+          fills INTEGER NOT NULL DEFAULT 0,
+          isService INTEGER NOT NULL DEFAULT 0,
+          isPublic INTEGER NOT NULL DEFAULT 1,
+          sortOrder INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        );
+        -- An owner's request or an admin's sale. What was bought is copied: the package may change or go later.
+        CREATE TABLE IF NOT EXISTS package_orders (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+          packageId TEXT,
+          name TEXT NOT NULL,
+          price INTEGER NOT NULL,
+          previews INTEGER NOT NULL DEFAULT 0,
+          fills INTEGER NOT NULL DEFAULT 0,
+          isService INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL CHECK(status IN ('REQUESTED', 'PAID', 'DONE', 'DECLINED', 'CANCELLED')),
+          paymentId TEXT,
+          createdAt TEXT NOT NULL,
+          paidAt TEXT,
+          doneAt TEXT
+        );
+        CREATE INDEX IF NOT EXISTS package_orders_store ON package_orders(storeId, createdAt);
+        CREATE INDEX IF NOT EXISTS package_orders_status ON package_orders(status, createdAt);
+
+        CREATE TABLE payments_new (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          storeName TEXT NOT NULL,
+          amount INTEGER NOT NULL,
+          months INTEGER NOT NULL,
+          method TEXT NOT NULL CHECK(method IN ('CASH', 'TRANSFER', 'OTHER')),
+          comment TEXT,
+          periodStart TEXT,
+          periodEnd TEXT,
+          createdBy TEXT,
+          createdAt TEXT NOT NULL,
+          receipt TEXT,
+          packageName TEXT
+        );
+        INSERT INTO payments_new (id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, createdAt, receipt)
+          SELECT id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, createdAt, receipt FROM payments;
+        DROP TABLE payments;
+        ALTER TABLE payments_new RENAME TO payments;
+        CREATE INDEX IF NOT EXISTS payments_store ON payments(storeId, createdAt);
+      `);
+      // What packages left the store; spent only once the month's plan limit is.
+      addColumn(db, "stores", "extraPreviews", "INTEGER NOT NULL DEFAULT 0");
+      addColumn(db, "stores", "extraFills", "INTEGER NOT NULL DEFAULT 0");
+      // Units of a request counted against the plan's month and units paid by packages instead.
+      addColumn(db, "ai_usage", "planUnits", "INTEGER");
+      addColumn(db, "ai_usage", "packageUnits", "INTEGER NOT NULL DEFAULT 0");
+      db.exec("UPDATE ai_usage SET planUnits = units WHERE planUnits IS NULL");
+
+      // Examples from the owner's wishes, hidden until the admin checks the prices and shows them.
+      const now = new Date().toISOString();
+      const insert = db.prepare(
+        `INSERT OR IGNORE INTO packages (id, name, price, description, previews, fills, isService, isPublic, sortOrder, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+      );
+      const examples = [
+        ["previews-10", "+10 ИИ-превью", 100, "Обложки для товаров, когда превью тарифа на месяц закончились", 10, 0, 0],
+        ["fills-100", "+100 карточек с ИИ", 200, "Карточки по фото и голосу сверх лимита тарифа", 0, 100, 0],
+        ["setup-help", "Помощь с первым заполнением", 1000, "Добавим первые товары за вас: фото, описания, размеры и цены", 0, 0, 1]
+      ] as const;
+      for (const [index, example] of examples.entries()) insert.run(...example, index, now, now);
+    }
+  },
+  {
+    version: 13,
+    name: "no free help with products in plans",
+    // Filling products in for the owner is a paid package now («Помощь с первым
+    // заполнением»), not part of a plan: the line plans got by default goes.
+    up(db) {
+      const line = "Поможем запуститься и добавить первые товары";
+      const rows = db.prepare("SELECT id, features FROM plans").all() as { id: string; features: string }[];
+      const update = db.prepare("UPDATE plans SET features = ? WHERE id = ?");
+      for (const row of rows) {
+        let features: unknown;
+        try {
+          features = JSON.parse(row.features);
+        } catch {
+          continue;
+        }
+        if (!Array.isArray(features) || !features.includes(line)) continue;
+        update.run(JSON.stringify(features.filter((feature) => feature !== line)), row.id);
+      }
+    }
   }
 ];
 

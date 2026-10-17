@@ -70,7 +70,12 @@ const LABELS: Record<string, string> = {
   aiModel: "Модель для карточек",
   aiPreviewModel: "Модель для превью",
   aiPreviewQuality: "Качество превью",
-  aiRubPerUsd: "Курс"
+  aiRubPerUsd: "Курс",
+  previews: "ИИ-превью",
+  fills: "Карточки с ИИ",
+  isService: "Услуга",
+  contents: "Что в пакете",
+  packageId: "Пакет"
 };
 
 function valueAt(data: unknown, path: PropertyKey[]) {
@@ -255,7 +260,42 @@ export const planSchema = z
   })
   .refine((plan) => !plan.aiEnabled || plan.aiMonthlyLimit != null, { message: "укажите, сколько карточек с ИИ в месяц", path: ["aiMonthlyLimit"] });
 
-export const planOrderSchema = z.object({ ids: z.array(z.string().min(1).max(100)).min(1).max(50) });
+const sortOrder = z.object({ ids: z.array(z.string().min(1).max(100)).min(1).max(50) });
+export const planOrderSchema = sortOrder;
+
+// «Тарифы и цены» → «Пакеты»
+
+const count = (max: number) =>
+  z.preprocess((value) => (value === "" || value == null ? 0 : typeof value === "string" ? Number(value) : value), z.number().int().min(0).max(max));
+
+export const packageSchema = z
+  .object({
+    name: requiredText(60),
+    price: z.preprocess((value) => (typeof value === "string" ? Number(value.replace(/\s/g, "")) : value), z.number().int().min(0).max(1_000_000)),
+    description: text(300),
+    previews: count(10_000),
+    fills: count(100_000),
+    isService: flag,
+    isPublic: flag
+  })
+  .refine((item) => item.previews > 0 || item.fills > 0 || item.isService, {
+    message: "добавьте ИИ-превью, карточки с ИИ или отметьте услугу",
+    path: ["contents"]
+  });
+
+export const packageSortSchema = sortOrder;
+
+/** A package sold to a store: from the list (packageId) or the owner's request (orderId). */
+export const packageSaleSchema = z
+  .object({
+    packageId: z.string().min(1).max(100).optional(),
+    orderId: z.string().min(1).max(100).optional(),
+    amount: z.coerce.number().int().min(0).max(10_000_000),
+    method: z.enum(["CASH", "TRANSFER", "OTHER"]),
+    comment: optionalText(500),
+    receipt: optionalText(500)
+  })
+  .refine((sale) => sale.packageId || sale.orderId, { message: "выберите пакет", path: ["packageId"] });
 
 // «Настройки»
 

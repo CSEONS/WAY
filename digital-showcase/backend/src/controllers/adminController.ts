@@ -4,6 +4,9 @@ import {
   ownerCreateSchema,
   ownerPasswordSchema,
   ownerUpdateSchema,
+  packageSaleSchema,
+  packageSchema,
+  packageSortSchema,
   parseBody,
   paymentSchema,
   planOrderSchema,
@@ -21,6 +24,7 @@ import * as authService from "../services/authService.js";
 import * as backupService from "../services/backupService.js";
 import * as onboardingService from "../services/onboardingService.js";
 import * as overviewService from "../services/overviewService.js";
+import * as packageService from "../services/packageService.js";
 import * as paymentService from "../services/paymentService.js";
 import * as planService from "../services/planService.js";
 import * as reportService from "../services/reportService.js";
@@ -120,13 +124,41 @@ export const setPaymentReceipt = asyncHandler(async (req, res) => {
 
 export const cancelPayment = asyncHandler(async (req, res) => {
   const { payment, rolledBack } = await paymentService.cancelPayment(String(req.params.id));
+  // A package sale: what's left of it goes back.
+  const returned = payment.packageName ? await packageService.returnPackage(payment.id) : null;
   await auditService.logAction(
     req.user!.userId,
     "PAYMENT_CANCELLED",
     { type: "store", id: payment.storeId, name: payment.storeName },
-    `${rubles(payment.amount)} от ${dateLabel(payment.createdAt)}${rolledBack ? ", дата подписки возвращена" : ""}`
+    `${rubles(payment.amount)} от ${dateLabel(payment.createdAt)}${rolledBack ? ", дата подписки возвращена" : ""}${returned ? `, пакет «${returned.name}» отменён` : ""}`
   );
   res.json({ rolledBack });
+});
+
+/** «Продать пакет»: from the list or the owner's request; the money is recorded like any payment. */
+export const sellPackage = asyncHandler(async (req, res) => {
+  const result = await packageService.sellPackage(String(req.params.id), parseBody(packageSaleSchema, req.body), req.user!.userId);
+  await auditService.logAction(
+    req.user!.userId,
+    "PACKAGE_SOLD",
+    { type: "store", id: result.store.id, name: result.store.name },
+    `«${result.order.name}» (${packageService.contentsLabel(result.order)}) за ${rubles(result.payment.amount)}`
+  );
+  res.status(201).json(result);
+});
+
+/** The owner's request turned down: nothing paid, nothing added. */
+export const declinePackageOrder = asyncHandler(async (req, res) => {
+  const order = await packageService.closeRequest(String(req.params.id), "DECLINED");
+  await auditService.logAction(req.user!.userId, "PACKAGE_DECLINED", { type: "store", id: order.storeId }, `Запрос пакета «${order.name}»`);
+  res.json(order);
+});
+
+/** «Выполнено»: the paid service is done. */
+export const completePackageOrder = asyncHandler(async (req, res) => {
+  const order = await packageService.completeService(String(req.params.id));
+  await auditService.logAction(req.user!.userId, "PACKAGE_DONE", { type: "store", id: order.storeId }, `«${order.name}»`);
+  res.json(order);
 });
 
 /** Month results of every store — for «Отправить отчёт в WhatsApp». */
@@ -269,6 +301,33 @@ export const deletePlan = asyncHandler(async (req, res) => {
 
 export const reorderPlans = asyncHandler(async (req, res) => {
   res.json(await planService.reorderPlans(parseBody(planOrderSchema, req.body).ids));
+});
+
+/** «Тарифы и цены» → «Пакеты»: every package with how many times it was sold. */
+export const listPackages = asyncHandler(async (_req, res) => {
+  res.json(await packageService.listPackages());
+});
+
+export const createPackage = asyncHandler(async (req, res) => {
+  const item = await packageService.savePackage(null, parseBody(packageSchema, req.body));
+  await auditService.logAction(req.user!.userId, "PACKAGE_SAVED", undefined, `Новый пакет «${item.name}»`);
+  res.status(201).json(item);
+});
+
+export const updatePackage = asyncHandler(async (req, res) => {
+  const item = await packageService.savePackage(String(req.params.id), parseBody(packageSchema, req.body));
+  await auditService.logAction(req.user!.userId, "PACKAGE_SAVED", undefined, `Пакет «${item.name}»`);
+  res.json(item);
+});
+
+export const deletePackage = asyncHandler(async (req, res) => {
+  const item = await packageService.deletePackage(String(req.params.id));
+  await auditService.logAction(req.user!.userId, "PACKAGE_DELETED", undefined, `Пакет «${item.name}»`);
+  res.status(204).send();
+});
+
+export const reorderPackages = asyncHandler(async (req, res) => {
+  res.json(await packageService.reorderPackages(parseBody(packageSortSchema, req.body).ids));
 });
 
 /** «Расходы на ИИ»: the last 6 months and this month by store. */

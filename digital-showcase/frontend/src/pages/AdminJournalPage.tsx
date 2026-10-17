@@ -19,7 +19,14 @@ const actions: Record<string, { label: string; tone: Tone }> = {
   BACKUP_STARTED: { label: "Копия сделана вручную", tone: "neutral" },
   SETTINGS_CHANGED: { label: "Изменены настройки", tone: "accent" },
   IMAGE_APPROVED: { label: "Фото показано после проверки", tone: "success" },
-  IMAGE_REJECTED: { label: "Фото скрыто после проверки", tone: "warning" }
+  IMAGE_REJECTED: { label: "Фото скрыто после проверки", tone: "warning" },
+  PLAN_SAVED: { label: "Сохранён тариф", tone: "accent" },
+  PLAN_DELETED: { label: "Удалён тариф", tone: "warning" },
+  PACKAGE_SAVED: { label: "Сохранён пакет", tone: "accent" },
+  PACKAGE_DELETED: { label: "Удалён пакет", tone: "warning" },
+  PACKAGE_SOLD: { label: "Продан пакет", tone: "success" },
+  PACKAGE_DONE: { label: "Услуга выполнена", tone: "success" },
+  PACKAGE_DECLINED: { label: "Отклонён запрос пакета", tone: "warning" }
 };
 
 const timeFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });

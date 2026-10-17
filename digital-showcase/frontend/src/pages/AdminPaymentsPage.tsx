@@ -123,7 +123,7 @@ export function AdminPaymentsPage() {
                     <div className={styles.rowMain}>
                       <strong>{payment.amount ? formatMoney(payment.amount) : "Бесплатно"}</strong>
                       <span>
-                        {payment.storeName} · {payment.months} мес. · {methodLabels[payment.method]}
+                        {payment.storeName} · {payment.packageName ? `пакет «${payment.packageName}»` : `${payment.months} мес.`} · {methodLabels[payment.method]}
                       </span>
                       {payment.comment && <small>{payment.comment}</small>}
                       <span className={styles.receipt}>
@@ -148,7 +148,7 @@ export function AdminPaymentsPage() {
                     </div>
                     <div className={styles.rowMeta}>
                       <span>{formatDate(payment.createdAt)}</span>
-                      <small>оплачено до {formatDate(payment.periodEnd)}</small>
+                      {payment.periodEnd && <small>оплачено до {formatDate(payment.periodEnd)}</small>}
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => setToCancel(payment)}>
                       Отменить
@@ -200,7 +200,7 @@ export function AdminPaymentsPage() {
       {toCancel && (
         <ConfirmModal
           title="Отменить оплату?"
-          description={`${toCancel.amount ? formatMoney(toCancel.amount) : "Бесплатное продление"} от ${formatDate(toCancel.createdAt)}, ${toCancel.storeName}. Если это последнее продление магазина, подписка вернётся к ${toCancel.periodStart ? formatDate(toCancel.periodStart) : "прежней дате"}.`}
+          description={`${toCancel.amount ? formatMoney(toCancel.amount) : "Бесплатное продление"} от ${formatDate(toCancel.createdAt)}, ${toCancel.storeName}. ${toCancel.packageName ? `Пакет «${toCancel.packageName}» отменится: магазин потеряет то, что из него не успел потратить.` : `Если это последнее продление магазина, подписка вернётся к ${toCancel.periodStart ? formatDate(toCancel.periodStart) : "прежней дате"}.`}`}
           confirmLabel="Отменить оплату"
           cancelLabel="Не отменять"
           danger

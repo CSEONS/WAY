@@ -3,12 +3,13 @@ import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
 import * as analyticsService from "../services/analyticsService.js";
 import { publicLogo } from "../services/imageModerationService.js";
+import { publicPackages } from "../services/packageService.js";
 import { publicPlans } from "../services/planService.js";
 import { publicSettings } from "../services/settingsService.js";
 
-/** Plans and contacts for the landing, help videos, requisites for /offer and /privacy — from the admin panel. */
+/** Plans, packages and contacts for the landing, help videos, requisites for /offer and /privacy — from the admin panel. */
 export const getSite = asyncHandler(async (_req, res) => {
-  res.json({ ...publicSettings(), plans: await publicPlans() });
+  res.json({ ...publicSettings(), plans: await publicPlans(), packages: await publicPackages() });
 });
 
 async function publicStore(slug: string) {

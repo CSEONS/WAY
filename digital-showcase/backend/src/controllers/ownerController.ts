@@ -6,6 +6,7 @@ import { previewSettings } from "../services/aiProvider.js";
 import { planOf } from "../services/planService.js";
 import { settings } from "../services/settingsService.js";
 import * as analyticsService from "../services/analyticsService.js";
+import * as packageService from "../services/packageService.js";
 import { checkImage, cleanFindings, flagImage } from "../services/imageModerationService.js";
 import { readStoredImage } from "../services/imageService.js";
 import { createProductPreview, parsePreviewOptions } from "../services/previewImageService.js";
@@ -22,6 +23,19 @@ async function scopedStore(req: Request) {
   const store = await storeService.getOwnerStoreById(req.user!.userId, String(req.params.storeId));
   if (!store) throw new HttpError(404, "Магазин не найден");
   return store;
+}
+
+/**
+ * The store as the owner's app sees it: aiFormEnabled — AI cards can be made
+ * (the plan has AI or a package left some), aiPreviewEnabled — previews can be
+ * drawn (the server can, and the plan or a package allows).
+ */
+function ownerView(store: Store) {
+  return {
+    ...withSubscription(store),
+    aiFormEnabled: aiUsageService.aiAllowed(store, "DRAFT") ? 1 : 0,
+    aiPreviewEnabled: previewSettings() !== null && aiUsageService.aiAllowed(store, "PREVIEW")
+  };
 }
 
 /** The store, if new products can go on it now: not while the subscription is unpaid (see addingProductsBlocked). */
@@ -56,12 +70,11 @@ function stringList(value: unknown) {
 }
 
 export const listStores = asyncHandler(async (req, res) => {
-  res.json((await storeService.listOwnerStores(req.user!.userId)).map(withSubscription));
+  res.json((await storeService.listOwnerStores(req.user!.userId)).map(ownerView));
 });
 
 export const getStore = asyncHandler(async (req, res) => {
-  // aiPreviewEnabled: the server can draw previews (AI_PREVIEW_MODEL isn't "off").
-  res.json({ ...withSubscription(await scopedStore(req)), aiPreviewEnabled: previewSettings() !== null });
+  res.json(ownerView(await scopedStore(req)));
 });
 
 /** Who to call about the subscription: «Контакты» in the admin panel. */
@@ -84,7 +97,7 @@ export const getSupport = asyncHandler(async (_req, res) => {
 /** «Подписка и итоги»: paid date, tariff, AI left this month, payments and month results. */
 export const getSubscription = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
-  const [ai, payments, reports] = await Promise.all([
+  const [ai, payments, reports, packages, orders] = await Promise.all([
     aiUsageService.aiStatus(store),
     paymentService.listPayments({ storeId: store.id, limit: 24 }),
     Promise.all(
@@ -93,7 +106,9 @@ export const getSubscription = asyncHandler(async (req, res) => {
         // No reports for months before the store was connected.
         .filter((month) => month >= paymentService.monthKey(new Date(store.createdAt)))
         .map((month) => reportService.storeMonthReport(store.id, month))
-    )
+    ),
+    packageService.publicPackages(),
+    packageService.listOrders(store.id)
   ]);
   res.json({
     subscription: withSubscription(store).subscription,
@@ -101,10 +116,45 @@ export const getSubscription = asyncHandler(async (req, res) => {
     graceDays: GRACE_DAYS,
     ai,
     // Admin comments stay in the admin panel.
-    payments: payments.map(({ id, amount, months, method, periodEnd, receipt, createdAt }) => ({ id, amount, months, method, periodEnd, receipt, createdAt })),
+    payments: payments.map(({ id, amount, months, method, periodEnd, receipt, packageName, createdAt }) => ({
+      id,
+      amount,
+      months,
+      method,
+      periodEnd,
+      receipt,
+      packageName,
+      createdAt
+    })),
+    packages,
+    // Requests and purchases; the payment itself is in `payments`.
+    orders: orders.map(({ id, packageId, name, price, previews, fills, isService, status, createdAt, paidAt, doneAt }) => ({
+      id,
+      packageId,
+      name,
+      price,
+      previews,
+      fills,
+      isService,
+      status,
+      createdAt,
+      paidAt,
+      doneAt
+    })),
     reports,
     support: supportContacts()
   });
+});
+
+/** «Хочу этот пакет»: the admin sees the request at the top of the admin panel and takes the money. */
+export const requestPackage = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  res.status(201).json(await packageService.requestPackage(store.id, String(req.params.packageId)));
+});
+
+export const withdrawPackageRequest = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  res.json(await packageService.closeRequest(String(req.params.orderId), "CANCELLED", store.id));
 });
 
 export const updateStore = asyncHandler(async (req, res) => {
@@ -148,12 +198,12 @@ export const createProduct = asyncHandler(async (req, res) => {
 
 export const createProductDraft = asyncHandler(async (req, res) => {
   const store = await storeForNewProducts(req);
-  if (!store.aiFormEnabled) throw new HttpError(403, "ИИ-заполнение формы не подключено");
+  if (!aiUsageService.aiAllowed(store, "DRAFT")) throw new HttpError(403, "ИИ-заполнение формы не подключено");
 
   const { voice, images } = uploadedAiDraftFiles(req);
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
   if (!prompt.trim() && !voice) throw new HttpError(400, "Добавьте текстовое или голосовое описание товара");
-  await aiUsageService.assertWithinLimit(store);
+  await aiUsageService.assertWithinLimit(store, "DRAFT");
 
   const { result, usage } = await aiUsageService.measureTokens(() => createProductAiDraft({ prompt, voice, images, imageUrls: stringList(req.body.imageUrls) }));
   await aiUsageService.recordUsage(store.id, "DRAFT", 1, usage);
@@ -163,12 +213,12 @@ export const createProductDraft = asyncHandler(async (req, res) => {
 /** «Превью с ИИ»: a storefront cover drawn from one photo of the product. */
 export const createPreview = asyncHandler(async (req, res) => {
   const store = await storeForNewProducts(req);
-  if (!store.aiFormEnabled) throw new HttpError(403, "ИИ не подключён для этого магазина");
+  if (!aiUsageService.aiAllowed(store, "PREVIEW")) throw new HttpError(403, "ИИ-превью не подключены: нужен тариф с ИИ или пакет превью");
   const options = parsePreviewOptions(req.body.options);
   // A new photo comes as a file; one already saved with the product — as its address.
   const photo = req.file ?? (typeof req.body.imageUrl === "string" ? await readStoredImage(req.body.imageUrl) : null);
   if (!photo) throw new HttpError(400, "Добавьте фото товара — по нему ИИ нарисует превью");
-  await aiUsageService.assertWithinLimit(store);
+  await aiUsageService.assertWithinLimit(store, "PREVIEW");
 
   const { result, usage } = await aiUsageService.measureTokens(() => createProductPreview(options, photo));
   await aiUsageService.recordUsage(store.id, "PREVIEW", aiUsageService.previewUnits(), usage);
@@ -177,12 +227,12 @@ export const createPreview = asyncHandler(async (req, res) => {
 
 export const createBulkProductDraft = asyncHandler(async (req, res) => {
   const store = await storeForNewProducts(req);
-  if (!store.aiFormEnabled) throw new HttpError(403, "ИИ-заполнение формы не подключено");
+  if (!aiUsageService.aiAllowed(store, "BULK")) throw new HttpError(403, "ИИ-заполнение формы не подключено");
   const { voice, images } = uploadedAiDraftFiles(req);
   if (images.length < 2) throw new HttpError(400, "Для массовой группировки добавьте минимум два изображения");
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
   const expectedCount = Number(req.body.expectedCount);
-  await aiUsageService.assertWithinLimit(store);
+  await aiUsageService.assertWithinLimit(store, "BULK");
   const { result, usage } = await aiUsageService.measureTokens(() =>
     createBulkProductAiDraft({
       prompt,

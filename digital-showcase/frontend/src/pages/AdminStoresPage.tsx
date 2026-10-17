@@ -1,7 +1,8 @@
-import { ArchiveArrowDownIcon, ArchiveArrowUpIcon, Delete02Icon, Edit02Icon, Money03Icon, PlusSignIcon, Store01Icon } from "@hugeicons/core-free-icons";
+import { ArchiveArrowDownIcon, ArchiveArrowUpIcon, Delete02Icon, Edit02Icon, Money03Icon, PlusSignIcon, ShoppingBasketAdd01Icon, Store01Icon } from "@hugeicons/core-free-icons";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
+import { SellPackageModal } from "../components/admin/SellPackageModal";
 import { planLabel, useAdminPlans } from "../state/adminPlans";
 import type { Store, User } from "../types/models";
 import { subscriptionBadge } from "../utils/subscription";
@@ -105,6 +106,7 @@ export function AdminStoresPage() {
   const [storeToArchive, setStoreToArchive] = useState<Store | null>(null);
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
   const [storeToPay, setStoreToPay] = useState<Store | null>(null);
+  const [storeToSell, setStoreToSell] = useState<Store | null>(null);
   const ownerOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
 
   async function load() {
@@ -257,6 +259,9 @@ export function AdminStoresPage() {
                     <Button variant="primary" size="sm" icon={Money03Icon} onClick={() => setStoreToPay(store)}>
                       Продлить
                     </Button>
+                    <Button variant="secondary" size="sm" icon={ShoppingBasketAdd01Icon} onClick={() => setStoreToSell(store)}>
+                      Пакет
+                    </Button>
                     <Button variant="secondary" size="sm" icon={Edit02Icon} onClick={() => openEditStore(store)}>
                       Редактировать
                     </Button>
@@ -351,6 +356,16 @@ export function AdminStoresPage() {
           onClose={() => setStoreToPay(null)}
           onPaid={() => {
             setStoreToPay(null);
+            load();
+          }}
+        />
+      )}
+      {storeToSell && (
+        <SellPackageModal
+          store={storeToSell}
+          onClose={() => setStoreToSell(null)}
+          onSold={() => {
+            setStoreToSell(null);
             load();
           }}
         />

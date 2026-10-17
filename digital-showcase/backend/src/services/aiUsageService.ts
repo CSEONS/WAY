@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { getDb } from "../database/db.js";
+import { getDb, rawDb } from "../database/db.js";
 import type { Store } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
 import { requestCostUsd, rublesPerDollar } from "./aiPrices.js";
@@ -7,6 +7,18 @@ import { planOf } from "./planService.js";
 import { settings } from "./settingsService.js";
 
 export type AiUsageKind = "DRAFT" | "BULK" | "PREVIEW";
+
+/** What packages add: previews pay for PREVIEW, cards («fills») for DRAFT and BULK. */
+type Credits = Pick<Store, "aiFormEnabled" | "extraPreviews" | "extraFills">;
+
+function creditsFor(store: Credits, kind: AiUsageKind) {
+  return kind === "PREVIEW" ? store.extraPreviews : store.extraFills;
+}
+
+/** The store may use this kind of AI: its plan has AI, or packages left some. */
+export function aiAllowed(store: Credits, kind: AiUsageKind) {
+  return Boolean(store.aiFormEnabled) || creditsFor(store, kind) > 0;
+}
 
 export interface TokenUsage {
   inputTokens: number;
@@ -47,26 +59,41 @@ export function monthStart(now = new Date()) {
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 }
 
-export async function usedThisMonth(storeId: string, now = new Date()) {
-  const db = await getDb();
-  const row = await db.get<{ units: number | null }>("SELECT SUM(units) as units FROM ai_usage WHERE storeId = ? AND createdAt >= ?", storeId, monthStart(now));
+// Rows saved before packages have no planUnits: all their units counted against the plan.
+const PLAN_UNITS = "COALESCE(planUnits, units)";
+
+/** Cards of the plan's month used so far; what packages paid for isn't counted. */
+function planUsedSync(storeId: string, now = new Date()) {
+  const row = rawDb().prepare(`SELECT SUM(${PLAN_UNITS}) as units FROM ai_usage WHERE storeId = ? AND createdAt >= ?`).get(storeId, monthStart(now)) as {
+    units: number | null;
+  };
   return row?.units ?? 0;
 }
 
-export async function aiStatus(store: Store) {
-  return { enabled: Boolean(store.aiFormEnabled), used: await usedThisMonth(store.id), limit: monthlyLimit(store) };
+export async function usedThisMonth(storeId: string, now = new Date()) {
+  return planUsedSync(storeId, now);
 }
 
-/** Stops a request before it costs money once the month's cards are used up. */
-export async function assertWithinLimit(store: Store) {
+/** The plan's month (used of limit) and what packages left: previews and cards. */
+export async function aiStatus(store: Store) {
+  return {
+    enabled: aiAllowed(store, "DRAFT") || aiAllowed(store, "PREVIEW"),
+    used: await usedThisMonth(store.id),
+    limit: monthlyLimit(store),
+    extraPreviews: store.extraPreviews,
+    extraFills: store.extraFills
+  };
+}
+
+/** Stops a request before it costs money once the month's cards are used up and no package has any left. */
+export async function assertWithinLimit(store: Store, kind: AiUsageKind) {
   const { used, limit } = await aiStatus(store);
-  if (used >= limit) {
-    throw new HttpError(
-      429,
-      `ИИ-помощник на этот месяц израсходован: ${used} из ${limit} карточек. Товары можно добавлять вручную, а лимит обновится 1-го числа. Чтобы увеличить лимит, напишите администратору.`
-    );
-  }
-  return { used, limit };
+  if (used < limit || creditsFor(store, kind) > 0) return { used, limit };
+  const what = kind === "PREVIEW" ? "ИИ-превью" : "Карточки с ИИ";
+  throw new HttpError(
+    429,
+    `${what} на этот месяц закончились: ${used} из ${limit} по тарифу. Докупите пакет в «Подписке» или дождитесь 1-го числа — лимит обновится. Товары можно добавлять и вручную.`
+  );
 }
 
 /** Cards one AI preview takes from the month («Настройки», 1 by default): a picture costs more than a text draft. */
@@ -74,26 +101,46 @@ export function previewUnits() {
   return settings().aiPreviewUnits;
 }
 
-/** One card = one unit: a single draft is 1, a bulk upload is the number of products it produced, a preview is previewUnits(). */
+/**
+ * One card = one unit: a single draft is 1, a bulk upload is the number of
+ * products it produced, a preview is previewUnits(). The plan's month pays
+ * first; what it can't, packages do — a bulk upload may split between the two,
+ * a preview takes one package preview. With neither left the units still count
+ * against the month (the request was let in while some was left).
+ */
 export async function recordUsage(storeId: string, kind: AiUsageKind, units: number, tokens: TokenUsage) {
-  const db = await getDb();
-  await db.run(
-    "INSERT INTO ai_usage (id, storeId, kind, units, inputTokens, outputTokens, model, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    crypto.randomUUID(),
-    storeId,
-    kind,
-    Math.max(1, units),
-    tokens.inputTokens,
-    tokens.outputTokens,
-    tokens.model ?? null,
-    new Date().toISOString()
-  );
+  const db = rawDb();
+  const total = Math.max(1, units);
+  db.transaction(() => {
+    const store = db.prepare("SELECT aiMonthlyLimit, planId, extraPreviews, extraFills FROM stores WHERE id = ?").get(storeId) as
+      | Pick<Store, "aiMonthlyLimit" | "planId" | "extraPreviews" | "extraFills">
+      | undefined;
+    const planLeft = store ? Math.max(0, monthlyLimit(store) - planUsedSync(storeId)) : total;
+    let packageUnits = 0;
+    if (store && kind === "PREVIEW") {
+      packageUnits = planLeft === 0 && store.extraPreviews > 0 ? 1 : 0;
+    } else if (store) {
+      packageUnits = Math.min(total - Math.min(total, planLeft), store.extraFills);
+    }
+    // A package preview isn't a card of the month at all; package cards replace month cards one for one.
+    const planUnits = kind === "PREVIEW" ? (packageUnits ? 0 : total) : total - packageUnits;
+    if (packageUnits) {
+      const column = kind === "PREVIEW" ? "extraPreviews" : "extraFills";
+      db.prepare(`UPDATE stores SET ${column} = MAX(0, ${column} - ?) WHERE id = ?`).run(packageUnits, storeId);
+    }
+    db.prepare(
+      "INSERT INTO ai_usage (id, storeId, kind, units, planUnits, packageUnits, inputTokens, outputTokens, model, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(crypto.randomUUID(), storeId, kind, total, planUnits, packageUnits, tokens.inputTokens, tokens.outputTokens, tokens.model ?? null, new Date().toISOString());
+  })();
 }
 
-/** Cards each store used this month. */
+/** Cards each store made this month (`units`) and how many of them count against its plan (`planUnits`). */
 export async function usageByStore(now = new Date()) {
   const db = await getDb();
-  return db.all<{ storeId: string; units: number }>("SELECT storeId, SUM(units) as units FROM ai_usage WHERE createdAt >= ? GROUP BY storeId", monthStart(now));
+  return db.all<{ storeId: string; units: number; planUnits: number }>(
+    `SELECT storeId, SUM(units) as units, SUM(${PLAN_UNITS}) as planUnits FROM ai_usage WHERE createdAt >= ? GROUP BY storeId`,
+    monthStart(now)
+  );
 }
 
 /** Models in use now: they price older rows saved before the model was recorded. */
@@ -109,7 +156,7 @@ export interface CurrentModels {
  * ruble rate is set on «Настройки»; requests to models without a known price are left
  * out of them and named in `unpricedModels`.
  */
-type UsageRow = { kind: AiUsageKind; units: number; inputTokens: number; outputTokens: number; model: string | null };
+type UsageRow = { kind: AiUsageKind; units: number; planUnits: number | null; inputTokens: number; outputTokens: number; model: string | null };
 
 /**
  * Dollars one ai_usage row cost. `unpriced` — the model has no known price;
@@ -131,7 +178,7 @@ function toRubles(usd: number) {
 
 export async function monthSpend(current: CurrentModels, now = new Date()) {
   const db = await getDb();
-  const rows = await db.all<UsageRow>("SELECT kind, units, inputTokens, outputTokens, model FROM ai_usage WHERE createdAt >= ?", monthStart(now));
+  const rows = await db.all<UsageRow>("SELECT kind, units, planUnits, inputTokens, outputTokens, model FROM ai_usage WHERE createdAt >= ?", monthStart(now));
   const rate = rublesPerDollar();
   const rub = toRubles;
 
@@ -174,13 +221,14 @@ function monthKey(date: Date) {
  * «Расходы на ИИ» in the admin panel: the last `months` months (oldest
  * first, empty months included) and this month by store, most expensive
  * first. Cards are drafts and products of bulk uploads; `used` also counts
- * previews, as the store's limit does. Ruble sums are null until the rate is set.
+ * previews, as the store's limit does, but not what packages paid for. Ruble
+ * sums are null until the rate is set.
  */
 export async function spendReport(current: CurrentModels, now = new Date(), months = 6) {
   const db = await getDb();
   const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
   const rows = await db.all<UsageRow & { createdAt: string; storeId: string; storeName: string; aiMonthlyLimit: number | null; planId: string | null }>(
-    `SELECT u.kind, u.units, u.inputTokens, u.outputTokens, u.model, u.createdAt, u.storeId, s.name as storeName, s.aiMonthlyLimit, s.planId
+    `SELECT u.kind, u.units, u.planUnits, u.inputTokens, u.outputTokens, u.model, u.createdAt, u.storeId, s.name as storeName, s.aiMonthlyLimit, s.planId
      FROM ai_usage u JOIN stores s ON s.id = u.storeId WHERE u.createdAt >= ?`,
     from.toISOString()
   );
@@ -216,7 +264,7 @@ export async function spendReport(current: CurrentModels, now = new Date(), mont
     };
     store.cards += isPreview ? 0 : row.units;
     store.previews += isPreview ? 1 : 0;
-    store.used += row.units;
+    store.used += row.planUnits ?? row.units;
     store.usd += usd ?? 0;
     byStore.set(row.storeId, store);
   }

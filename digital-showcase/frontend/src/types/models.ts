@@ -29,13 +29,16 @@ export interface Store {
   isActive: number;
   /** The store's plan («Тарифы и цены»). */
   planId: string | null;
-  /** AI helper on: follows the plan. */
+  /** AI helper on: follows the plan. In the owner's app also on when packages left AI cards. */
   aiFormEnabled: number;
-  /** GET /owner/stores/:id only: the server draws «Превью с ИИ». */
+  /** Owner's app only: «Превью с ИИ» can be drawn (the server can; the plan or a package allows). */
   aiPreviewEnabled?: boolean;
   subscriptionEndsAt: string | null;
   /** AI cards per month; null — the server default. */
   aiMonthlyLimit?: number | null;
+  /** AI previews and cards bought in packages and not spent yet. */
+  extraPreviews?: number;
+  extraFills?: number;
   /** Computed by the server for the owner and admin panels. */
   subscription?: SubscriptionInfo;
   createdAt: string;
@@ -155,10 +158,13 @@ export interface Payment {
   method: PaymentMethod;
   comment: string | null;
   periodStart: string | null;
-  periodEnd: string;
+  /** The new paid date; null for a package — it extends nothing. */
+  periodEnd: string | null;
   createdBy: string | null;
   /** Receipt link («Мой налог») or number. */
   receipt: string | null;
+  /** A package sale: its name (months is 0 then); null — a subscription extension. */
+  packageName: string | null;
   createdAt: string;
 }
 
@@ -181,8 +187,12 @@ export interface MonthReport {
 
 export interface AiStatus {
   enabled: boolean;
+  /** Cards of the plan's month. */
   used: number;
   limit: number;
+  /** Left from packages: spent after the month's cards, don't burn at its end. */
+  extraPreviews: number;
+  extraFills: number;
 }
 
 export interface SupportContacts {
@@ -198,9 +208,13 @@ export interface OwnerSubscription {
   plan: { name: string; price: number | null; aiEnabled: boolean; aiMonthlyLimit: number | null } | null;
   graceDays: number;
   ai: AiStatus;
-  payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "receipt" | "createdAt">[];
+  payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "receipt" | "packageName" | "createdAt">[];
   reports: MonthReport[];
   support: SupportContacts;
+  /** Packages the owner can ask for. */
+  packages: PublicPackage[];
+  /** The store's requests and purchases, newest first. */
+  orders: Omit<PackageOrder, "storeId" | "paymentId">[];
 }
 
 /** One store in the admin overview. */
@@ -220,7 +234,7 @@ export interface OverviewStore {
   subscription: SubscriptionInfo;
   productCount: number;
   visibleProductCount: number;
-  ai: { used: number; limit: number };
+  ai: { used: number; limit: number; extraPreviews: number; extraFills: number };
   contactsThisMonth: number;
 }
 
@@ -239,6 +253,10 @@ export interface AdminOverview {
   moderationPending: number;
   /** The last copy failed, or there has been none for over a day. */
   backupProblem: { kind: "failed" | "stale"; at: string | null; error: string | null } | null;
+  /** Owners asking for a package: take the money or turn it down. */
+  packageRequests: OpenPackageOrder[];
+  /** Paid packages with a service still to do. */
+  packageServices: OpenPackageOrder[];
   inactiveDays: number;
 }
 
@@ -272,6 +290,57 @@ export interface AdminPlan extends Plan {
   storeCount: number;
 }
 
+/** What a package card shows. */
+export interface PackageView {
+  name: string;
+  /** Rubles, once. */
+  price: number;
+  description: string;
+  /** AI previews it adds. */
+  previews: number;
+  /** AI cards it adds. */
+  fills: number;
+  /** The admin does something by hand after payment. */
+  isService: boolean | number;
+}
+
+/** A package on the landing and on the owner's «Подписка». */
+export interface PublicPackage extends PackageView {
+  id: string;
+  isService: boolean;
+}
+
+/** GET /admin/packages — with whether it's shown and how many times it was sold. */
+export interface AdminPackage extends PackageView {
+  id: string;
+  isService: number;
+  isPublic: number;
+  sortOrder: number;
+  soldCount: number;
+}
+
+export type PackageOrderStatus = "REQUESTED" | "PAID" | "DONE" | "DECLINED" | "CANCELLED";
+
+/** An owner's request for a package or a sale: a copy of the package as it was. */
+export interface PackageOrder extends PackageView {
+  id: string;
+  storeId: string;
+  packageId: string | null;
+  isService: number;
+  status: PackageOrderStatus;
+  paymentId: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  doneAt: string | null;
+}
+
+/** A request or a service to do, with its store — for «Нужно сделать сейчас». */
+export interface OpenPackageOrder extends PackageOrder {
+  storeName: string;
+  ownerName: string;
+  ownerPhone: string | null;
+}
+
 export interface HelpVideo {
   title: string;
   url: string;
@@ -298,6 +367,8 @@ export interface Legal {
 export interface SiteSettings {
   /** Plans shown on the landing, in order. */
   plans: PublicPlan[];
+  /** Packages bought on top of a plan, in order. */
+  packages: PublicPackage[];
   /** «Посмотреть пример» on the landing; empty — no button. */
   demoStoreSlug: string;
   /** «Написать нам» on the landing. */
@@ -314,8 +385,8 @@ export interface TrialPeriod {
   unit: "days" | "months";
 }
 
-/** GET/PUT /admin/settings — contacts, videos, requisites, the trial, AI. Plans are separate (/admin/plans). */
-export interface Settings extends Omit<SiteSettings, "plans"> {
+/** GET/PUT /admin/settings — contacts, videos, requisites, the trial, AI. Plans and packages are separate (/admin/plans, /admin/packages). */
+export interface Settings extends Omit<SiteSettings, "plans" | "packages"> {
   /** Who owners write or call: «Помощь» and «Подписка и итоги». */
   support: { whatsapp: string; phone: string; telegram: string };
   trial: TrialPeriod;

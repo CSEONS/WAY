@@ -17,7 +17,12 @@ export type AuditAction =
   | "IMAGE_APPROVED"
   | "IMAGE_REJECTED"
   | "PLAN_SAVED"
-  | "PLAN_DELETED";
+  | "PLAN_DELETED"
+  | "PACKAGE_SAVED"
+  | "PACKAGE_DELETED"
+  | "PACKAGE_SOLD"
+  | "PACKAGE_DONE"
+  | "PACKAGE_DECLINED";
 
 export interface AuditTarget {
   type: "store" | "owner" | "payment";

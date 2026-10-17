@@ -42,6 +42,8 @@ test("новая база: два тарифа — без ИИ и с ИИ, у в
       ["ai", "Витрина + ИИ", 1, 100, 1]
     ]
   );
+  // Filling products in for the owner is a paid package, not a plan feature.
+  assert.ok(!list.some((plan) => plan.features.some((feature) => /Поможем/.test(feature))));
   assert.deepEqual((await plans.publicPlans()).map((plan) => [plan.name, plan.aiMonthlyLimit, plan.highlighted]), [
     ["Витрина", null, false],
     ["Витрина + ИИ", 100, true]

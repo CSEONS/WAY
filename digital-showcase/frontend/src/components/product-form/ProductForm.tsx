@@ -271,7 +271,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
 
       <ImageManager
         manager={imageManager}
-        onCreatePreview={aiFormEnabled && aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
+        onCreatePreview={aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
         previewLabel={
           previewDrawing.isDrawing
             ? `Рисуем превью… ${previewDrawing.seconds} с`

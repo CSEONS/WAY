@@ -2,6 +2,7 @@ import {
   AiMagicIcon,
   ArrowRight01Icon,
   Call02Icon,
+  Cancel01Icon,
   ContactBookIcon,
   DatabaseRestoreIcon,
   HourglassIcon,
@@ -15,21 +16,25 @@ import {
   PlayCircleIcon,
   PlusSignIcon,
   Settings02Icon,
+  ShoppingBasketAdd01Icon,
   Store01Icon,
   StoreRemove01Icon,
   Tag01Icon,
+  TaskDone01Icon,
   UserAccountIcon
 } from "@hugeicons/core-free-icons";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
 import { AiProviderCard } from "../components/admin/AiProviderCard";
 import { AiSpendTab } from "../components/admin/AiSpendTab";
 import { BackupCard } from "../components/admin/BackupCard";
+import { SellPackageModal } from "../components/admin/SellPackageModal";
+import { packageSummary } from "../components/landing/PackageCard";
 import { useSiteSettings } from "../state/siteSettings";
-import type { AdminOverview, Lead, OverviewStore } from "../types/models";
-import { formatDate, formatLastSeen, plural } from "../utils/format";
+import type { AdminOverview, Lead, OpenPackageOrder, OverviewStore } from "../types/models";
+import { formatDate, formatLastSeen, formatMoney, plural } from "../utils/format";
 import { phoneUrl } from "../utils/contact";
 import { subscriptionBadge } from "../utils/subscription";
 import {
@@ -46,6 +51,7 @@ import {
   PageHeader,
   SegmentedControl,
   Stat,
+  useToast,
   type IconSvgElement
 } from "../ui";
 import styles from "./AdminPage.module.css";
@@ -58,7 +64,7 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/leads", label: "Заявки с сайта", icon: InboxIcon },
   { to: "/admin/journal", label: "Журнал действий", icon: Note01Icon },
   { to: "/admin/moderation", label: "Проверка фото", icon: ImageNotFound01Icon },
-  { to: "/admin/plans", label: "Тарифы и цены", icon: Tag01Icon },
+  { to: "/admin/plans", label: "Тарифы, пакеты и цены", icon: Tag01Icon },
   { to: "/admin/contacts", label: "Контакты", icon: ContactBookIcon },
   { to: "/admin/videos", label: "Видеоинструкции", icon: PlayCircleIcon },
   { to: "/admin/legal", label: "Реквизиты", icon: LegalDocument01Icon },
@@ -66,6 +72,9 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
 ];
 
 type PayTarget = Pick<OverviewStore, "id" | "name" | "subscriptionEndsAt" | "subscription" | "planId">;
+
+/** «Продать пакет»: a store (with what packages left it), and the owner's request when it's paid from one. */
+type SellTarget = { store: { id: string; name: string; extraPreviews?: number; extraFills?: number }; order?: OpenPackageOrder };
 
 type Tab = "overview" | "stores" | "ai" | "system" | "sections";
 
@@ -88,6 +97,8 @@ export function AdminPage() {
   const [overview, setOverview] = useState<AdminOverview>();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
+  const [sellTarget, setSellTarget] = useState<SellTarget | null>(null);
+  const toast = useToast();
   // The privacy policy promises to delete a store's data this long after the paid date (admin panel → «Реквизиты»).
   const keepDataDays = useSiteSettings()?.legal.keepDataDays ?? 90;
 
@@ -102,6 +113,23 @@ export function AdminPage() {
   }
 
   useEffect(load, []);
+
+  /** «Отклонить» a request or «Выполнено» for a paid service. */
+  async function closeOrder(order: OpenPackageOrder, action: "decline" | "done") {
+    try {
+      await api.post(`/admin/package-orders/${order.id}/${action}`);
+      toast.show(action === "done" ? `«${order.name}» для «${order.storeName}» — выполнено` : `Запрос «${order.name}» отклонён`, { tone: "success" });
+      load();
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не получилось", { tone: "danger" });
+    }
+  }
+
+  /** Sell from a request: the store's balance comes from the overview row. */
+  function sellFromRequest(order: OpenPackageOrder) {
+    const store = overview?.stores.find((item) => item.id === order.storeId);
+    setSellTarget({ store: { id: order.storeId, name: order.storeName, ...store?.ai }, order });
+  }
 
   function openTab(value: Tab) {
     setParams(value === "overview" ? {} : { tab: value }, { replace: true });
@@ -149,6 +177,8 @@ export function AdminPage() {
     overview.latestLeads.length +
     overview.expiring.length +
     dataToDelete.length +
+    overview.packageRequests.length +
+    overview.packageServices.length +
     (overview.backupProblem ? 1 : 0) +
     (overview.moderationPending ? 1 : 0);
 
@@ -163,6 +193,29 @@ export function AdminPage() {
           <AttentionGroup title="Ждут оплаты — витрина ещё видна покупателям" stores={awaitingPayment} onPay={setPayTarget} />
           <AttentionGroup title="Просрочено — витрина закрыта" stores={pastDueToCall} onPay={setPayTarget} />
           <LeadGroup leads={overview.latestLeads} total={overview.newLeads} />
+          <PackageGroup
+            title="Просят пакет — примите оплату"
+            orders={overview.packageRequests}
+            actions={(order) => (
+              <>
+                <Button variant="secondary" size="sm" icon={ShoppingBasketAdd01Icon} onClick={() => sellFromRequest(order)}>
+                  Оплачено
+                </Button>
+                <Button variant="ghost" size="sm" icon={Cancel01Icon} onClick={() => closeOrder(order, "decline")}>
+                  Отклонить
+                </Button>
+              </>
+            )}
+          />
+          <PackageGroup
+            title="Оплачено — сделайте услугу"
+            orders={overview.packageServices}
+            actions={(order) => (
+              <Button variant="secondary" size="sm" icon={TaskDone01Icon} onClick={() => closeOrder(order, "done")}>
+                Выполнено
+              </Button>
+            )}
+          />
           {overview.moderationPending > 0 && (
             <Notice
               tone="warning"
@@ -213,7 +266,12 @@ export function AdminPage() {
             {overview.stores.length ? (
               <div className={styles.storeList}>
                 {overview.stores.map((store) => (
-                  <StoreRow key={store.id} store={store} onPay={() => setPayTarget(store)} />
+                  <StoreRow
+                    key={store.id}
+                    store={store}
+                    onPay={() => setPayTarget(store)}
+                    onSell={() => setSellTarget({ store: { id: store.id, name: store.name, ...store.ai } })}
+                  />
                 ))}
               </div>
             ) : (
@@ -252,6 +310,18 @@ export function AdminPage() {
             ))}
           </nav>
         </Card>
+      )}
+
+      {sellTarget && (
+        <SellPackageModal
+          store={sellTarget.store}
+          order={sellTarget.order}
+          onClose={() => setSellTarget(null)}
+          onSold={() => {
+            setSellTarget(null);
+            load();
+          }}
+        />
       )}
 
       {payTarget && (
@@ -343,6 +413,32 @@ function LeadGroup({ leads, total }: { leads: Lead[]; total: number }) {
   );
 }
 
+/** Package requests to take money for, or paid services to do: who, what, and the buttons for it. */
+function PackageGroup({ title, orders, actions }: { title: string; orders: OpenPackageOrder[]; actions: (order: OpenPackageOrder) => ReactNode }) {
+  if (!orders.length) return null;
+  return (
+    <div className={styles.group}>
+      <h3 className={styles.groupTitle}>
+        {title} <span className={styles.groupCount}>{orders.length}</span>
+      </h3>
+      {orders.map((order) => (
+        <div key={order.id} className={styles.attentionRow}>
+          <div className={styles.rowText}>
+            <strong>
+              {order.storeName} · «{order.name}»
+            </strong>
+            <small>{[order.ownerName, formatMoney(order.price), packageSummary(order), formatDate(order.paidAt ?? order.createdAt)].filter(Boolean).join(" · ")}</small>
+          </div>
+          <div className={styles.rowActions}>
+            {order.ownerPhone && <CallButton phone={order.ownerPhone} />}
+            {actions(order)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** A failed copy, or none for a day: the data are at risk until a copy works. */
 function BackupAlert({ problem, onOpen }: { problem: NonNullable<AdminOverview["backupProblem"]>; onOpen: () => void }) {
   const action = (
@@ -372,7 +468,8 @@ function CallButton({ phone }: { phone: string }) {
   );
 }
 
-function StoreRow({ store, onPay }: { store: OverviewStore; onPay: () => void }) {
+function StoreRow({ store, onPay, onSell }: { store: OverviewStore; onPay: () => void; onSell: () => void }) {
+  const extra = [store.ai.extraFills ? `+${store.ai.extraFills} карточек` : "", store.ai.extraPreviews ? `+${store.ai.extraPreviews} превью` : ""].filter(Boolean).join(", ");
   const badge = subscriptionBadge(store.subscription);
   return (
     <div className={styles.storeRow}>
@@ -397,16 +494,22 @@ function StoreRow({ store, onPay }: { store: OverviewStore; onPay: () => void })
           <Icon icon={Call02Icon} size="xs" />
           {store.contactsThisMonth} {plural(store.contactsThisMonth, ["обращение", "обращения", "обращений"])} за месяц
         </span>
-        {Boolean(store.aiFormEnabled) && (
-          <span className={store.ai.used >= store.ai.limit ? styles.aiOver : undefined}>
+        {(Boolean(store.aiFormEnabled) || extra) && (
+          <span className={store.ai.used >= store.ai.limit && !extra ? styles.aiOver : undefined}>
             <Icon icon={AiMagicIcon} size="xs" />
             ИИ {store.ai.used} из {store.ai.limit}
+            {extra && ` · из пакетов ${extra}`}
           </span>
         )}
       </div>
-      <Button variant="secondary" size="sm" icon={Money03Icon} onClick={onPay} className={styles.payButton}>
-        Продлить
-      </Button>
+      <div className={styles.payButton}>
+        <Button variant="secondary" size="sm" icon={Money03Icon} onClick={onPay}>
+          Продлить
+        </Button>
+        <Button variant="ghost" size="sm" icon={ShoppingBasketAdd01Icon} onClick={onSell}>
+          Пакет
+        </Button>
+      </div>
     </div>
   );
 }

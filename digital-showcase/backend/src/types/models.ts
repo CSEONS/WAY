@@ -35,6 +35,9 @@ export interface Store {
   subscriptionEndsAt: string | null;
   /** AI cards per calendar month; null — the plan's limit. */
   aiMonthlyLimit: number | null;
+  /** AI previews and AI cards bought in packages and not spent yet; they don't burn at the month's end. */
+  extraPreviews: number;
+  extraFills: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,10 +126,12 @@ export interface Payment {
   months: number;
   method: PaymentMethod;
   comment: string | null;
-  /** Subscription end before this payment (null — there was none). */
+  /** Subscription end before this payment (null — there was none, or it's a package). */
   periodStart: string | null;
-  /** Subscription end after this payment. */
-  periodEnd: string;
+  /** Subscription end after this payment; null for a package — it extends nothing. */
+  periodEnd: string | null;
+  /** A package sale: its name. Then months is 0. Null — a subscription extension. */
+  packageName: string | null;
   createdBy: string | null;
   /** Receipt link («Мой налог») or number; null — not issued yet. */
   receipt: string | null;

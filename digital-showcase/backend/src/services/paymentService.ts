@@ -25,8 +25,7 @@ export async function acceptPayment(storeId: string, input: PaymentInput, adminI
   if (!store) throw new HttpError(404, "Магазин не найден");
 
   const periodEnd = addMonths(extensionBase(store), input.months).toISOString();
-  const payment: Payment = {
-    id: crypto.randomUUID(),
+  const payment = await insertPayment({
     storeId,
     storeName: store.name,
     amount: input.amount,
@@ -37,12 +36,20 @@ export async function acceptPayment(storeId: string, input: PaymentInput, adminI
     periodEnd,
     createdBy: adminId,
     receipt: input.receipt?.trim() || null,
+    packageName: null,
     createdAt: new Date().toISOString()
-  };
+  });
+  const updated = await updateStore(storeId, { subscriptionEndsAt: periodEnd, isActive: 1 });
+  return { payment, store: updated! };
+}
+
+/** Writes a payment as given: an extension above, a package sale in packageService. */
+export async function insertPayment(fields: Omit<Payment, "id">) {
+  const payment: Payment = { id: crypto.randomUUID(), ...fields };
   const db = await getDb();
   await db.run(
-    `INSERT INTO payments (id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, receipt, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO payments (id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, receipt, packageName, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     payment.id,
     payment.storeId,
     payment.storeName,
@@ -54,15 +61,17 @@ export async function acceptPayment(storeId: string, input: PaymentInput, adminI
     payment.periodEnd,
     payment.createdBy,
     payment.receipt,
+    payment.packageName,
     payment.createdAt
   );
-  const updated = await updateStore(storeId, { subscriptionEndsAt: periodEnd, isActive: 1 });
-  return { payment, store: updated! };
+  return payment;
 }
 
 /**
  * A payment entered by mistake. If it is the latest extension of the store,
- * the paid date goes back to what it was before; otherwise only the record is removed.
+ * the paid date goes back to what it was before; otherwise only the record is
+ * removed. A package sale extended nothing: what it gave is taken back by
+ * packageService.returnPackage.
  */
 export async function cancelPayment(paymentId: string) {
   const db = await getDb();
@@ -70,7 +79,7 @@ export async function cancelPayment(paymentId: string) {
   if (!payment) throw new HttpError(404, "Оплата не найдена");
 
   const store = await getStore(payment.storeId);
-  const rolledBack = Boolean(store && store.subscriptionEndsAt === payment.periodEnd);
+  const rolledBack = Boolean(store && !payment.packageName && store.subscriptionEndsAt === payment.periodEnd);
   await db.run("DELETE FROM payments WHERE id = ?", paymentId);
   if (store && rolledBack) await updateStore(store.id, { subscriptionEndsAt: payment.periodStart });
   return { payment, rolledBack };

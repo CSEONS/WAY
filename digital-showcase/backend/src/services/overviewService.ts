@@ -4,6 +4,7 @@ import { aiSettings, previewSettings } from "./aiProvider.js";
 import { monthlyLimit, monthSpend, monthStart, usageByStore } from "./aiUsageService.js";
 import { backupSettings, lastSuccessfulBackup, listBackupRuns } from "./backupService.js";
 import { countPending } from "./imageModerationService.js";
+import { openOrders } from "./packageService.js";
 import { planOf } from "./planService.js";
 import { revenueByMonth } from "./paymentService.js";
 import { subscriptionInfo } from "./subscriptionService.js";
@@ -23,7 +24,7 @@ type StoreWithOwner = Store & { ownerName: string; ownerPhone: string | null; ow
 /** Everything the admin panel's first screen needs, in one request. */
 export async function adminOverview(now = new Date()) {
   const db = await getDb();
-  const [stores, products, aiUsage, aiSpend, contacts, revenue, newLeads, latestLeads, backup, moderationPending] = await Promise.all([
+  const [stores, products, aiUsage, aiSpend, contacts, revenue, newLeads, latestLeads, backup, moderationPending, packageOrders] = await Promise.all([
     db.all<StoreWithOwner>(
       "SELECT s.*, u.name as ownerName, u.phone as ownerPhone, u.lastSeenAt as ownerLastSeenAt FROM stores s JOIN users u ON u.id = s.ownerId"
     ),
@@ -38,7 +39,8 @@ export async function adminOverview(now = new Date()) {
     db.get<{ count: number }>("SELECT COUNT(*) as count FROM leads WHERE status = 'NEW'"),
     db.all<Lead>("SELECT * FROM leads WHERE status = 'NEW' ORDER BY createdAt DESC LIMIT ?", LATEST_LEADS),
     backupProblem(now),
-    countPending()
+    countPending(),
+    openOrders()
   ]);
 
   const inactiveSince = now.getTime() - INACTIVE_DAYS * DAY_MS;
@@ -63,7 +65,7 @@ export async function adminOverview(now = new Date()) {
         subscription: subscriptionInfo(store, now.getTime()),
         productCount: productRow?.total ?? 0,
         visibleProductCount: productRow?.visible ?? 0,
-        ai: { used: usage?.units ?? 0, limit: monthlyLimit(store) },
+        ai: { used: usage?.planUnits ?? 0, limit: monthlyLimit(store), extraPreviews: store.extraPreviews, extraFills: store.extraFills },
         contactsThisMonth: contacts.find((row) => row.storeId === store.id)?.count ?? 0
       };
     })
@@ -82,6 +84,10 @@ export async function adminOverview(now = new Date()) {
     backupProblem: backup,
     /** Photos with living beings waiting for moderation: hidden from buyers until then. */
     moderationPending,
+    /** Owners asking for a package: take the money (or turn it down). */
+    packageRequests: packageOrders.filter((order) => order.status === "REQUESTED"),
+    /** Paid packages with a service still to do. */
+    packageServices: packageOrders.filter((order) => order.status === "PAID"),
     inactiveDays: INACTIVE_DAYS
   };
 }

@@ -12,6 +12,8 @@ ownerRoutes.patch("/stores/:storeId", controller.updateStore);
 ownerRoutes.post("/stores/:storeId/logo", upload.single("logo"), controller.updateStoreLogo);
 ownerRoutes.get("/stores/:storeId/analytics", controller.getAnalytics);
 ownerRoutes.get("/stores/:storeId/subscription", controller.getSubscription);
+ownerRoutes.post("/stores/:storeId/packages/:packageId/request", controller.requestPackage);
+ownerRoutes.delete("/stores/:storeId/package-orders/:orderId", controller.withdrawPackageRequest);
 ownerRoutes.get("/stores/:storeId/products", controller.listProducts);
 ownerRoutes.post("/stores/:storeId/products/ai-draft", aiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 8 }]), controller.createProductDraft);
 ownerRoutes.post("/stores/:storeId/products/bulk-ai-draft", bulkAiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 40 }]), controller.createBulkProductDraft);

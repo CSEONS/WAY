@@ -3,6 +3,11 @@
   gap: var(--space-5);
 }
 
+/* In a row of cards a part may get a taller row than it needs: it stays at the top instead of spreading its lines. */
+.plan > * {
+  align-self: start;
+}
+
 .highlighted {
   border-color: var(--color-accent);
   box-shadow: var(--focus-ring);
@@ -48,6 +53,11 @@
   color: var(--color-ink);
   font-size: var(--font-size-md);
   list-style: none;
+}
+
+/* No features and nothing under them (the preview while editing): no empty space at the bottom. */
+.features:empty:last-child {
+  display: none;
 }
 
 .features li {

@@ -204,6 +204,16 @@
   gap: var(--space-4);
 }
 
+/*
+ * Cards side by side line up part by part: titles, prices, lists and buttons
+ * each start on one line, however long the description or the list. Each
+ * PlanCard is four parts and takes four rows of this grid.
+ */
+.plans > * {
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+}
+
 @media (min-width: 720px) {
   .plans {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -27,6 +27,9 @@ export interface Store {
   /** Free text, e.g. «Ежедневно 10:00–20:00». */
   workingHours: string | null;
   isActive: number;
+  /** The store's plan («Тарифы и цены»). */
+  planId: string | null;
+  /** AI helper on: follows the plan. */
   aiFormEnabled: number;
   /** GET /owner/stores/:id only: the server draws «Превью с ИИ». */
   aiPreviewEnabled?: boolean;
@@ -191,6 +194,8 @@ export interface SupportContacts {
 /** GET /owner/stores/:id/subscription */
 export interface OwnerSubscription {
   subscription: SubscriptionInfo;
+  /** The store's plan; null if it has none. */
+  plan: { name: string; price: number | null; aiEnabled: boolean; aiMonthlyLimit: number | null } | null;
   graceDays: number;
   ai: AiStatus;
   payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "receipt" | "createdAt">[];
@@ -209,6 +214,8 @@ export interface OverviewStore {
   ownerLastSeenAt: string | null;
   isActive: number;
   aiFormEnabled: number;
+  planId: string | null;
+  planName: string | null;
   subscriptionEndsAt: string | null;
   subscription: SubscriptionInfo;
   productCount: number;
@@ -235,12 +242,34 @@ export interface AdminOverview {
   inactiveDays: number;
 }
 
+/** What a plan card shows. */
 export interface Plan {
   name: string;
   /** Rubles a month; null — «Цена по запросу». */
   price: number | null;
   description: string;
   features: string[];
+}
+
+/** A plan on the landing (GET /public/site). */
+export interface PublicPlan extends Plan {
+  id: string;
+  /** The plan most people should pick: accented. */
+  highlighted: boolean;
+  /** «До N карточек с ИИ в месяц»; null — no AI. */
+  aiMonthlyLimit: number | null;
+}
+
+/** GET /admin/plans — a plan with what it unlocks and how many stores are on it. */
+export interface AdminPlan extends Plan {
+  id: string;
+  aiEnabled: number;
+  aiMonthlyLimit: number | null;
+  highlighted: number;
+  /** Shown on the landing; a hidden plan still works for its stores. */
+  isPublic: number;
+  sortOrder: number;
+  storeCount: number;
 }
 
 export interface HelpVideo {
@@ -267,10 +296,8 @@ export interface Legal {
 
 /** GET /public/site — the part of «Настройки» any visitor sees. */
 export interface SiteSettings {
-  /** «Витрина» and «Витрина + ИИ» — the two plans a store can be on. */
-  plans: { basic: Plan; ai: Plan };
-  /** AI cards a month on «Витрина + ИИ». */
-  aiMonthlyLimit: number;
+  /** Plans shown on the landing, in order. */
+  plans: PublicPlan[];
   /** «Посмотреть пример» on the landing; empty — no button. */
   demoStoreSlug: string;
   /** «Написать нам» on the landing. */
@@ -281,11 +308,17 @@ export interface SiteSettings {
 
 export type PreviewQuality = "low" | "medium" | "high";
 
-/** GET/PUT /admin/settings — everything on «Настройки». */
-export interface Settings extends SiteSettings {
+/** A free period: so many days or calendar months. */
+export interface TrialPeriod {
+  count: number;
+  unit: "days" | "months";
+}
+
+/** GET/PUT /admin/settings — contacts, videos, requisites, the trial, AI. Plans are separate (/admin/plans). */
+export interface Settings extends Omit<SiteSettings, "plans"> {
   /** Who owners write or call: «Помощь» and «Подписка и итоги». */
   support: { whatsapp: string; phone: string; telegram: string };
-  trialDays: number;
+  trial: TrialPeriod;
   aiPreviewUnits: number;
   aiModel: string;
   aiPreviewEnabled: boolean;

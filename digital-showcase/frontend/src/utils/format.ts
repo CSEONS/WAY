@@ -12,6 +12,11 @@ export function sortSizes(sizes: string[]) {
 }
 
 /** Russian plural: plural(3, ["раз", "раза", "раз"]) → «раза». Forms: one, few, many. */
+/** «14 дней», «1 месяц» — a trial period. */
+export function formatTrial(trial: { count: number; unit: "days" | "months" }) {
+  return `${trial.count} ${plural(trial.count, trial.unit === "months" ? ["месяц", "месяца", "месяцев"] : ["день", "дня", "дней"])}`;
+}
+
 export function plural(count: number, [one, few, many]: [string, string, string]) {
   const mod10 = count % 10;
   const mod100 = count % 100;

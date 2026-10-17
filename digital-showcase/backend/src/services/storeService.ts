@@ -4,7 +4,8 @@ import { HttpError } from "../utils/http.js";
 import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "../utils/slug.js";
 import { deleteStoredImage, storeProductImage, type UploadedImage } from "./imageService.js";
 import { forgetImage } from "./imageModerationService.js";
-import { addDays, isStorefrontOpen, trialDays } from "./subscriptionService.js";
+import { resolvePlan } from "./planService.js";
+import { isStorefrontOpen, trialEnd } from "./subscriptionService.js";
 
 /** Buyers can open the storefront (paid, or within the grace days after the paid date). */
 export function isSubscriptionValid(store: Store) {
@@ -47,16 +48,21 @@ export async function getStoreBySlug(slug: string) {
   return db.get<Store>("SELECT * FROM stores WHERE slug = ?", slug);
 }
 
-/** A store without a paid date gets the trial period, so nobody runs for free forever by accident. */
+/**
+ * A store without a paid date gets the trial period, so nobody runs for free
+ * forever by accident. Without a chosen plan it gets the first one (with or
+ * without AI if only aiFormEnabled is given); the AI switch follows the plan.
+ */
 export async function createStore(input: Partial<Store> & { ownerId: string; name: string; slug: string }) {
   const slug = input.slug.trim().toLowerCase();
   await assertSlugAvailable(slug);
+  const plan = resolvePlan(input.planId, input.aiFormEnabled === undefined ? undefined : Boolean(input.aiFormEnabled));
   const db = await getDb();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   await db.run(
-    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, workingHours, isActive, aiFormEnabled, subscriptionEndsAt, aiMonthlyLimit, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, workingHours, isActive, planId, aiFormEnabled, subscriptionEndsAt, aiMonthlyLimit, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.ownerId,
     input.name,
@@ -69,8 +75,9 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
     input.logoUrl ?? null,
     input.workingHours ?? null,
     input.isActive ?? 1,
-    input.aiFormEnabled ?? 0,
-    input.subscriptionEndsAt || addDays(new Date(), trialDays()).toISOString(),
+    plan.id,
+    plan.aiEnabled,
+    input.subscriptionEndsAt || trialEnd().toISOString(),
     input.aiMonthlyLimit ?? null,
     now,
     now
@@ -78,15 +85,17 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
   return getStore(id);
 }
 
+/** A new planId moves the store to that plan, AI switch included; aiFormEnabled itself isn't set here. */
 export async function updateStore(id: string, input: Partial<Store>) {
   const current = await getStore(id);
   if (!current) return null;
+  const plan = input.planId && input.planId !== current.planId ? resolvePlan(input.planId) : null;
   const slug = input.slug?.trim().toLowerCase() || current.slug;
   if (slug !== current.slug) await assertSlugAvailable(slug, id);
   const db = await getDb();
   await db.run(
     `UPDATE stores SET ownerId = ?, name = ?, slug = ?, description = ?, address = ?, phone = ?, whatsapp = ?, telegram = ?,
-     logoUrl = ?, workingHours = ?, isActive = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, aiMonthlyLimit = ?, updatedAt = ? WHERE id = ?`,
+     logoUrl = ?, workingHours = ?, isActive = ?, planId = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, aiMonthlyLimit = ?, updatedAt = ? WHERE id = ?`,
     input.ownerId ?? current.ownerId,
     input.name ?? current.name,
     slug,
@@ -98,7 +107,8 @@ export async function updateStore(id: string, input: Partial<Store>) {
     field(input, "logoUrl", current.logoUrl),
     field(input, "workingHours", current.workingHours),
     input.isActive ?? current.isActive,
-    input.aiFormEnabled ?? current.aiFormEnabled,
+    plan?.id ?? current.planId,
+    plan ? plan.aiEnabled : current.aiFormEnabled,
     field(input, "subscriptionEndsAt", current.subscriptionEndsAt),
     field(input, "aiMonthlyLimit", current.aiMonthlyLimit),
     new Date().toISOString(),

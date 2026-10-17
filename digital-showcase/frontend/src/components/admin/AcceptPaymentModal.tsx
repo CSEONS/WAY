@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { api } from "../../api/client";
-import { useSiteSettings } from "../../state/siteSettings";
+import { useAdminPlans } from "../../state/adminPlans";
 import type { PaymentMethod, Store, SubscriptionInfo } from "../../types/models";
 import { formatDate, formatMoney } from "../../utils/format";
 import { Button, Field, Input, Modal, SegmentedControl, Select, Textarea, useToast } from "../../ui";
@@ -29,8 +29,8 @@ function previewEnd(endsAt: string | null | undefined, months: number) {
 }
 
 interface AcceptPaymentModalProps {
-  /** aiFormEnabled picks the plan whose price is suggested: «Витрина» or «Витрина + ИИ». */
-  store: { id: string; name: string; subscriptionEndsAt: string | null; subscription?: SubscriptionInfo; aiFormEnabled?: number | boolean };
+  /** planId: its price × the period is suggested as the sum. */
+  store: { id: string; name: string; subscriptionEndsAt: string | null; subscription?: SubscriptionInfo; planId?: string | null };
   onClose: () => void;
   onPaid: (store: Store) => void;
 }
@@ -48,9 +48,9 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
   const [isSaving, setIsSaving] = useState(false);
   const months = Number(period);
   const endsAt = previewEnd(store.subscriptionEndsAt, months);
-  // The plan's price from «Настройки» × the period, until the admin types another sum.
-  const site = useSiteSettings();
-  const plan = site && store.aiFormEnabled !== undefined ? (store.aiFormEnabled ? site.plans.ai : site.plans.basic) : null;
+  // The store's plan price × the period, until the admin types another sum.
+  const { plans } = useAdminPlans();
+  const plan = plans?.find((item) => item.id === store.planId) ?? null;
   const shownAmount = !amountTouched && plan?.price != null ? String(plan.price * months) : amount;
 
   async function submit(event: FormEvent) {

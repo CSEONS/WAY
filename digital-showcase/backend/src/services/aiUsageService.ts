@@ -3,6 +3,7 @@ import { getDb } from "../database/db.js";
 import type { Store } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
 import { requestCostUsd, rublesPerDollar } from "./aiPrices.js";
+import { planOf } from "./planService.js";
 import { settings } from "./settingsService.js";
 
 export type AiUsageKind = "DRAFT" | "BULK" | "PREVIEW";
@@ -35,10 +36,11 @@ export function reportTokens(usage: unknown, model?: string) {
   current.outputTokens += Number(output_tokens ?? completion_tokens) || 0;
 }
 
-/** AI cards a store may create per calendar month («Витрина + ИИ»): its own limit or the one on «Тарифы и цены». */
-export function monthlyLimit(store: Pick<Store, "aiMonthlyLimit">) {
+/** AI cards a store may create per calendar month: its own limit or its plan's; 0 on a plan without AI. */
+export function monthlyLimit(store: Pick<Store, "aiMonthlyLimit" | "planId">) {
   if (store.aiMonthlyLimit != null && store.aiMonthlyLimit >= 0) return store.aiMonthlyLimit;
-  return settings().aiMonthlyLimit;
+  const plan = planOf(store);
+  return plan?.aiEnabled ? (plan.aiMonthlyLimit ?? 0) : 0;
 }
 
 export function monthStart(now = new Date()) {
@@ -177,8 +179,8 @@ function monthKey(date: Date) {
 export async function spendReport(current: CurrentModels, now = new Date(), months = 6) {
   const db = await getDb();
   const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-  const rows = await db.all<UsageRow & { createdAt: string; storeId: string; storeName: string; aiMonthlyLimit: number | null }>(
-    `SELECT u.kind, u.units, u.inputTokens, u.outputTokens, u.model, u.createdAt, u.storeId, s.name as storeName, s.aiMonthlyLimit
+  const rows = await db.all<UsageRow & { createdAt: string; storeId: string; storeName: string; aiMonthlyLimit: number | null; planId: string | null }>(
+    `SELECT u.kind, u.units, u.inputTokens, u.outputTokens, u.model, u.createdAt, u.storeId, s.name as storeName, s.aiMonthlyLimit, s.planId
      FROM ai_usage u JOIN stores s ON s.id = u.storeId WHERE u.createdAt >= ?`,
     from.toISOString()
   );
@@ -209,7 +211,7 @@ export async function spendReport(current: CurrentModels, now = new Date(), mont
       cards: 0,
       previews: 0,
       used: 0,
-      limit: monthlyLimit({ aiMonthlyLimit: row.aiMonthlyLimit }),
+      limit: monthlyLimit({ aiMonthlyLimit: row.aiMonthlyLimit, planId: row.planId }),
       usd: 0
     };
     store.cards += isPreview ? 0 : row.units;

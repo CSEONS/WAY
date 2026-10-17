@@ -3,9 +3,10 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
-import type { Lead, Store, User } from "../types/models";
+import { useAdminPlans } from "../state/adminPlans";
+import type { Lead, Settings, Store, TrialPeriod, User } from "../types/models";
 import { whatsappUrl } from "../utils/contact";
-import { formatDate } from "../utils/format";
+import { formatDate, formatTrial } from "../utils/format";
 import {
   Button,
   ButtonLink,
@@ -18,16 +19,25 @@ import {
   Page,
   PageHeader,
   SegmentedControl,
+  Select,
   Textarea,
   useCopyToClipboard
 } from "../ui";
 import styles from "./AdminConnectPage.module.css";
 
-const trialOptions = [
-  { value: "0", label: "Нет" },
-  { value: "7", label: "7 дней" },
-  { value: "14", label: "14 дней" },
-  { value: "30", label: "30 дней" }
+/** «14:days», «1:months» — a trial as a choice value. */
+const trialKey = (trial: TrialPeriod) => `${trial.count}:${trial.unit}`;
+
+function parseTrialKey(key: string): TrialPeriod {
+  const [count, unit] = key.split(":");
+  return { count: Number(count), unit: unit === "months" ? "months" : "days" };
+}
+
+const baseTrialOptions: TrialPeriod[] = [
+  { count: 0, unit: "days" },
+  { count: 7, unit: "days" },
+  { count: 14, unit: "days" },
+  { count: 1, unit: "months" }
 ];
 
 const emptyForm = { ownerName: "", phone: "", email: "", storeName: "", slug: "", storePhone: "" };
@@ -67,9 +77,26 @@ export function AdminConnectPage() {
   const leadId = params.get("lead");
   const copy = useCopyToClipboard();
   const [form, setForm] = useState<Form>(emptyForm);
-  const [withAi, setWithAi] = useState(false);
-  const [trial, setTrial] = useState("14");
+  const { plans } = useAdminPlans();
+  const [planId, setPlanId] = useState("");
+  // The first plan shown on the landing — what a new client most likely asked about.
+  const defaultPlanId = plans?.find((plan) => plan.isPublic)?.id ?? plans?.[0]?.id ?? "";
+  const chosenPlan = plans?.find((plan) => plan.id === (planId || defaultPlanId));
+  // Empty — the trial from «Тарифы и цены»; it's also among the choices.
+  const [trial, setTrial] = useState("");
+  const [defaultTrial, setDefaultTrial] = useState<TrialPeriod>({ count: 14, unit: "days" });
+  const trialOptions = [...baseTrialOptions, ...(baseTrialOptions.some((item) => trialKey(item) === trialKey(defaultTrial)) ? [] : [defaultTrial])].map((item) => ({
+    value: trialKey(item),
+    label: item.count ? formatTrial(item) : "Нет"
+  }));
   const [slugState, setSlugState] = useState<SlugState>({ status: "idle" });
+
+  useEffect(() => {
+    api
+      .get<{ settings: Settings }>("/admin/settings")
+      .then((res) => setDefaultTrial(res.data.settings.trial))
+      .catch(() => undefined);
+  }, []);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [connected, setConnected] = useState<Connected | null>(null);
@@ -139,8 +166,8 @@ export function AdminConnectPage() {
         ...form,
         email: form.email || null,
         storePhone: form.storePhone || null,
-        withAi,
-        trialDays: Number(trial),
+        planId: planId || defaultPlanId || null,
+        trial: parseTrialKey(trial || trialKey(defaultTrial)),
         leadId
       });
       setConnected(data);
@@ -155,8 +182,8 @@ export function AdminConnectPage() {
   function startOver() {
     setConnected(null);
     setForm(emptyForm);
-    setWithAi(false);
-    setTrial("14");
+    setPlanId("");
+    setTrial("");
     setSlugState({ status: "idle" });
     slugTouched.current = false;
   }
@@ -263,18 +290,21 @@ export function AdminConnectPage() {
 
         <Card as="section" padding="lg" className={styles.section}>
           <CardHeader title="Тариф" />
-          <SegmentedControl
-            label="Тариф"
-            value={withAi ? "ai" : "basic"}
-            onChange={(value) => setWithAi(value === "ai")}
-            options={[
-              { value: "basic", label: "Витрина" },
-              { value: "ai", label: "Витрина + ИИ" }
-            ]}
-          />
+          {plans && plans.length > 0 && (
+            <Field
+              label="Тариф"
+              hint={chosenPlan && `${chosenPlan.price != null ? `${chosenPlan.price.toLocaleString("ru-RU")} ₽ в месяц` : "Цена по запросу"} · ${chosenPlan.aiEnabled ? `ИИ: ${chosenPlan.aiMonthlyLimit} карточек в месяц` : "без ИИ"}`}
+            >
+              <Select
+                value={planId || defaultPlanId}
+                onChange={setPlanId}
+                options={plans.map((plan) => ({ value: plan.id, label: plan.isPublic ? plan.name : `${plan.name} (скрыт с лендинга)` }))}
+              />
+            </Field>
+          )}
           <div className={styles.group}>
             <span className={styles.groupLabel}>Пробный период</span>
-            <SegmentedControl label="Пробный период" value={trial} onChange={setTrial} options={trialOptions} />
+            <SegmentedControl label="Пробный период" value={trial || trialKey(defaultTrial)} onChange={setTrial} options={trialOptions} />
           </div>
         </Card>
 

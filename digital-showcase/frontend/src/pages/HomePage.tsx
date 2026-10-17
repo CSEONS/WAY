@@ -133,16 +133,18 @@ export function HomePage() {
         </div>
       </Section>
 
-      {site && (
+      {site && site.plans.length > 0 && (
         <Section id="pricing" eyebrow="Тарифы" title="Стоимость">
-          <div className={styles.plans}>
-            <PlanCard plan={site.plans.basic} action={<PlanButton price={site.plans.basic.price} />} />
-            <PlanCard
-              plan={site.plans.ai}
-              extra={site.aiMonthlyLimit > 0 ? `До ${site.aiMonthlyLimit} карточек с ИИ в месяц` : undefined}
-              highlighted
-              action={<PlanButton price={site.plans.ai.price} highlighted />}
-            />
+          <div className={styles.plans} data-count={Math.min(site.plans.length, 3)}>
+            {site.plans.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                extra={plan.aiMonthlyLimit ? `До ${plan.aiMonthlyLimit} карточек с ИИ в месяц` : undefined}
+                highlighted={plan.highlighted}
+                action={<PlanButton price={plan.price} highlighted={plan.highlighted} />}
+              />
+            ))}
           </div>
         </Section>
       )}

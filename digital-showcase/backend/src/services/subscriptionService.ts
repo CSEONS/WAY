@@ -1,5 +1,5 @@
 import type { Store } from "../types/models.js";
-import { settings } from "./settingsService.js";
+import { settings, type TrialPeriod } from "./settingsService.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -8,9 +8,23 @@ export const GRACE_DAYS = 3;
 /** Warn the owner this many days before the paid date. */
 export const WARNING_DAYS = 7;
 
-/** Free period for a newly connected store («Тарифы и цены»). */
-export function trialDays() {
-  return settings().trialDays;
+/** Free period for a newly connected store («Тарифы и цены»): days or calendar months. */
+export function trialPeriod() {
+  return settings().trial;
+}
+
+/** When a trial starting `from` ends; months are calendar months (31 January + 1 = 28/29 February). */
+export function trialEnd(trial: TrialPeriod = trialPeriod(), from = new Date()) {
+  return trial.unit === "months" ? addMonths(from, trial.count) : addDays(from, trial.count);
+}
+
+/** «14 дней», «1 месяц» — for the journal. */
+export function trialLabel(trial: TrialPeriod) {
+  const forms = trial.unit === "months" ? ["месяц", "месяца", "месяцев"] : ["день", "дня", "дней"];
+  const mod10 = trial.count % 10;
+  const mod100 = trial.count % 100;
+  const form = mod10 === 1 && mod100 !== 11 ? forms[0] : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? forms[1] : forms[2];
+  return `${trial.count} ${form}`;
 }
 
 export type SubscriptionState =

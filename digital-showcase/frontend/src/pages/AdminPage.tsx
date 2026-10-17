@@ -65,7 +65,7 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/settings", label: "Настройки ИИ", icon: Settings02Icon }
 ];
 
-type PayTarget = Pick<OverviewStore, "id" | "name" | "subscriptionEndsAt" | "subscription" | "aiFormEnabled">;
+type PayTarget = Pick<OverviewStore, "id" | "name" | "subscriptionEndsAt" | "subscription" | "planId">;
 
 type Tab = "overview" | "stores" | "ai" | "system" | "sections";
 
@@ -388,6 +388,7 @@ function StoreRow({ store, onPay }: { store: OverviewStore; onPay: () => void })
       </div>
       <div className={styles.storeFacts}>
         <Badge tone={badge.tone}>{badge.label}</Badge>
+        {store.planName && <Badge tone={store.aiFormEnabled ? "accent" : "neutral"}>{store.planName}</Badge>}
         <span>
           <Icon icon={Package01Icon} size="xs" />
           {store.visibleProductCount} из {store.productCount} на витрине

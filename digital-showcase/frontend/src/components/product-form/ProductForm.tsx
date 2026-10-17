@@ -65,8 +65,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       isVisible: initial?.isVisible ?? 1
     }
   );
-  // A new product starts with the AI when the store has it: photos + voice is the easiest way in.
-  const [aiMode, setAiMode] = useState(aiFormEnabled && !initial && !savedDraft);
+  // A new product starts with the manual form; the AI is one tap away on the switch above it.
+  const [aiMode, setAiMode] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
   const [aiDraftApplied, setAiDraftApplied] = useState(false);
   const [aiFilled, setAiFilled] = useState<Set<AiField>>(new Set());

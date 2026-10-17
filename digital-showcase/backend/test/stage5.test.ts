@@ -130,21 +130,22 @@ test("мастер подключения создаёт владельца и �
   const slug = await suggestSlug("Бутик Лейла");
   assert.equal(slug, "butik-leyla");
   const result = await connectStore(
-    { ownerName: "Лейла", phone: "8 928 111-22-33", storeName: "Бутик Лейла", slug, withAi: true, trialDays: 7 },
+    { ownerName: "Лейла", phone: "8 928 111-22-33", storeName: "Бутик Лейла", slug, planId: "ai", trial: { count: 7, unit: "days" } },
     admin.id
   );
   assert.match(result.password, /^\d{8}$/);
+  assert.equal(result.store.planId, "ai");
   assert.equal(result.store.aiFormEnabled, 1);
   assert.equal(result.store.whatsapp, "8 928 111-22-33");
   assert.equal(await suggestSlug("Бутик Лейла"), "butik-leyla-2");
 
   const ownersBefore = (await db.get<{ count: number }>("SELECT COUNT(*) as count FROM users"))!.count;
   await assert.rejects(
-    connectStore({ ownerName: "Другой", phone: "+79281112233", storeName: "Дубль", slug: "other-shop", withAi: false, trialDays: 14 }, admin.id),
+    connectStore({ ownerName: "Другой", phone: "+79281112233", storeName: "Дубль", slug: "other-shop", trial: { count: 14, unit: "days" } }, admin.id),
     /уже используется/
   );
   await assert.rejects(
-    connectStore({ ownerName: "Третий", phone: "+79285556677", storeName: "Дубль", slug, withAi: false, trialDays: 14 }, admin.id),
+    connectStore({ ownerName: "Третий", phone: "+79285556677", storeName: "Дубль", slug, trial: { count: 1, unit: "months" } }, admin.id),
     /уже занят/
   );
   assert.equal((await db.get<{ count: number }>("SELECT COUNT(*) as count FROM users"))!.count, ownersBefore);
@@ -165,6 +166,20 @@ test("вход от имени владельца: короткая сессия
 
   await authService.me({ userId: owner.id, role: "OWNER" });
   assert.notEqual((await db.get<{ lastSeenAt: string | null }>("SELECT lastSeenAt FROM users WHERE id = ?", owner.id))!.lastSeenAt, null);
+});
+
+test("мастер подключения: пробный месяц — календарный, а не 30 дней", async () => {
+  const before = new Date();
+  const result = await connectStore(
+    { ownerName: "Месяц", phone: "+79287770000", storeName: "Пробный месяц", slug: "trial-month", trial: { count: 1, unit: "months" } },
+    admin.id
+  );
+  const endsAt = Date.parse(result.store.subscriptionEndsAt!);
+  assert.ok(Math.abs(endsAt - addMonths(before, 1).getTime()) < 60_000);
+  await assert.rejects(
+    connectStore({ ownerName: "Год", phone: "+79287770001", storeName: "Год", slug: "trial-year", trial: { count: 13, unit: "months" } }, admin.id),
+    /до 12 месяцев/
+  );
 });
 
 test("наверху админки: новые заявки и проблема с резервной копией", async () => {

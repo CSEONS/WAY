@@ -4,6 +4,7 @@ import { aiSettings, previewSettings } from "./aiProvider.js";
 import { monthlyLimit, monthSpend, monthStart, usageByStore } from "./aiUsageService.js";
 import { backupSettings, lastSuccessfulBackup, listBackupRuns } from "./backupService.js";
 import { countPending } from "./imageModerationService.js";
+import { planOf } from "./planService.js";
 import { revenueByMonth } from "./paymentService.js";
 import { subscriptionInfo } from "./subscriptionService.js";
 
@@ -56,6 +57,8 @@ export async function adminOverview(now = new Date()) {
         createdAt: store.createdAt,
         isActive: store.isActive,
         aiFormEnabled: store.aiFormEnabled,
+        planId: store.planId,
+        planName: planOf(store)?.name ?? null,
         subscriptionEndsAt: store.subscriptionEndsAt,
         subscription: subscriptionInfo(store, now.getTime()),
         productCount: productRow?.total ?? 0,

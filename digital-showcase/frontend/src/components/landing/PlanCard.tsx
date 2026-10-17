@@ -29,8 +29,9 @@ export function PlanCard({ plan, highlighted = false, extra, action }: { plan: P
       </p>
       {features.length > 0 && (
         <ul className={styles.features}>
-          {features.map((feature) => (
-            <li key={feature}>
+          {features.map((feature, index) => (
+            // Two lines may read the same: the position keeps React from mixing them up.
+            <li key={`${index}-${feature}`}>
               <Icon icon={CheckmarkCircle02Icon} size="sm" />
               {feature}
             </li>

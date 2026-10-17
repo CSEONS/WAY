@@ -20,8 +20,7 @@ process.env.SUPPORT_WHATSAPP = "+79280000000";
 const { closeDb, initDatabase } = await import("../src/database/db.js");
 const settingsService = await import("../src/services/settingsService.js");
 const { aiSettings, previewSettings } = await import("../src/services/aiProvider.js");
-const { monthlyLimit } = await import("../src/services/aiUsageService.js");
-const { trialDays } = await import("../src/services/subscriptionService.js");
+const { trialEnd, trialPeriod } = await import("../src/services/subscriptionService.js");
 const { parseBody, settingsSchema } = await import("../src/utils/validation.js");
 
 await initDatabase();
@@ -29,32 +28,22 @@ settingsService.loadSettings();
 
 test("пока админ ничего не сохранил, действуют старые значения из .env", () => {
   const current = settingsService.settings();
-  assert.equal(current.trialDays, 7);
+  assert.deepEqual(current.trial, { count: 7, unit: "days" });
   assert.equal(current.aiModel, "gpt-4o");
   assert.equal(current.aiPreviewEnabled, false);
   assert.equal(current.support.whatsapp, "+79280000000");
-  assert.equal(current.aiMonthlyLimit, 100);
   assert.equal(previewSettings(), null);
 });
 
-test("форма настроек: цены, курс и ссылки читаются как их вводят люди", () => {
-  const input = {
-    ...settingsService.settings(),
-    plans: {
-      basic: { name: "Витрина", price: "500", description: "", features: ["Ссылка на витрину"] },
-      ai: { name: "Витрина + ИИ", price: "1 000", description: "", features: [] }
-    },
-    aiRubPerUsd: "92,5",
-    trialDays: "14"
-  };
+test("форма настроек: курс и ссылки читаются как их вводят люди", () => {
+  const input = { ...settingsService.settings(), aiRubPerUsd: "92,5", trial: { count: "1", unit: "months" } };
   const parsed = parseBody(settingsSchema, input);
-  assert.equal(parsed.plans.basic.price, 500);
-  assert.equal(parsed.plans.ai.price, 1000);
   assert.equal(parsed.aiRubPerUsd, 92.5);
-  assert.equal(parsed.trialDays, 14);
-  assert.equal(parseBody(settingsSchema, { ...input, plans: { ...input.plans, basic: { ...input.plans.basic, price: "" } } }).plans.basic.price, null);
+  assert.deepEqual(parsed.trial, { count: 1, unit: "months" });
+  assert.equal(parseBody(settingsSchema, { ...input, aiRubPerUsd: "" }).aiRubPerUsd, null);
 
-  assert.throws(() => parseBody(settingsSchema, { ...input, trialDays: 0 }), /Пробный период/);
+  assert.throws(() => parseBody(settingsSchema, { ...input, trial: { count: 0, unit: "days" } }), /Пробный период/);
+  assert.throws(() => parseBody(settingsSchema, { ...input, trial: { count: 13, unit: "months" } }), /не больше 12 месяцев/);
   assert.throws(() => parseBody(settingsSchema, { ...input, helpVideos: [{ title: "Как добавить товар", url: "youtube" }] }), /Ссылка.*https/);
 });
 
@@ -62,9 +51,7 @@ test("сохранённые настройки важнее .env и переж�
   const current = settingsService.settings();
   settingsService.saveSettings({
     ...current,
-    plans: { ...current.plans, basic: { ...current.plans.basic, price: 500 } },
-    trialDays: 10,
-    aiMonthlyLimit: 50,
+    trial: { count: 1, unit: "months" },
     aiModel: "gpt-5.6-luna",
     aiPreviewEnabled: true,
     aiPreviewQuality: "low",
@@ -72,16 +59,15 @@ test("сохранённые настройки важнее .env и переж�
   });
   settingsService.loadSettings();
 
-  assert.equal(trialDays(), 10);
-  assert.equal(monthlyLimit({ aiMonthlyLimit: null }), 50);
-  assert.equal(monthlyLimit({ aiMonthlyLimit: 5 }), 5);
+  assert.deepEqual(trialPeriod(), { count: 1, unit: "months" });
+  // A calendar month: 31 January + 1 month = the last day of February.
+  assert.equal(trialEnd(trialPeriod(), new Date(2026, 0, 31, 12)).getDate(), 28);
+  assert.equal(trialEnd({ count: 14, unit: "days" }, new Date(2026, 0, 31, 12)).getDate(), 14);
   assert.equal(aiSettings().model, "gpt-5.6-luna");
   assert.equal(previewSettings()?.quality, "low");
-  assert.equal(settingsService.settings().plans.basic.price, 500);
 
   const visible = settingsService.publicSettings();
-  assert.equal(visible.plans.basic.price, 500);
-  assert.equal(visible.aiMonthlyLimit, 50);
+  assert.equal(visible.legal.keepDataDays, 90);
   assert.ok(!("support" in visible) && !("aiModel" in visible), "контакты поддержки и модели — только для админа");
 });
 

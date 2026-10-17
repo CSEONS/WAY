@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { SiteSettings } from "../types/models";
 
-// Plans, contacts, help videos and requisites from «Настройки» in the admin
-// panel. Loaded once per page load and shared by every screen that asks;
-// saving «Настройки» updates them everywhere without a reload.
+// Plans, contacts, help videos and requisites from the admin panel. Loaded
+// once per page load and shared by every screen that asks; a save in the
+// admin panel refreshes them everywhere without a reload.
 
 let current: SiteSettings | undefined;
 let loading: Promise<SiteSettings> | null = null;
@@ -42,8 +42,8 @@ export function useSiteSettings() {
   return value;
 }
 
-/** After «Сохранить» on «Настройки». */
-export function setSiteSettings(value: SiteSettings) {
-  loading = Promise.resolve(value);
-  publish(value);
+/** After a save in the admin panel: fetch again, everyone gets the new values. */
+export function refreshSiteSettings() {
+  loading = null;
+  load().catch(() => undefined);
 }

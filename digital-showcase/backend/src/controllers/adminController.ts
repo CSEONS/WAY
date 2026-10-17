@@ -6,6 +6,8 @@ import {
   ownerUpdateSchema,
   parseBody,
   paymentSchema,
+  planOrderSchema,
+  planSchema,
   receiptSchema,
   settingsSchema,
   storeCreateSchema,
@@ -20,6 +22,7 @@ import * as backupService from "../services/backupService.js";
 import * as onboardingService from "../services/onboardingService.js";
 import * as overviewService from "../services/overviewService.js";
 import * as paymentService from "../services/paymentService.js";
+import * as planService from "../services/planService.js";
 import * as reportService from "../services/reportService.js";
 import * as settingsService from "../services/settingsService.js";
 import * as userService from "../services/userService.js";
@@ -182,8 +185,11 @@ async function logStoreChanges(adminId: string, before: Store, after: Store) {
   if (before.subscriptionEndsAt !== after.subscriptionEndsAt) {
     await auditService.logAction(adminId, "SUBSCRIPTION_CHANGED", target, `${dateLabel(before.subscriptionEndsAt)} → ${dateLabel(after.subscriptionEndsAt)}`);
   }
-  if (before.aiFormEnabled !== after.aiFormEnabled || before.aiMonthlyLimit !== after.aiMonthlyLimit) {
-    const plan = (store: Store) => (store.aiFormEnabled ? `Витрина + ИИ (лимит ${store.aiMonthlyLimit ?? "по умолчанию"})` : "Витрина");
+  if (before.planId !== after.planId || before.aiMonthlyLimit !== after.aiMonthlyLimit) {
+    const plan = (store: Store) => {
+      const name = planService.planOf(store)?.name ?? "без тарифа";
+      return store.aiMonthlyLimit == null ? name : `${name} (свой лимит ИИ ${store.aiMonthlyLimit})`;
+    };
     await auditService.logAction(adminId, "PLAN_CHANGED", target, `${plan(before)} → ${plan(after)}`);
   }
 }
@@ -236,6 +242,33 @@ export const startBackup = asyncHandler(async (req, res) => {
 /** Where AI requests go (no key) — for the admin panel. */
 export const aiStatus = asyncHandler(async (_req, res) => {
   res.json(aiProvider.aiSummary());
+});
+
+/** «Тарифы и цены»: every plan with how many stores are on it. */
+export const listPlans = asyncHandler(async (_req, res) => {
+  res.json(await planService.listPlans());
+});
+
+export const createPlan = asyncHandler(async (req, res) => {
+  const plan = await planService.savePlan(null, parseBody(planSchema, req.body));
+  await auditService.logAction(req.user!.userId, "PLAN_SAVED", undefined, `Новый тариф «${plan.name}»`);
+  res.status(201).json(plan);
+});
+
+export const updatePlan = asyncHandler(async (req, res) => {
+  const plan = await planService.savePlan(String(req.params.id), parseBody(planSchema, req.body));
+  await auditService.logAction(req.user!.userId, "PLAN_SAVED", undefined, `Тариф «${plan.name}»`);
+  res.json(plan);
+});
+
+export const deletePlan = asyncHandler(async (req, res) => {
+  const plan = await planService.deletePlan(String(req.params.id));
+  await auditService.logAction(req.user!.userId, "PLAN_DELETED", undefined, `Тариф «${plan.name}»`);
+  res.status(204).send();
+});
+
+export const reorderPlans = asyncHandler(async (req, res) => {
+  res.json(await planService.reorderPlans(parseBody(planOrderSchema, req.body).ids));
 });
 
 /** «Расходы на ИИ»: the last 6 months and this month by store. */

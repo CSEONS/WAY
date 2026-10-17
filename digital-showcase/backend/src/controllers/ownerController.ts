@@ -1,7 +1,9 @@
 import type { Request } from "express";
+import type { Store } from "../types/models.js";
 import { createBulkProductAiDraft, createProductAiDraft } from "../services/aiDraftService.js";
 import * as aiUsageService from "../services/aiUsageService.js";
 import { previewSettings } from "../services/aiProvider.js";
+import { planOf } from "../services/planService.js";
 import { settings } from "../services/settingsService.js";
 import * as analyticsService from "../services/analyticsService.js";
 import { checkImage, cleanFindings, flagImage } from "../services/imageModerationService.js";
@@ -68,6 +70,12 @@ function supportContacts() {
   return { whatsapp: whatsapp || null, phone: phone || null, telegram: telegram || null };
 }
 
+/** The store's plan for «Подписка и итоги»: name, price, AI. */
+function planSummary(store: Store) {
+  const plan = planOf(store);
+  return plan && { name: plan.name, price: plan.price, aiEnabled: Boolean(plan.aiEnabled), aiMonthlyLimit: plan.aiMonthlyLimit };
+}
+
 /** «Помощь» in the owner's app: who to write or call. */
 export const getSupport = asyncHandler(async (_req, res) => {
   res.json(supportContacts());
@@ -89,6 +97,7 @@ export const getSubscription = asyncHandler(async (req, res) => {
   ]);
   res.json({
     subscription: withSubscription(store).subscription,
+    plan: planSummary(store),
     graceDays: GRACE_DAYS,
     ai,
     // Admin comments stay in the admin panel.

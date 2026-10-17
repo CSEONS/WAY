@@ -1,11 +1,12 @@
 import crypto from "node:crypto";
 import { getDb } from "../database/db.js";
 import { HttpError } from "../utils/http.js";
+import type { TrialPeriod } from "./settingsService.js";
 import { slugify } from "../utils/slug.js";
 import { logAction } from "./auditService.js";
 import { setLeadStatus } from "./leadService.js";
 import { assertSlugAvailable, createStore, getStoreBySlug } from "./storeService.js";
-import { addDays } from "./subscriptionService.js";
+import { trialEnd, trialLabel } from "./subscriptionService.js";
 import { createOwner, deleteOwner, findUserByLogin, normalizePhone } from "./userService.js";
 
 export interface ConnectStoreInput {
@@ -17,14 +18,14 @@ export interface ConnectStoreInput {
   slug: string;
   /** Number buyers write to, if it's not the owner's own. */
   storePhone?: string | null;
-  /** «Витрина + ИИ». */
-  withAi: boolean;
-  trialDays: number;
+  /** «Тарифы и цены»; none — the first plan. */
+  planId?: string | null;
+  /** Free period for this store: count 0 — none, it has to pay right away. */
+  trial: TrialPeriod;
   /** A landing-page request this connection answers: marked as done. */
   leadId?: string | null;
 }
 
-const MAX_TRIAL_DAYS = 60;
 
 /** 8 digits: easy to dictate over the phone and to type on a phone keypad. */
 export function generatePassword() {
@@ -54,8 +55,9 @@ export async function connectStore(input: ConnectStoreInput, adminId: string) {
   if (!ownerName) throw new HttpError(400, "Укажите имя владельца");
   if (!phone || normalizePhone(phone).length < 10) throw new HttpError(400, "Укажите телефон владельца — это его логин");
   if (!storeName) throw new HttpError(400, "Укажите название магазина");
-  if (!Number.isInteger(input.trialDays) || input.trialDays < 0 || input.trialDays > MAX_TRIAL_DAYS) {
-    throw new HttpError(400, `Пробный период — от 0 до ${MAX_TRIAL_DAYS} дней`);
+  const maxTrial = input.trial?.unit === "months" ? 12 : 60;
+  if (!input.trial || !Number.isInteger(input.trial.count) || input.trial.count < 0 || input.trial.count > maxTrial) {
+    throw new HttpError(400, "Пробный период — до 60 дней или до 12 месяцев");
   }
   await assertSlugAvailable(slug);
 
@@ -80,9 +82,9 @@ export async function connectStore(input: ConnectStoreInput, adminId: string) {
       slug,
       phone: storePhone,
       whatsapp: storePhone,
-      aiFormEnabled: input.withAi ? 1 : 0,
+      planId: input.planId ?? null,
       isActive: 1,
-      subscriptionEndsAt: addDays(new Date(), input.trialDays).toISOString()
+      subscriptionEndsAt: trialEnd(input.trial).toISOString()
     });
   } catch (error) {
     await deleteOwner(owner.id);
@@ -94,6 +96,6 @@ export async function connectStore(input: ConnectStoreInput, adminId: string) {
   }
 
   if (input.leadId) await setLeadStatus(input.leadId, "DONE");
-  await logAction(adminId, "STORE_CONNECTED", { type: "store", id: store.id, name: store.name }, `Владелец ${owner.name}, пробный период ${input.trialDays} дн.`);
+  await logAction(adminId, "STORE_CONNECTED", { type: "store", id: store.id, name: store.name }, `Владелец ${owner.name}, пробный период ${input.trial.count ? trialLabel(input.trial) : "без него"}`);
   return { owner, store, password };
 }

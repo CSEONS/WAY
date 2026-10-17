@@ -36,6 +36,10 @@ const LABELS: Record<string, string> = {
   showColors: "Показать все цвета",
   isActive: "Магазин включён",
   aiFormEnabled: "Тариф",
+  planId: "Тариф",
+  aiEnabled: "ИИ-помощник",
+  highlighted: "Выделить на лендинге",
+  isPublic: "Показывать на лендинге",
   aiMonthlyLimit: "Лимит ИИ",
   subscriptionEndsAt: "Подписка до",
   sizes: "Размеры",
@@ -51,6 +55,8 @@ const LABELS: Record<string, string> = {
   method: "Способ оплаты",
   comment: "Комментарий",
   trialDays: "Пробный период",
+  trial: "Пробный период",
+  count: "Пробный период",
   days: "Дни",
   demoStoreSlug: "Демо-магазин",
   url: "Ссылка",
@@ -123,6 +129,11 @@ const hex = z.preprocess((value) => {
   const code = typeof value === "string" ? value.trim() : "";
   return /^#?[0-9a-fA-F]{3,8}$/.test(code) ? code : null;
 }, z.string().nullable().optional());
+/** Days (up to 60) or calendar months (up to 12); `min` 0 — «no trial» is allowed. */
+const trialSchema = (min: number) =>
+  z
+    .object({ count: z.coerce.number().int().min(min).max(60), unit: z.enum(["days", "months"]) })
+    .refine((trial) => trial.unit === "days" || trial.count <= 12, { message: "не больше 12 месяцев", path: ["count"] });
 const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), { message: "неверная дата" });
 
 // Auth
@@ -178,7 +189,7 @@ const adminStoreFields = {
   name: requiredText(120),
   slug: requiredText(40),
   isActive: flag.optional(),
-  aiFormEnabled: flag.optional(),
+  planId: z.string().min(1).max(100).optional(),
   subscriptionEndsAt: isoDate.nullable().optional(),
   aiMonthlyLimit: aiLimit
 };
@@ -220,8 +231,8 @@ export const connectSchema = z.object({
   storeName: requiredText(120),
   slug: requiredText(40),
   storePhone: optionalText(40),
-  withAi: z.boolean().default(false),
-  trialDays: z.coerce.number().int().min(0).max(60),
+  planId: z.string().min(1).max(100).nullable().optional(),
+  trial: trialSchema(0),
   leadId: z.string().max(100).nullable().optional()
 });
 
@@ -229,14 +240,25 @@ export const leadStatusSchema = z.object({ status: z.enum(["NEW", "DONE"]) });
 
 export const moderationReviewSchema = z.object({ status: z.enum(["APPROVED", "REJECTED"]) });
 
+// «Тарифы и цены»
+
+export const planSchema = z
+  .object({
+    name: requiredText(60),
+    price: price.transform((value) => value ?? null),
+    description: text(300),
+    features: z.array(requiredText(120)).max(12),
+    aiEnabled: flag,
+    aiMonthlyLimit: aiLimit.transform((value) => value ?? null),
+    highlighted: flag,
+    isPublic: flag
+  })
+  .refine((plan) => !plan.aiEnabled || plan.aiMonthlyLimit != null, { message: "укажите, сколько карточек с ИИ в месяц", path: ["aiMonthlyLimit"] });
+
+export const planOrderSchema = z.object({ ids: z.array(z.string().min(1).max(100)).min(1).max(50) });
+
 // «Настройки»
 
-const plan = z.object({
-  name: requiredText(60),
-  price: price.transform((value) => value ?? null),
-  description: text(300),
-  features: z.array(requiredText(120)).max(12)
-});
 const link = text(500).refine((value) => /^https?:\/\/\S+$/i.test(value), { message: "нужна ссылка, которая начинается с https://" });
 /** Rubles per dollar: "85", "92,5" or empty for «not set». */
 const rate = z.preprocess(
@@ -245,7 +267,6 @@ const rate = z.preprocess(
 );
 
 export const settingsSchema = z.object({
-  plans: z.object({ basic: plan, ai: plan }),
   demoStoreSlug: text(40),
   salesContacts: z.object({ whatsapp: text(40), phone: text(40) }),
   support: z.object({ whatsapp: text(40), phone: text(40), telegram: text(100) }),
@@ -261,8 +282,7 @@ export const settingsSchema = z.object({
     updatedAt: isoDate,
     keepDataDays: z.coerce.number().int().min(1).max(3650)
   }),
-  trialDays: z.coerce.number().int().min(1).max(60),
-  aiMonthlyLimit: z.coerce.number().int().min(0).max(10_000),
+  trial: trialSchema(1),
   aiPreviewUnits: z.coerce.number().int().min(1).max(20),
   aiModel: requiredText(100),
   aiPreviewEnabled: z.boolean(),

@@ -1,19 +1,12 @@
 import { rawDb } from "../database/db.js";
 
-// What the admin changes on «Настройки» without touching files: plans and
-// prices, contacts, requisites, help videos, the trial, AI limits and models.
+// What the admin changes in the admin panel without touching files: contacts,
+// requisites, help videos, the trial, AI models and the ruble rate. Plans and
+// prices are a table of their own (planService).
 // These used to live in .env and in frontend config files. The old .env values
 // (TRIAL_DAYS, AI_MODEL, SUPPORT_*, …) are still the starting point until the
 // admin saves. Secrets and infrastructure — keys, provider addresses, the
 // domain, backups — stay in .env.
-
-export interface Plan {
-  name: string;
-  /** Rubles a month; null — «Цена по запросу». */
-  price: number | null;
-  description: string;
-  features: string[];
-}
 
 export interface HelpVideo {
   title: string;
@@ -42,9 +35,13 @@ export interface Legal {
 
 export type PreviewQuality = "low" | "medium" | "high";
 
+/** A free period: so many days or calendar months. */
+export interface TrialPeriod {
+  count: number;
+  unit: "days" | "months";
+}
+
 export interface Settings {
-  /** The two plans a store can be on: «Витрина» and «Витрина + ИИ» (the store's AI switch). */
-  plans: { basic: Plan; ai: Plan };
   /** Slug of a store with sample products: «Посмотреть пример» on the landing. Empty — no button. */
   demoStoreSlug: string;
   /** «Написать нам» on the landing. */
@@ -55,9 +52,7 @@ export interface Settings {
   helpVideos: HelpVideo[];
   legal: Legal;
   /** Free days for a newly connected store. */
-  trialDays: number;
-  /** AI cards per store per calendar month, unless the store has its own limit. */
-  aiMonthlyLimit: number;
+  trial: TrialPeriod;
   /** Cards one AI preview takes from the month: a picture costs more than a text draft. */
   aiPreviewUnits: number;
   /** Model that fills in product cards, as the provider in AI_BASE_URL names it. */
@@ -90,31 +85,6 @@ export function defaultSettings(): Settings {
   const quality = envText("AI_PREVIEW_QUALITY");
   const rate = Number(process.env.AI_RUB_PER_USD);
   return {
-    plans: {
-      basic: {
-        name: "Витрина",
-        price: null,
-        description: "Каталог магазина по ссылке — всё, чтобы покупатели писали вам.",
-        features: [
-          "Ссылка на витрину и QR-плакат для кассы",
-          "Товары с фото, размерами, цветами и ценами",
-          "Кнопки WhatsApp, Telegram и звонка",
-          "Статистика и отчёт за месяц",
-          "Поможем запуститься и добавить первые товары"
-        ]
-      },
-      ai: {
-        name: "Витрина + ИИ",
-        price: null,
-        description: "То же, плюс ИИ-помощник: товар добавляется по фото и голосу за полминуты.",
-        features: [
-          "Всё из тарифа «Витрина»",
-          "Карточка товара по фото и голосовому описанию",
-          // «До N карточек с ИИ в месяц» is added by the landing from aiMonthlyLimit.
-          "Много товаров сразу: ИИ сам разберёт фото по карточкам"
-        ]
-      }
-    },
     demoStoreSlug: "demo",
     salesContacts: { whatsapp: "", phone: "" },
     support: { whatsapp: envText("SUPPORT_WHATSAPP"), phone: envText("SUPPORT_PHONE"), telegram: envText("SUPPORT_TELEGRAM") },
@@ -130,8 +100,7 @@ export function defaultSettings(): Settings {
       updatedAt: "2026-09-27",
       keepDataDays: 90
     },
-    trialDays: envInteger("TRIAL_DAYS", 14, 1),
-    aiMonthlyLimit: envInteger("AI_MONTHLY_LIMIT", 100, 0),
+    trial: { count: envInteger("TRIAL_DAYS", 14, 1), unit: "days" },
     aiPreviewUnits: envInteger("AI_PREVIEW_UNITS", 1, 1),
     // The cheapest tier: filling in a product card from photos doesn't need more (see aiPrices.ts).
     aiModel: envText("AI_MODEL", "OPENAI_MODEL") || "gpt-5.6-luna",
@@ -187,8 +156,8 @@ export function saveSettings(next: Settings) {
   return settings();
 }
 
-/** What any visitor may see: plans and contacts for the landing, help videos, requisites for /offer and /privacy. */
+/** What any visitor may see: contacts for the landing, help videos, requisites for /offer and /privacy. Plans come from planService. */
 export function publicSettings() {
-  const { plans, aiMonthlyLimit, demoStoreSlug, salesContacts, helpVideos, legal } = settings();
-  return { plans, aiMonthlyLimit, demoStoreSlug, salesContacts, helpVideos, legal };
+  const { demoStoreSlug, salesContacts, helpVideos, legal } = settings();
+  return { demoStoreSlug, salesContacts, helpVideos, legal };
 }

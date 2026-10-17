@@ -330,6 +330,95 @@ export const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS image_checks_status ON image_checks(status, createdAt);
       `);
     }
+  },
+  {
+    version: 10,
+    name: "plans as a table",
+    // Plans used to be two fixed entries in settings («Витрина» and «Витрина + ИИ»)
+    // and a store only had its AI switch. Now any number of plans live here and a
+    // store points at one; its AI switch is copied from the plan (see planService).
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plans (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          price REAL,
+          description TEXT NOT NULL DEFAULT '',
+          features TEXT NOT NULL DEFAULT '[]',
+          aiEnabled INTEGER NOT NULL DEFAULT 0,
+          aiMonthlyLimit INTEGER,
+          highlighted INTEGER NOT NULL DEFAULT 0,
+          isPublic INTEGER NOT NULL DEFAULT 1,
+          sortOrder INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        );
+      `);
+      addColumn(db, "stores", "planId", "TEXT REFERENCES plans(id)");
+
+      // The two plans as the admin last saved them on «Тарифы и цены», or as a new installation had them.
+      const saved = (key: string): unknown => {
+        const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+        try {
+          return row ? JSON.parse(row.value) : undefined;
+        } catch {
+          return undefined;
+        }
+      };
+      type SavedPlan = { name?: string; price?: number | null; description?: string; features?: string[] };
+      const savedPlans = (saved("plans") ?? {}) as { basic?: SavedPlan; ai?: SavedPlan };
+      const envLimit = Number(process.env.AI_MONTHLY_LIMIT);
+      const savedLimit = Number(saved("aiMonthlyLimit"));
+      const limit = Number.isInteger(savedLimit) && savedLimit >= 0 ? savedLimit : Number.isInteger(envLimit) && envLimit >= 0 ? envLimit : 100;
+      const defaults = {
+        basic: {
+          name: "Витрина",
+          price: null,
+          description: "Каталог магазина по ссылке — всё, чтобы покупатели писали вам.",
+          features: [
+            "Ссылка на витрину и QR-плакат для кассы",
+            "Товары с фото, размерами, цветами и ценами",
+            "Кнопки WhatsApp, Telegram и звонка",
+            "Статистика и отчёт за месяц",
+            "Поможем запуститься и добавить первые товары"
+          ]
+        },
+        ai: {
+          name: "Витрина + ИИ",
+          price: null,
+          description: "То же, плюс ИИ-помощник: товар добавляется по фото и голосу за полминуты.",
+          features: ["Всё из тарифа «Витрина»", "Карточка товара по фото и голосовому описанию", "Много товаров сразу: ИИ сам разберёт фото по карточкам"]
+        }
+      };
+      const now = new Date().toISOString();
+      const insert = db.prepare(
+        `INSERT OR IGNORE INTO plans (id, name, price, description, features, aiEnabled, aiMonthlyLimit, highlighted, isPublic, sortOrder, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      );
+      for (const [index, key] of (["basic", "ai"] as const).entries()) {
+        const plan = { ...defaults[key], ...savedPlans[key] };
+        const isAi = key === "ai";
+        insert.run(key, plan.name, plan.price ?? null, plan.description ?? "", JSON.stringify(plan.features ?? []), isAi ? 1 : 0, isAi ? limit : null, isAi ? 1 : 0, index, now, now);
+      }
+      db.exec(`
+        UPDATE stores SET planId = CASE WHEN aiFormEnabled = 1 THEN 'ai' ELSE 'basic' END WHERE planId IS NULL;
+        DELETE FROM settings WHERE key IN ('plans', 'aiMonthlyLimit');
+      `);
+    }
+  },
+  {
+    version: 11,
+    name: "trial in days or months",
+    // The saved «trialDays» setting becomes «trial»: { count, unit }.
+    up(db) {
+      const row = db.prepare("SELECT value, updatedAt FROM settings WHERE key = 'trialDays'").get() as { value: string; updatedAt: string } | undefined;
+      if (!row) return;
+      const days = Number(JSON.parse(row.value));
+      if (Number.isInteger(days) && days > 0) {
+        db.prepare("INSERT OR REPLACE INTO settings (key, value, updatedAt) VALUES ('trial', ?, ?)").run(JSON.stringify({ count: days, unit: "days" }), row.updatedAt);
+      }
+      db.prepare("DELETE FROM settings WHERE key = 'trialDays'").run();
+    }
   }
 ];
 

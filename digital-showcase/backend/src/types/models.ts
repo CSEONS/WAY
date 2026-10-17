@@ -28,9 +28,12 @@ export interface Store {
   /** Free text, e.g. «Пн–Сб 10:00–19:00». */
   workingHours: string | null;
   isActive: number;
+  /** The store's plan («Тарифы и цены»). */
+  planId: string | null;
+  /** AI helper on: a copy of the plan's aiEnabled, kept by planService. */
   aiFormEnabled: number;
   subscriptionEndsAt: string | null;
-  /** AI cards per calendar month; null — the AI_MONTHLY_LIMIT default. */
+  /** AI cards per calendar month; null — the plan's limit. */
   aiMonthlyLimit: number | null;
   createdAt: string;
   updatedAt: string;

@@ -3,11 +3,12 @@ import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
 import * as analyticsService from "../services/analyticsService.js";
 import { publicLogo } from "../services/imageModerationService.js";
+import { publicPlans } from "../services/planService.js";
 import { publicSettings } from "../services/settingsService.js";
 
-/** Plans and contacts for the landing, help videos, requisites for /offer and /privacy — from «Настройки». */
+/** Plans and contacts for the landing, help videos, requisites for /offer and /privacy — from the admin panel. */
 export const getSite = asyncHandler(async (_req, res) => {
-  res.json(publicSettings());
+  res.json({ ...publicSettings(), plans: await publicPlans() });
 });
 
 async function publicStore(slug: string) {

@@ -1,9 +1,8 @@
 import { Delete02Icon, FloppyDiskIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { setSiteSettings } from "../state/siteSettings";
-import type { HelpVideo, Legal, Plan, PreviewQuality, Settings } from "../types/models";
+import { refreshSiteSettings } from "../state/siteSettings";
+import type { HelpVideo, Legal, PreviewQuality, Settings } from "../types/models";
 import { Button, Card, CardHeader, ErrorState, Field, IconButton, Input, LoadingState, Notice, Page, PageHeader, SegmentedControl, Switch, Textarea, useToast } from "../ui";
 import styles from "./AdminSettingsPage.module.css";
 
@@ -15,12 +14,8 @@ interface SettingsResponse {
 
 // Numbers are edited as text: an emptied field stays empty instead of jumping to 0.
 // The server reads «1 500», «92,5» and the like.
-type PlanDraft = Omit<Plan, "price" | "features"> & { price: string; features: string };
-type Draft = Omit<Settings, "plans" | "legal" | "trialDays" | "aiMonthlyLimit" | "aiPreviewUnits" | "aiRubPerUsd"> & {
-  plans: { basic: PlanDraft; ai: PlanDraft };
+type Draft = Omit<Settings, "legal" | "aiPreviewUnits" | "aiRubPerUsd"> & {
   legal: Omit<Legal, "keepDataDays"> & { keepDataDays: string };
-  trialDays: string;
-  aiMonthlyLimit: string;
   aiPreviewUnits: string;
   aiRubPerUsd: string;
 };
@@ -31,24 +26,13 @@ const qualityOptions: { value: PreviewQuality; label: string }[] = [
   { value: "high", label: "Высокое" }
 ];
 
-function planDraft(plan: Plan): PlanDraft {
-  return { ...plan, price: plan.price == null ? "" : String(plan.price), features: plan.features.join("\n") };
-}
-
 function toDraft(settings: Settings): Draft {
   return {
     ...settings,
-    plans: { basic: planDraft(settings.plans.basic), ai: planDraft(settings.plans.ai) },
     legal: { ...settings.legal, keepDataDays: String(settings.legal.keepDataDays) },
-    trialDays: String(settings.trialDays),
-    aiMonthlyLimit: String(settings.aiMonthlyLimit),
     aiPreviewUnits: String(settings.aiPreviewUnits),
     aiRubPerUsd: settings.aiRubPerUsd == null ? "" : String(settings.aiRubPerUsd)
   };
-}
-
-function planPayload(plan: PlanDraft) {
-  return { ...plan, features: plan.features.split("\n").map((line) => line.trim()).filter(Boolean) };
 }
 
 /** Text input bound to one value. */
@@ -56,18 +40,12 @@ function bind(value: string, onChange: (value: string) => void) {
   return { value, onChange: (event: { target: { value: string } }) => onChange(event.target.value) };
 }
 
-export type SettingsPart = "plans" | "ai" | "contacts" | "videos" | "legal";
+export type SettingsPart = "ai" | "contacts" | "videos" | "legal";
 
 const BACK_TO_SECTIONS = { to: "/admin?tab=sections", label: "В админку" };
 
 /** Each part is its own section of the admin panel: title, what it's for, where «назад» leads. */
 const PARTS: Record<SettingsPart, { title: string; description: string; back: { to: string; label: string }; saved: string }> = {
-  plans: {
-    title: "Редактирование тарифов",
-    description: "Изменения сразу видны на лендинге и в «Продлить»",
-    back: { to: "/admin/plans", label: "К тарифам" },
-    saved: "Тарифы сохранены"
-  },
   ai: { title: "Настройки ИИ", description: "Модели, курс рубля и превью. Сервер провайдера и ключ — в .env", back: BACK_TO_SECTIONS, saved: "Настройки ИИ сохранены" },
   contacts: { title: "Контакты", description: "Куда пишут владельцы магазинов и те, кто хочет подключиться", back: BACK_TO_SECTIONS, saved: "Контакты сохранены" },
   videos: { title: "Видеоинструкции", description: "Короткие видео в «Помощи» у владельцев", back: BACK_TO_SECTIONS, saved: "Видео сохранены" },
@@ -76,13 +54,12 @@ const PARTS: Record<SettingsPart, { title: string; description: string; back: { 
 
 /**
  * What used to need .env or a rebuild — one form over the same settings, a
- * page per part: «Тарифы и цены» → edit (plans, the AI limit, the trial),
- * «Настройки ИИ» (models, the ruble rate, previews), «Контакты»,
- * «Видеоинструкции», «Реквизиты». Saving sends all of it. Keys and provider
- * addresses stay in .env.
+ * page per part: «Настройки ИИ» (models, the ruble rate, previews),
+ * «Контакты», «Видеоинструкции», «Реквизиты». Saving sends all of it.
+ * Plans are a section of their own (AdminPlansPage).
+ * Keys and provider addresses stay in .env.
  */
 export function AdminSettingsPage({ part }: { part: SettingsPart }) {
-  const navigate = useNavigate();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>();
   const [models, setModels] = useState<SettingsResponse["models"]>({ text: [], image: [] });
@@ -111,11 +88,6 @@ export function AdminSettingsPage({ part }: { part: SettingsPart }) {
     setError("");
   }
 
-  function changePlan(which: "basic" | "ai", patch: Partial<PlanDraft>) {
-    setDraft((current) => current && { ...current, plans: { ...current.plans, [which]: { ...current.plans[which], ...patch } } });
-    setError("");
-  }
-
   function changeLegal(patch: Partial<Draft["legal"]>) {
     setDraft((current) => current && { ...current, legal: { ...current.legal, ...patch } });
     setError("");
@@ -132,16 +104,10 @@ export function AdminSettingsPage({ part }: { part: SettingsPart }) {
     setIsSaving(true);
     setError("");
     try {
-      const { data } = await api.put<SettingsResponse>("/admin/settings", {
-        ...draft,
-        plans: { basic: planPayload(draft.plans.basic), ai: planPayload(draft.plans.ai) }
-      });
+      const { data } = await api.put<SettingsResponse>("/admin/settings", draft);
       apply(data);
-      const { plans, aiMonthlyLimit, demoStoreSlug, salesContacts, helpVideos, legal } = data.settings;
-      setSiteSettings({ plans, aiMonthlyLimit, demoStoreSlug, salesContacts, helpVideos, legal });
+      refreshSiteSettings();
       toast.show(PARTS[part].saved, { tone: "success" });
-      // Plans are edited from their cards: back to them to see the result.
-      if (part === "plans") navigate("/admin/plans");
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Не удалось сохранить настройки");
     } finally {
@@ -172,22 +138,6 @@ export function AdminSettingsPage({ part }: { part: SettingsPart }) {
     <Page width="narrow">
       {header}
       <form className={styles.form} onSubmit={submit}>
-        {part === "plans" && (
-          <Section title="Тарифы" description="Пустая цена — «Цена по запросу».">
-            <div className={styles.plans}>
-              <PlanFields title="Без ИИ" plan={draft.plans.basic} onChange={(patch) => changePlan("basic", patch)} />
-              <PlanFields title="С ИИ-помощником" plan={draft.plans.ai} onChange={(patch) => changePlan("ai", patch)}>
-                <Field label="Карточек с ИИ в месяц" hint="На лендинге — строкой «До N карточек с ИИ в месяц». Магазину можно задать свой лимит">
-                  <Input inputMode="numeric" {...bind(draft.aiMonthlyLimit, (aiMonthlyLimit) => change({ aiMonthlyLimit }))} />
-                </Field>
-              </PlanFields>
-            </div>
-            <Field label="Пробный период, дней" hint="Столько новый магазин работает бесплатно, от 1 до 60">
-              <Input inputMode="numeric" {...bind(draft.trialDays, (trialDays) => change({ trialDays }))} />
-            </Field>
-          </Section>
-        )}
-
         {part === "ai" && (
           <Section title="ИИ" description="Сервер провайдера и ключ — в .env (AI_BASE_URL, AI_API_KEY)">
             <datalist id="text-models">
@@ -330,26 +280,5 @@ function Section({ title, description, children }: { title: string; description?
       <CardHeader title={title} description={description} />
       {children}
     </Card>
-  );
-}
-
-function PlanFields({ title, plan, onChange, children }: { title: string; plan: PlanDraft; onChange: (patch: Partial<PlanDraft>) => void; children?: ReactNode }) {
-  return (
-    <div className={styles.plan}>
-      <h3 className={styles.planTitle}>{title}</h3>
-      <Field label="Название">
-        <Input {...bind(plan.name, (name) => onChange({ name }))} />
-      </Field>
-      <Field label="Цена, ₽ в месяц">
-        <Input inputMode="numeric" placeholder="Цена по запросу" {...bind(plan.price, (price) => onChange({ price }))} />
-      </Field>
-      <Field label="Описание">
-        <Textarea rows={2} {...bind(plan.description, (description) => onChange({ description }))} />
-      </Field>
-      <Field label="Что входит" hint="По пункту в строке">
-        <Textarea rows={5} {...bind(plan.features, (features) => onChange({ features }))} />
-      </Field>
-      {children}
-    </div>
   );
 }

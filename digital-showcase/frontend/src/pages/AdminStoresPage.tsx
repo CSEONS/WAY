@@ -2,6 +2,7 @@ import { ArchiveArrowDownIcon, ArchiveArrowUpIcon, Delete02Icon, Edit02Icon, Mon
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
+import { planLabel, useAdminPlans } from "../state/adminPlans";
 import type { Store, User } from "../types/models";
 import { subscriptionBadge } from "../utils/subscription";
 import {
@@ -18,7 +19,6 @@ import {
   Modal,
   Page,
   PageHeader,
-  SegmentedControl,
   Select,
   Textarea,
   useToast
@@ -36,8 +36,9 @@ interface StoreFormState {
   whatsapp: string;
   telegram: string;
   subscriptionEndsAt: string;
-  aiFormEnabled: boolean;
-  /** Empty — the server default. */
+  /** Empty — the first plan (the server's default). */
+  planId: string;
+  /** Empty — the plan's limit. */
   aiMonthlyLimit: string;
 }
 
@@ -52,7 +53,7 @@ const emptyStoreForm: StoreFormState = {
   whatsapp: "",
   telegram: "",
   subscriptionEndsAt: "",
-  aiFormEnabled: false,
+  planId: "",
   aiMonthlyLimit: ""
 };
 
@@ -82,7 +83,7 @@ function storePayload(form: StoreFormState) {
     whatsapp: form.whatsapp || null,
     telegram: form.telegram || null,
     subscriptionEndsAt: toIsoDate(form.subscriptionEndsAt),
-    aiFormEnabled: form.aiFormEnabled ? 1 : 0,
+    ...(form.planId ? { planId: form.planId } : {}),
     aiMonthlyLimit: form.aiMonthlyLimit.trim() === "" ? null : Number(form.aiMonthlyLimit)
   };
 }
@@ -93,12 +94,14 @@ function errorMessage(err: any, fallback: string) {
 
 export function AdminStoresPage() {
   const toast = useToast();
+  const { plans } = useAdminPlans();
   const [owners, setOwners] = useState<User[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [storeForm, setStoreForm] = useState<StoreFormState>(emptyStoreForm);
   const [isCreating, setIsCreating] = useState(false);
   const [storeToEdit, setStoreToEdit] = useState<Store | null>(null);
   const [storeEditForm, setStoreEditForm] = useState<StoreFormState>(emptyStoreForm);
+  const editPlan = plans?.find((plan) => plan.id === storeEditForm.planId);
   const [storeToArchive, setStoreToArchive] = useState<Store | null>(null);
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
   const [storeToPay, setStoreToPay] = useState<Store | null>(null);
@@ -153,7 +156,7 @@ export function AdminStoresPage() {
       whatsapp: store.whatsapp ?? "",
       telegram: store.telegram ?? "",
       subscriptionEndsAt: toDateTimeLocal(store.subscriptionEndsAt),
-      aiFormEnabled: Boolean(store.aiFormEnabled),
+      planId: store.planId ?? "",
       aiMonthlyLimit: store.aiMonthlyLimit == null ? "" : String(store.aiMonthlyLimit)
     });
   }
@@ -186,7 +189,7 @@ export function AdminStoresPage() {
     setStoreToDelete(null);
   }
 
-  function field(key: Exclude<keyof StoreFormState, "aiFormEnabled">) {
+  function field(key: keyof StoreFormState) {
     return {
       value: storeEditForm[key],
       onChange: (event: { target: { value: string } }) => setStoreEditForm({ ...storeEditForm, [key]: event.target.value })
@@ -247,7 +250,7 @@ export function AdminStoresPage() {
                     ) : (
                       <Badge tone="neutral">В архиве</Badge>
                     )}
-                    <Badge tone={store.aiFormEnabled ? "accent" : "neutral"}>{store.aiFormEnabled ? "Витрина + ИИ" : "Витрина"}</Badge>
+                    <Badge tone={store.aiFormEnabled ? "accent" : "neutral"}>{plans?.find((plan) => plan.id === store.planId)?.name ?? "Без тарифа"}</Badge>
                     <span>{store.ownerName}</span>
                   </div>
                   <div className={styles.rowActions}>
@@ -326,23 +329,20 @@ export function AdminStoresPage() {
           <Field label="Подписка до" hint="Чтобы продлить с оплатой, нажмите «Продлить» у магазина — так платёж попадёт в учёт">
             <Input type="datetime-local" {...field("subscriptionEndsAt")} />
           </Field>
-          <div className={styles.tariff}>
-            <span className={styles.tariffLabel}>Тариф</span>
-            <SegmentedControl
-              label="Тариф"
-              value={storeEditForm.aiFormEnabled ? "ai" : "basic"}
-              onChange={(value) => setStoreEditForm({ ...storeEditForm, aiFormEnabled: value === "ai" })}
-              options={[
-                { value: "basic", label: "Витрина" },
-                { value: "ai", label: "Витрина + ИИ" }
-              ]}
-            />
-          </div>
-          {storeEditForm.aiFormEnabled && (
-            <Field label="Лимит ИИ в месяц" hint="Карточек, созданных с помощью ИИ. Пусто — общий лимит сервера (AI_MONTHLY_LIMIT)">
-              <Input inputMode="numeric" placeholder="по умолчанию" {...field("aiMonthlyLimit")} />
+          {plans && (
+            <Field label="Тариф" hint="ИИ-помощник и его лимит — как в тарифе">
+              <Select
+                value={storeEditForm.planId}
+                onChange={(planId) => setStoreEditForm({ ...storeEditForm, planId })}
+                options={plans.map((plan) => ({ value: plan.id, label: planLabel(plan) }))}
+              />
             </Field>
           )}
+          {editPlan?.aiEnabled ? (
+            <Field label="Свой лимит ИИ в месяц" hint={`Карточек, созданных с помощью ИИ. Пусто — как в тарифе (${editPlan.aiMonthlyLimit})`}>
+              <Input inputMode="numeric" placeholder={String(editPlan.aiMonthlyLimit ?? "")} {...field("aiMonthlyLimit")} />
+            </Field>
+          ) : null}
         </Modal>
       )}
       {storeToPay && (

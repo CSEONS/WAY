@@ -79,9 +79,11 @@ export function SubscriptionPage() {
                   : `${subscription.state === "grace" ? "Была оплачена" : isTrial ? "До" : "Оплачено до"} ${formatDate(subscription.endsAt)}`}
             </strong>
           </div>
-          <Badge tone={store.aiFormEnabled ? "accent" : "neutral"} className={styles.plan}>
-            {store.aiFormEnabled ? "Витрина + ИИ" : "Витрина"}
-          </Badge>
+          {data.plan && (
+            <Badge tone={data.plan.aiEnabled ? "accent" : "neutral"} className={styles.plan}>
+              {data.plan.name}
+            </Badge>
+          )}
         </div>
         <p className={styles.muted}>
           После окончания витрина работает ещё {data.graceDays} дня, чтобы вы успели продлить, но новые товары в эти дни добавить нельзя. Продление — у
@@ -124,7 +126,7 @@ export function SubscriptionPage() {
           </>
         ) : (
           <p className={styles.muted}>
-            ИИ заполняет карточку по фото и голосу: название, описание, размеры и цвета. Доступен в тарифе «Витрина + ИИ» — спросите у администратора.
+            ИИ заполняет карточку по фото и голосу: название, описание, размеры и цвета. Доступен в тарифах с ИИ-помощником — спросите у администратора.
           </p>
         )}
       </Card>

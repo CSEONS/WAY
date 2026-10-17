@@ -3,6 +3,7 @@ import type { Store } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
 import { SLUG_MAX_LENGTH, SLUG_PATTERN } from "../utils/slug.js";
 import { deleteStoredImage, storeProductImage, type UploadedImage } from "./imageService.js";
+import { forgetImage } from "./imageModerationService.js";
 import { addDays, isStorefrontOpen, trialDays } from "./subscriptionService.js";
 
 /** Buyers can open the storefront (paid, or within the grace days after the paid date). */
@@ -123,6 +124,6 @@ export async function updateStoreLogo(id: string, file: UploadedImage) {
   if (!store) return null;
   const logoUrl = await storeProductImage(file);
   const updated = await updateStore(id, { logoUrl });
-  await deleteStoredImage(store.logoUrl);
+  await Promise.all([deleteStoredImage(store.logoUrl), forgetImage(store.logoUrl)]);
   return updated;
 }

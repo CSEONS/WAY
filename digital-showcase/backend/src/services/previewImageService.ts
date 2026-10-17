@@ -3,6 +3,7 @@ import { z } from "zod";
 import { HttpError } from "../utils/http.js";
 import { parseBody } from "../utils/validation.js";
 import { editImage } from "./aiProvider.js";
+import { coverWithMarker, findLivingBeings } from "./imageModerationService.js";
 import type { UploadedImage } from "./imageService.js";
 
 // «Превью с ИИ» in the product form: the owner's photo turned into a storefront
@@ -157,12 +158,20 @@ export function buildPreviewPrompt(options: PreviewOptions) {
   if (autos.length) lines.push(`Choose automatically whatever fits the product best: ${autos.join(", ")}.`);
 
   const avoid = ["brand logos", "watermarks", "distorted text", "misspelled letters", "blurry product", "low quality", "changes to the product's design, color or proportions", "unrelated extra objects"];
+  // No living beings on the storefront (see imageModerationService): show worn items on an invisible mannequin or laid flat.
+  lines.push("Show no people, body parts, animals or other living beings, and no faces of mannequins or dolls: if the photo has the item on a person, show it on an invisible (ghost) mannequin or laid flat.");
+  avoid.push("people", "faces", "hands", "animals", "birds", "mannequin heads");
   if (!withText) avoid.push("any text", "letters", "numbers");
   lines.push(`Avoid: ${avoid.join(", ")}.`);
   return lines.join("\n");
 }
 
-/** Draws the cover. Returns it as a data: URL; it becomes a product photo only when the owner saves the product. */
+/**
+ * Draws the cover. Returns it as a data: URL; it becomes a product photo only
+ * when the owner saves the product. Living beings the model drew anyway get
+ * their faces covered with marker strokes (`livingBeings` says who was found); if the
+ * picture can't be checked, it isn't shown at all.
+ */
 export async function createProductPreview(options: PreviewOptions, photo: UploadedImage) {
   let reference: Buffer;
   try {
@@ -179,5 +188,14 @@ export async function createProductPreview(options: PreviewOptions, photo: Uploa
     prompt: buildPreviewPrompt(options),
     images: [{ buffer: reference, mimetype: "image/jpeg", filename: "product.jpg" }]
   });
-  return { image: `data:${mimetype};base64,${base64}` };
+  const drawn = Buffer.from(base64, "base64");
+  let beings: Awaited<ReturnType<typeof findLivingBeings>>;
+  try {
+    beings = await findLivingBeings(drawn);
+  } catch {
+    throw new HttpError(502, "Не удалось проверить превью на лица и живых существ — нажмите «Нарисовать ещё»");
+  }
+  if (!beings?.faces.length) return { image: `data:${mimetype};base64,${base64}`, livingBeings: beings?.found ?? [] };
+  const covered = await coverWithMarker(drawn, beings.faces);
+  return { image: `data:image/webp;base64,${covered.toString("base64")}`, livingBeings: beings.found };
 }

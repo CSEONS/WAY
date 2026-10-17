@@ -308,6 +308,28 @@ export const migrations: Migration[] = [
     up(db) {
       db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updatedAt TEXT NOT NULL)");
     }
+  },
+  {
+    version: 9,
+    name: "moderation of photos with living beings",
+    // One row per photo or logo where the AI found people or animals (see imageModerationService).
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS image_checks (
+          id TEXT PRIMARY KEY,
+          url TEXT NOT NULL UNIQUE,
+          kind TEXT NOT NULL CHECK(kind IN ('PRODUCT', 'LOGO')),
+          storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+          productId TEXT REFERENCES products(id) ON DELETE CASCADE,
+          status TEXT NOT NULL CHECK(status IN ('PENDING', 'APPROVED', 'REJECTED')),
+          findings TEXT NOT NULL DEFAULT '',
+          createdAt TEXT NOT NULL,
+          reviewedBy TEXT,
+          reviewedAt TEXT
+        );
+        CREATE INDEX IF NOT EXISTS image_checks_status ON image_checks(status, createdAt);
+      `);
+    }
   }
 ];
 

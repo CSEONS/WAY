@@ -50,10 +50,37 @@ export interface SubscriptionInfo {
   daysLeft: number | null;
 }
 
+export type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** A photo where the AI found people or animals: waits for moderation (hidden from buyers), shown or hidden for good. */
+export interface ImageModeration {
+  status: ModerationStatus;
+  /** What was found, e.g. «лицо человека, кот на принте». */
+  findings: string;
+}
+
 export interface ProductImage {
   id: string;
   url: string;
   sortOrder: number;
+  /** Only in the owner's own view. */
+  moderation?: ImageModeration | null;
+}
+
+/** GET /moderation/images — a photo or logo for the moderator. */
+export interface ImageCheck {
+  id: string;
+  url: string;
+  kind: "PRODUCT" | "LOGO";
+  status: ModerationStatus;
+  findings: string;
+  createdAt: string;
+  reviewedAt: string | null;
+  storeId: string;
+  storeName: string;
+  storeSlug: string;
+  productId: string | null;
+  productTitle: string | null;
 }
 
 export interface ProductSize {
@@ -201,6 +228,8 @@ export interface AdminOverview {
   newLeads: number;
   /** The newest of the new requests, for the top of the page. */
   latestLeads: Lead[];
+  /** Photos with living beings waiting for moderation: buyers don't see them until then. */
+  moderationPending: number;
   /** The last copy failed, or there has been none for over a day. */
   backupProblem: { kind: "failed" | "stale"; at: string | null; error: string | null } | null;
   inactiveDays: number;

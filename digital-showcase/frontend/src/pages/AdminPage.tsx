@@ -4,6 +4,7 @@ import {
   Call02Icon,
   DatabaseRestoreIcon,
   HourglassIcon,
+  ImageNotFound01Icon,
   InboxIcon,
   Invoice01Icon,
   Money03Icon,
@@ -51,6 +52,7 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/reports", label: "Отчёты владельцам", icon: Invoice01Icon },
   { to: "/admin/leads", label: "Заявки с сайта", icon: InboxIcon },
   { to: "/admin/journal", label: "Журнал действий", icon: Note01Icon },
+  { to: "/admin/moderation", label: "Проверка фото", icon: ImageNotFound01Icon },
   { to: "/admin/settings", label: "Настройки: тарифы, контакты, ИИ", icon: Settings02Icon }
 ];
 
@@ -132,7 +134,13 @@ export function AdminPage() {
   const pastDue = overview.overdue.filter((store) => store.subscription.state === "expired");
   const pastDueToCall = pastDue.filter((store) => !dataToDelete.includes(store));
   const urgentCount =
-    awaitingPayment.length + pastDueToCall.length + overview.latestLeads.length + overview.expiring.length + dataToDelete.length + (overview.backupProblem ? 1 : 0);
+    awaitingPayment.length +
+    pastDueToCall.length +
+    overview.latestLeads.length +
+    overview.expiring.length +
+    dataToDelete.length +
+    (overview.backupProblem ? 1 : 0) +
+    (overview.moderationPending ? 1 : 0);
 
   return (
     <Page className={styles.page}>
@@ -145,6 +153,19 @@ export function AdminPage() {
           <AttentionGroup title="Ждут оплаты — витрина ещё видна покупателям" stores={awaitingPayment} onPay={setPayTarget} />
           <AttentionGroup title="Просрочено — витрина закрыта" stores={pastDueToCall} onPay={setPayTarget} />
           <LeadGroup leads={overview.latestLeads} total={overview.newLeads} />
+          {overview.moderationPending > 0 && (
+            <Notice
+              tone="warning"
+              title={`Фото на проверке: ${overview.moderationPending}`}
+              action={
+                <ButtonLink variant="secondary" size="sm" icon={ImageNotFound01Icon} to="/admin/moderation">
+                  Проверить
+                </ButtonLink>
+              }
+            >
+              ИИ нашёл на них людей или животных. Покупатели их не видят, пока вы не решите.
+            </Notice>
+          )}
           <AttentionGroup title="Подписка скоро закончится" stores={overview.expiring} onPay={setPayTarget} />
           <AttentionGroup
             title={`Пора удалить данные: не платят больше ${keepDataDays} дней`}
@@ -212,6 +233,7 @@ export function AdminPage() {
                   {section.to === "/admin/leads" && overview.newLeads > 0 && (
                     <Badge tone="accent">{`${overview.newLeads} ${plural(overview.newLeads, ["новая", "новые", "новых"])}`}</Badge>
                   )}
+                  {section.to === "/admin/moderation" && overview.moderationPending > 0 && <Badge tone="warning">{overview.moderationPending}</Badge>}
                   <Icon icon={ArrowRight01Icon} size="sm" />
                 </span>
               </Link>

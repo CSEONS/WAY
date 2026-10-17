@@ -56,6 +56,8 @@ export interface ProductImage {
   url: string;
   sortOrder: number;
   createdAt: string;
+  /** For the owner only: the photo shows living beings and waits for moderation or was rejected. */
+  moderation?: { status: "PENDING" | "APPROVED" | "REJECTED"; findings: string } | null;
 }
 
 export interface ProductSize {

@@ -125,6 +125,19 @@
 }
 
 /* Small overlay «×» on a photo thumbnail. */
+/* «На проверке» / «Скрыто» over a thumbnail. */
+.imageModeration {
+  position: absolute;
+  right: var(--space-0-5);
+  bottom: var(--space-0-5);
+  left: var(--space-0-5);
+  justify-content: center;
+  overflow: hidden;
+  padding-inline: var(--space-0-5);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .imageRemove {
   position: absolute;
   top: -6px;

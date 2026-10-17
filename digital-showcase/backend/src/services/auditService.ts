@@ -13,7 +13,9 @@ export type AuditAction =
   | "OWNER_DELETED"
   | "STORE_DELETED"
   | "BACKUP_STARTED"
-  | "SETTINGS_CHANGED";
+  | "SETTINGS_CHANGED"
+  | "IMAGE_APPROVED"
+  | "IMAGE_REJECTED";
 
 export interface AuditTarget {
   type: "store" | "owner" | "payment";

@@ -4,6 +4,7 @@ import * as aiUsageService from "../services/aiUsageService.js";
 import { previewSettings } from "../services/aiProvider.js";
 import { settings } from "../services/settingsService.js";
 import * as analyticsService from "../services/analyticsService.js";
+import { checkImage } from "../services/imageModerationService.js";
 import { readStoredImage } from "../services/imageService.js";
 import { createProductPreview, parsePreviewOptions } from "../services/previewImageService.js";
 import * as paymentService from "../services/paymentService.js";
@@ -96,7 +97,10 @@ export const updateStore = asyncHandler(async (req, res) => {
 export const updateStoreLogo = asyncHandler(async (req, res) => {
   if (!req.file) throw new HttpError(400, "Выберите изображение логотипа");
   const store = await scopedStore(req);
-  res.json(await storeService.updateStoreLogo(store.id, req.file));
+  const updated = await storeService.updateStoreLogo(store.id, req.file);
+  // People or animals on it: hidden from buyers until a moderator looks (after the answer, it takes a few seconds).
+  if (updated?.logoUrl) void checkImage({ url: updated.logoUrl, kind: "LOGO", storeId: store.id }, req.file.buffer);
+  res.json(updated);
 });
 
 export const listProducts = asyncHandler(async (req, res) => {
@@ -189,9 +193,11 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 export const addImage = asyncHandler(async (req, res) => {
   if (!req.file) throw new HttpError(400, "Файл не загружен");
   const store = await scopedStore(req);
-  const product = await productService.addProductImage(String(req.params.id), store.id, req.file);
-  if (!product) throw new HttpError(404, "Товар не найден");
-  res.status(201).json(product);
+  const added = await productService.addProductImage(String(req.params.id), store.id, req.file);
+  if (!added) throw new HttpError(404, "Товар не найден");
+  // People or animals on it: hidden from buyers until a moderator looks (after the answer, it takes a few seconds).
+  void checkImage({ url: added.url, kind: "PRODUCT", storeId: store.id, productId: added.product.id }, req.file.buffer);
+  res.status(201).json(added.product);
 });
 
 export const deleteImage = asyncHandler(async (req, res) => {

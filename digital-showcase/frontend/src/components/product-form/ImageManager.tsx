@@ -2,7 +2,7 @@ import { AiMagicIcon, Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeic
 import { useState } from "react";
 import type { Product } from "../../types/models";
 import { compressImages } from "../../utils/compressImage";
-import { Button, Card, CardHeader, FileButton, Icon, cx } from "../../ui";
+import { Badge, Button, Card, CardHeader, FileButton, Icon, Notice, cx } from "../../ui";
 import { ProductPhoto } from "../ProductPhoto";
 import { createId, initialImages } from "./helpers";
 import type { ProductFormImage } from "./types";
@@ -80,9 +80,23 @@ export function ImageManager({ manager, onCreatePreview }: { manager: ImageManag
                 <button type="button" className={styles.imageRemove} aria-label={`Удалить ${image.name}`} title="Удалить" onClick={() => removeImage(image.id)}>
                   <Icon icon={Cancel01Icon} size="xs" strokeWidth={2} />
                 </button>
+                {image.moderation && image.moderation.status !== "APPROVED" && (
+                  <Badge tone={image.moderation.status === "PENDING" ? "warning" : "danger"} className={styles.imageModeration}>
+                    {image.moderation.status === "PENDING" ? "Проверка" : "Скрыто"}
+                  </Badge>
+                )}
               </div>
             ))}
           </div>
+          {images.some((image) => image.moderation && image.moderation.status !== "APPROVED") && (
+            <Notice tone="warning" title="Покупатели не видят часть фото">
+              На них {images
+                .filter((image) => image.moderation && image.moderation.status !== "APPROVED")
+                .map((image) => image.moderation!.findings)
+                .join("; ")}
+              . На витрине нельзя показывать людей и животных: такие фото проверяет администратор. «Скрыто» — фото не прошло проверку, его лучше удалить.
+            </Notice>
+          )}
           {onCreatePreview && (
             <Button variant="secondary" icon={AiMagicIcon} block onClick={onCreatePreview}>
               Сделать превью с ИИ

@@ -33,6 +33,8 @@ interface PreviewGeneratorProps {
 interface Result {
   file: File;
   url: string;
+  /** Living beings the model drew anyway; their faces are covered with marker. */
+  livingBeings: string[];
 }
 
 /**
@@ -110,10 +112,10 @@ export function PreviewGenerator({ path, images, coverId, product, onUse, onClos
           colors
         })
       );
-      const { data } = await api.post<{ image: string }>(path, formData);
+      const { data } = await api.post<{ image: string; livingBeings: string[] }>(path, formData);
       const file = dataUrlToFile(data.image, `ai-preview-${Date.now()}`);
       setSelected(results.length);
-      setResults((current) => [...current, { file, url: URL.createObjectURL(file) }]);
+      setResults((current) => [...current, { file, url: URL.createObjectURL(file), livingBeings: data.livingBeings ?? [] }]);
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Не удалось нарисовать превью. Проверьте интернет и попробуйте ещё раз.");
     } finally {
@@ -180,6 +182,12 @@ export function PreviewGenerator({ path, images, coverId, product, onUse, onClos
                 </button>
               ))}
             </div>
+          )}
+          {chosen.livingBeings.length > 0 && (
+            <Notice tone="warning" title="ИИ нарисовал живых существ">
+              {chosen.livingBeings.join(", ")} — лица замазаны маркером. Такую обложку покупатели увидят только после проверки администратором; лучше нарисовать
+              ещё раз.
+            </Notice>
           )}
           <p className={styles.hint}>Нравится — нажмите «Сделать обложкой». Нет — поменяйте настройки ниже и нарисуйте ещё.</p>
         </div>

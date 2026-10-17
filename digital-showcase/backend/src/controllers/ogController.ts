@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { asyncHandler, requestOrigin } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
+import { publicLogo } from "../services/imageModerationService.js";
 import * as productService from "../services/productService.js";
 
 // Renders minimal static HTML with Open Graph tags for link-preview crawlers
@@ -74,12 +75,13 @@ export const renderStoreOg = asyncHandler(async (req: Request, res: Response) =>
   const url = `${origin}/m/${encodeURIComponent(slug)}`;
 
   const store = await storeService.getStoreBySlug(slug);
+  const logoUrl = store ? await publicLogo(store.logoUrl) : null;
   const { html, status } =
     store && storeService.isSubscriptionValid(store)
       ? renderOgPage({
           title: store.name,
           description: store.description ? truncate(store.description, 200) : `Витрина ${store.name}`,
-          image: store.logoUrl ? `${origin}${store.logoUrl}` : null,
+          image: logoUrl ? `${origin}${logoUrl}` : null,
           url,
           status: 200
         })
@@ -110,7 +112,8 @@ export const renderProductOg = asyncHandler(async (req: Request, res: Response) 
 
   const priceText = product.priceText || (product.price != null ? `${product.price.toLocaleString("ru-RU")} ₽` : "");
   const description = product.description ? truncate(product.description, 180) : [store.name, priceText].filter(Boolean).join(" · ");
-  const image = product.images[0]?.url ? `${origin}${product.images[0].url}` : store.logoUrl ? `${origin}${store.logoUrl}` : null;
+  const logoUrl = await publicLogo(store.logoUrl);
+  const image = product.images[0]?.url ? `${origin}${product.images[0].url}` : logoUrl ? `${origin}${logoUrl}` : null;
 
   const { html, status } = renderOgPage({
     title: `${product.title} — ${store.name}`,

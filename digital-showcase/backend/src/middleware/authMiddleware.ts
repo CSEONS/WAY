@@ -22,6 +22,12 @@ export function adminOnly(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
+/** Moderation of photos with living beings: the admin for now; a moderator role can be let in here later. */
+export function moderatorOnly(req: Request, _res: Response, next: NextFunction) {
+  if (req.user?.role !== "ADMIN") return next(new HttpError(403, "Доступ только для модератора"));
+  next();
+}
+
 export function ownerOnly(req: Request, _res: Response, next: NextFunction) {
   if (req.user?.role !== "OWNER") return next(new HttpError(403, "Доступ только для владельца"));
   next();

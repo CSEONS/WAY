@@ -120,7 +120,8 @@ export function initialImages(initial?: Product): ProductFormImage[] {
       existingId: image.id,
       file: null,
       name: "Картинка товара",
-      url: image.url
+      url: image.url,
+      moderation: image.moderation ?? null
     })) ?? []
   );
 }

@@ -3,6 +3,7 @@ import type { Lead, Store } from "../types/models.js";
 import { aiSettings, previewSettings } from "./aiProvider.js";
 import { monthlyLimit, monthSpend, monthStart, usageByStore } from "./aiUsageService.js";
 import { backupSettings, lastSuccessfulBackup, listBackupRuns } from "./backupService.js";
+import { countPending } from "./imageModerationService.js";
 import { revenueByMonth } from "./paymentService.js";
 import { subscriptionInfo } from "./subscriptionService.js";
 
@@ -21,7 +22,7 @@ type StoreWithOwner = Store & { ownerName: string; ownerPhone: string | null; ow
 /** Everything the admin panel's first screen needs, in one request. */
 export async function adminOverview(now = new Date()) {
   const db = await getDb();
-  const [stores, products, aiUsage, aiSpend, contacts, revenue, newLeads, latestLeads, backup] = await Promise.all([
+  const [stores, products, aiUsage, aiSpend, contacts, revenue, newLeads, latestLeads, backup, moderationPending] = await Promise.all([
     db.all<StoreWithOwner>(
       "SELECT s.*, u.name as ownerName, u.phone as ownerPhone, u.lastSeenAt as ownerLastSeenAt FROM stores s JOIN users u ON u.id = s.ownerId"
     ),
@@ -35,7 +36,8 @@ export async function adminOverview(now = new Date()) {
     revenueByMonth(6, now),
     db.get<{ count: number }>("SELECT COUNT(*) as count FROM leads WHERE status = 'NEW'"),
     db.all<Lead>("SELECT * FROM leads WHERE status = 'NEW' ORDER BY createdAt DESC LIMIT ?", LATEST_LEADS),
-    backupProblem(now)
+    backupProblem(now),
+    countPending()
   ]);
 
   const inactiveSince = now.getTime() - INACTIVE_DAYS * DAY_MS;
@@ -75,6 +77,8 @@ export async function adminOverview(now = new Date()) {
     newLeads: newLeads?.count ?? 0,
     latestLeads,
     backupProblem: backup,
+    /** Photos with living beings waiting for moderation: hidden from buyers until then. */
+    moderationPending,
     inactiveDays: INACTIVE_DAYS
   };
 }

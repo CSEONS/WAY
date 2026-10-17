@@ -1,4 +1,4 @@
-import type { ProductStatus } from "../../types/models";
+import type { ImageModeration, ProductStatus } from "../../types/models";
 import type { SimpleDetails } from "./simple";
 
 export interface VariantFormRow {
@@ -57,6 +57,8 @@ export interface ProductFormImage {
   file: File | null;
   name: string;
   url: string;
+  /** A saved photo with people or animals on it: on moderation or hidden. */
+  moderation?: ImageModeration | null;
 }
 
 export interface ProductImageSelection {

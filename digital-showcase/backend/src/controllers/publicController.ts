@@ -2,6 +2,7 @@ import { asyncHandler, HttpError } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
 import * as analyticsService from "../services/analyticsService.js";
+import { publicLogo } from "../services/imageModerationService.js";
 import { publicSettings } from "../services/settingsService.js";
 
 /** Plans and contacts for the landing, help videos, requisites for /offer and /privacy — from «Настройки». */
@@ -13,7 +14,8 @@ async function publicStore(slug: string) {
   const store = await storeService.getStoreBySlug(slug);
   if (!store) throw new HttpError(404, "Магазин не найден");
   if (!storeService.isSubscriptionValid(store)) throw new HttpError(403, "Магазин временно недоступен");
-  return store;
+  // A logo with people or animals waits for moderation; buyers see the store without it meanwhile.
+  return { ...store, logoUrl: await publicLogo(store.logoUrl) };
 }
 
 export const getStore = asyncHandler(async (req, res) => {

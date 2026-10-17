@@ -1,6 +1,7 @@
 import { getDb } from "../database/db.js";
 import type { Product, ProductColor, ProductFull, ProductImage, ProductSize, ProductVariant } from "../types/models.js";
 import { deleteStoredImage, storeProductImage, type UploadedImage } from "./imageService.js";
+import { forgetImage, moderationOf, visibleToBuyers } from "./imageModerationService.js";
 
 type ProductVariantInput = {
   colorName?: string;
@@ -19,14 +20,21 @@ function groupByProduct<T extends { productId: string }>(rows: T[]) {
   return groups;
 }
 
-/** Loads images, sizes, colors and variants for many products in 4 queries instead of 4 per product. */
-async function enrichMany(products: Product[]): Promise<ProductFull[]> {
+/**
+ * Loads images, sizes, colors and variants for many products in 4 queries
+ * instead of 4 per product. Buyers (publicOnly) don't get photos waiting for
+ * moderation or rejected by it; the owner gets every photo with its moderation.
+ */
+async function enrichMany(products: Product[], publicOnly = false): Promise<ProductFull[]> {
   if (!products.length) return [];
   const db = await getDb();
   const ids = products.map((product) => product.id);
   const inList = ids.map(() => "?").join(", ");
   const [images, sizes, colors, variants] = await Promise.all([
-    db.all<ProductImage>(`SELECT * FROM product_images WHERE productId IN (${inList}) ORDER BY sortOrder, createdAt`, ids),
+    db.all<ProductImage>(
+      `SELECT * FROM product_images WHERE productId IN (${inList}) ${publicOnly ? `AND ${visibleToBuyers("product_images.url")}` : ""} ORDER BY sortOrder, createdAt`,
+      ids
+    ),
     db.all<ProductSize>(`SELECT * FROM product_sizes WHERE productId IN (${inList}) ORDER BY value`, ids),
     db.all<ProductColor>(`SELECT * FROM product_colors WHERE productId IN (${inList}) ORDER BY name`, ids),
     db.all<ProductVariant>(`SELECT * FROM product_variants WHERE productId IN (${inList}) ORDER BY colorName, size`, ids)
@@ -35,6 +43,10 @@ async function enrichMany(products: Product[]): Promise<ProductFull[]> {
   const sizesBy = groupByProduct(sizes);
   const colorsBy = groupByProduct(colors);
   const variantsBy = groupByProduct(variants);
+  if (!publicOnly) {
+    const moderation = await moderationOf(images.map((image) => image.url));
+    for (const image of images) image.moderation = moderation.get(image.url) ?? null;
+  }
   return products.map((product) => ({
     ...product,
     images: imagesBy.get(product.id) ?? [],
@@ -44,8 +56,8 @@ async function enrichMany(products: Product[]): Promise<ProductFull[]> {
   }));
 }
 
-async function enrich(product: Product): Promise<ProductFull> {
-  const [full] = await enrichMany([product]);
+async function enrich(product: Product, publicOnly = false): Promise<ProductFull> {
+  const [full] = await enrichMany([product], publicOnly);
   return full;
 }
 
@@ -111,7 +123,7 @@ export async function listProducts(
   const { sql, params } = productWhere(storeId, publicOnly, filters);
   const page = options.limit ? ` LIMIT ${Math.max(1, Math.floor(options.limit))} OFFSET ${Math.max(0, Math.floor(options.offset ?? 0))}` : "";
   const products = await db.all<Product>(`SELECT p.* FROM products p WHERE ${sql} ORDER BY ${ORDER_BY[options.sort ?? "new"]}${page}`, params);
-  return enrichMany(products);
+  return enrichMany(products, publicOnly);
 }
 
 export async function countProducts(storeId: string, publicOnly = false, filters: ProductFilters = {}) {
@@ -151,7 +163,7 @@ export async function getProduct(id: string, storeId?: string, publicOnly = fals
     `SELECT * FROM products WHERE id = ? ${storeId ? "AND storeId = ?" : ""} ${publicOnly ? "AND isVisible = 1" : ""}`,
     ...(storeId ? [id, storeId] : [id])
   );
-  return product ? enrich(product) : null;
+  return product ? enrich(product, publicOnly) : null;
 }
 
 async function replaceDetails(productId: string, sizes?: string[], colors?: { name: string; hex?: string | null }[]) {
@@ -294,7 +306,8 @@ export async function addProductImage(productId: string, storeId: string, file: 
     count?.count ?? 0,
     new Date().toISOString()
   );
-  return getProduct(productId, storeId);
+  const updated = await getProduct(productId, storeId);
+  return updated && { product: updated, url };
 }
 
 export async function deleteProductImage(productId: string, storeId: string, imageId: string) {
@@ -303,7 +316,7 @@ export async function deleteProductImage(productId: string, storeId: string, ima
   const db = await getDb();
   const image = await db.get<ProductImage>("SELECT * FROM product_images WHERE id = ? AND productId = ?", imageId, productId);
   await db.run("DELETE FROM product_images WHERE id = ? AND productId = ?", imageId, productId);
-  await deleteStoredImage(image?.url);
+  await Promise.all([deleteStoredImage(image?.url), forgetImage(image?.url)]);
   return getProduct(productId, storeId);
 }
 

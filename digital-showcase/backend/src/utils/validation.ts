@@ -227,6 +227,8 @@ export const connectSchema = z.object({
 
 export const leadStatusSchema = z.object({ status: z.enum(["NEW", "DONE"]) });
 
+export const moderationReviewSchema = z.object({ status: z.enum(["APPROVED", "REJECTED"]) });
+
 // «Настройки»
 
 const plan = z.object({

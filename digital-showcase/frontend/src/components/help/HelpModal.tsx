@@ -1,10 +1,10 @@
 import { Call02Icon, PlayCircleIcon, TelegramIcon, WhatsappIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
+import { useSiteSettings } from "../../state/siteSettings";
 import type { SupportContacts } from "../../types/models";
 import { ButtonLink, Icon, LoadingState, Modal } from "../../ui";
 import { phoneUrl, telegramUrl, whatsappUrl } from "../../utils/contact";
-import { HELP_VIDEOS } from "./config";
 import styles from "./HelpModal.module.css";
 
 const QUESTIONS = [
@@ -41,6 +41,8 @@ const QUESTIONS = [
 /** «Помощь»: write or call support, short videos, answers to the usual questions. */
 export function HelpModal({ onClose }: { onClose: () => void }) {
   const [support, setSupport] = useState<SupportContacts | null>();
+  // Links to the videos are on «Настройки» in the admin panel.
+  const videos = useSiteSettings()?.helpVideos ?? [];
 
   useEffect(() => {
     api
@@ -83,11 +85,11 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         <p className={styles.muted}>Напишите администратору, который подключал вам витрину.</p>
       )}
 
-      {HELP_VIDEOS.length > 0 && (
+      {videos.length > 0 && (
         <section className={styles.section}>
           <h3 className={styles.heading}>Видео</h3>
           <ul className={styles.videos}>
-            {HELP_VIDEOS.map((video) => (
+            {videos.map((video) => (
               <li key={video.url}>
                 <a href={video.url} target="_blank" rel="noreferrer">
                   <Icon icon={PlayCircleIcon} size="md" />

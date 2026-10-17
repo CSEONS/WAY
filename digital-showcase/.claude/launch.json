@@ -12,18 +12,6 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
       "port": 5173
-    },
-    {
-      "name": "verify-backend",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["C:/Users/ashab/AppData/Local/Temp/claude/C--Users-ashab-source-repos-WAY-digital-showcase/fc3f471b-4049-4fc0-b71a-ca7a113dbcf3/scratchpad/verify/start-backend.mjs"],
-      "port": 4100
-    },
-    {
-      "name": "verify-frontend",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["C:/Users/ashab/AppData/Local/Temp/claude/C--Users-ashab-source-repos-WAY-digital-showcase/fc3f471b-4049-4fc0-b71a-ca7a113dbcf3/scratchpad/verify/start-frontend.mjs"],
-      "port": 5273
     }
   ]
 }

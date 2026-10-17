@@ -28,6 +28,12 @@ const LABELS: Record<string, string> = {
   category: "Категория",
   status: "Наличие",
   isVisible: "Показывать на витрине",
+  scene: "Фон",
+  theme: "Цвета оформления",
+  text: "Надписи",
+  headline: "Заголовок",
+  features: "Преимущества",
+  showColors: "Показать все цвета",
   isActive: "Магазин включён",
   aiFormEnabled: "Тариф",
   aiMonthlyLimit: "Лимит ИИ",
@@ -45,7 +51,20 @@ const LABELS: Record<string, string> = {
   method: "Способ оплаты",
   comment: "Комментарий",
   trialDays: "Пробный период",
-  days: "Дни"
+  days: "Дни",
+  demoStoreSlug: "Демо-магазин",
+  url: "Ссылка",
+  operator: "Исполнитель",
+  taxStatus: "Статус",
+  inn: "ИНН",
+  ogrn: "ОГРН",
+  updatedAt: "Дата редакции",
+  keepDataDays: "Хранить данные после оплаты",
+  aiPreviewUnits: "Превью списывает карточек",
+  aiModel: "Модель для карточек",
+  aiPreviewModel: "Модель для превью",
+  aiPreviewQuality: "Качество превью",
+  aiRubPerUsd: "Курс"
 };
 
 function valueAt(data: unknown, path: PropertyKey[]) {
@@ -207,3 +226,45 @@ export const connectSchema = z.object({
 });
 
 export const leadStatusSchema = z.object({ status: z.enum(["NEW", "DONE"]) });
+
+// «Настройки»
+
+const plan = z.object({
+  name: requiredText(60),
+  price: price.transform((value) => value ?? null),
+  description: text(300),
+  features: z.array(requiredText(120)).max(12)
+});
+const link = text(500).refine((value) => /^https?:\/\/\S+$/i.test(value), { message: "нужна ссылка, которая начинается с https://" });
+/** Rubles per dollar: "85", "92,5" or empty for «not set». */
+const rate = z.preprocess(
+  (value) => (value === "" || value == null ? null : typeof value === "string" ? Number(value.replace(",", ".")) : value),
+  z.number().positive().max(1000).nullable()
+);
+
+export const settingsSchema = z.object({
+  plans: z.object({ basic: plan, ai: plan }),
+  demoStoreSlug: text(40),
+  salesContacts: z.object({ whatsapp: text(40), phone: text(40) }),
+  support: z.object({ whatsapp: text(40), phone: text(40), telegram: text(100) }),
+  helpVideos: z.array(z.object({ title: requiredText(120), url: link })).max(20),
+  legal: z.object({
+    operator: text(200),
+    taxStatus: text(200),
+    inn: text(20),
+    ogrn: text(20),
+    email: text(200),
+    phone: text(40),
+    address: text(300),
+    updatedAt: isoDate,
+    keepDataDays: z.coerce.number().int().min(1).max(3650)
+  }),
+  trialDays: z.coerce.number().int().min(1).max(60),
+  aiMonthlyLimit: z.coerce.number().int().min(0).max(10_000),
+  aiPreviewUnits: z.coerce.number().int().min(1).max(20),
+  aiModel: requiredText(100),
+  aiPreviewEnabled: z.boolean(),
+  aiPreviewModel: requiredText(100),
+  aiPreviewQuality: z.enum(["low", "medium", "high"]),
+  aiRubPerUsd: rate
+});

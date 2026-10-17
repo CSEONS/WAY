@@ -1,7 +1,7 @@
 // Creates the demo storefront the landing page links to («Посмотреть пример»):
 // store /m/demo with ten products, drawn illustrations instead of photos.
-// Its WhatsApp and phone are SUPPORT_WHATSAPP / SUPPORT_PHONE, so a visitor
-// who taps «Написать» in the example reaches you. Runs once; if the store
+// Its WhatsApp and phone are your contacts from «Настройки» (for owners), so a
+// visitor who taps «Написать» in the example reaches you. Runs once; if the store
 // exists, nothing changes. Edit it afterwards via «Войти как владелец».
 //   Docker:  docker compose exec -u node backend npm run demo:seed
 //   Locally: npx tsx src/scripts/seedDemo.ts
@@ -9,6 +9,7 @@ import crypto from "node:crypto";
 import sharp from "sharp";
 import { closeDb, getDb, initDatabase } from "../database/db.js";
 import { addProductImage, createProduct } from "../services/productService.js";
+import { loadSettings, settings } from "../services/settingsService.js";
 import { createStore, getStoreBySlug, updateStore } from "../services/storeService.js";
 import { createOwner } from "../services/userService.js";
 import type { ProductStatus } from "../types/models.js";
@@ -189,6 +190,7 @@ const products: DemoProduct[] = [
 ];
 
 await initDatabase();
+loadSettings();
 if (await getStoreBySlug(SLUG)) {
   console.log(`Store /m/${SLUG} already exists — nothing to do.`);
   closeDb();
@@ -199,7 +201,8 @@ const db = await getDb();
 const email = `demo-${crypto.randomBytes(4).toString("hex")}@showcase.local`;
 // Nobody signs in with this password: the admin opens the store via «Войти как владелец».
 const owner = await createOwner({ name: "Демо-магазин", email, password: crypto.randomBytes(24).toString("hex") });
-const contact = process.env.SUPPORT_WHATSAPP?.trim() || process.env.SUPPORT_PHONE?.trim() || null;
+const support = settings().support;
+const contact = support.whatsapp || support.phone || null;
 const store = await createStore({
   ownerId: owner!.id,
   name: "Пример витрины",
@@ -207,9 +210,9 @@ const store = await createStore({
   description: "Так покупатели видят ваш магазин: каталог с фото, ценами, размерами и наличием. Товары здесь для примера.",
   address: "ул. Примерная, 1",
   workingHours: "Ежедневно 10:00–20:00",
-  whatsapp: process.env.SUPPORT_WHATSAPP?.trim() || contact,
-  phone: process.env.SUPPORT_PHONE?.trim() || contact,
-  telegram: process.env.SUPPORT_TELEGRAM?.trim() || null
+  whatsapp: support.whatsapp || contact,
+  phone: support.phone || contact,
+  telegram: support.telegram || null
 });
 // The example never expires.
 await updateStore(store!.id, { subscriptionEndsAt: null });
@@ -239,5 +242,5 @@ for (const [index, item] of products.entries()) {
   await db.run("UPDATE products SET createdAt = ?, updatedAt = ? WHERE id = ?", createdAt, createdAt, product!.id);
 }
 
-console.log(`Demo store is ready: /m/${SLUG} (${products.length} products).${contact ? "" : " Set SUPPORT_WHATSAPP to show contact buttons in it."}`);
+console.log(`Demo store is ready: /m/${SLUG} (${products.length} products).${contact ? "" : " Fill in WhatsApp or phone on «Настройки» → «Контакты для владельцев» to show contact buttons in it."}`);
 closeDb();

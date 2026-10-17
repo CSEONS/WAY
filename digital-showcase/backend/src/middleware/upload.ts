@@ -44,6 +44,18 @@ export const aiDraftUpload = multer({
   }
 });
 
+/** «Превью с ИИ»: one photo of the product (or the address of a saved one in the body). */
+export const previewUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: imageUploadMaxBytes, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (file.fieldname !== "image" || !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
+      return cb(new HttpError(400, "Для превью нужно одно фото товара: jpg, png или webp"));
+    }
+    cb(null, true);
+  }
+});
+
 export const bulkAiDraftUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: imageUploadMaxBytes, files: 41 },

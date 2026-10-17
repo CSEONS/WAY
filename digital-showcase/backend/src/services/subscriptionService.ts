@@ -1,4 +1,5 @@
 import type { Store } from "../types/models.js";
+import { settings } from "./settingsService.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -7,10 +8,9 @@ export const GRACE_DAYS = 3;
 /** Warn the owner this many days before the paid date. */
 export const WARNING_DAYS = 7;
 
-/** Free period for a newly connected store. */
+/** Free period for a newly connected store («Настройки»). */
 export function trialDays() {
-  const days = Number(process.env.TRIAL_DAYS);
-  return Number.isInteger(days) && days > 0 ? days : 14;
+  return settings().trialDays;
 }
 
 export type SubscriptionState =

@@ -26,6 +26,7 @@ const AdminConnectPage = lazy(() => import("../pages/AdminConnectPage").then((m)
 const AdminPaymentsPage = lazy(() => import("../pages/AdminPaymentsPage").then((m) => ({ default: m.AdminPaymentsPage })));
 const AdminReportsPage = lazy(() => import("../pages/AdminReportsPage").then((m) => ({ default: m.AdminReportsPage })));
 const AdminJournalPage = lazy(() => import("../pages/AdminJournalPage").then((m) => ({ default: m.AdminJournalPage })));
+const AdminSettingsPage = lazy(() => import("../pages/AdminSettingsPage").then((m) => ({ default: m.AdminSettingsPage })));
 const PrivacyPage = lazy(() => import("../pages/legal/PrivacyPage").then((m) => ({ default: m.PrivacyPage })));
 const OfferPage = lazy(() => import("../pages/legal/OfferPage").then((m) => ({ default: m.OfferPage })));
 const SubscriptionPage = lazy(() => import("../pages/SubscriptionPage").then((m) => ({ default: m.SubscriptionPage })));
@@ -81,6 +82,7 @@ export function AppRoutes({ user, isAuthLoading, onLogin, onLogout }: Props) {
             <Route path="/admin/payments" element={<AdminPaymentsPage />} />
             <Route path="/admin/reports" element={<AdminReportsPage />} />
             <Route path="/admin/journal" element={<AdminJournalPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
           </Route>
         </Routes>
       </Suspense>

@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { api } from "../../api/client";
+import { useSiteSettings } from "../../state/siteSettings";
 import type { PaymentMethod, Store, SubscriptionInfo } from "../../types/models";
 import { formatDate, formatMoney } from "../../utils/format";
 import { Button, Field, Input, Modal, SegmentedControl, Select, Textarea, useToast } from "../../ui";
@@ -28,7 +29,8 @@ function previewEnd(endsAt: string | null | undefined, months: number) {
 }
 
 interface AcceptPaymentModalProps {
-  store: { id: string; name: string; subscriptionEndsAt: string | null; subscription?: SubscriptionInfo };
+  /** aiFormEnabled picks the plan whose price is suggested: «Витрина» or «Витрина + ИИ». */
+  store: { id: string; name: string; subscriptionEndsAt: string | null; subscription?: SubscriptionInfo; aiFormEnabled?: number | boolean };
   onClose: () => void;
   onPaid: (store: Store) => void;
 }
@@ -37,6 +39,7 @@ interface AcceptPaymentModalProps {
 export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModalProps) {
   const toast = useToast();
   const [amount, setAmount] = useState("");
+  const [amountTouched, setAmountTouched] = useState(false);
   const [period, setPeriod] = useState<Period>("1");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [comment, setComment] = useState("");
@@ -45,10 +48,14 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
   const [isSaving, setIsSaving] = useState(false);
   const months = Number(period);
   const endsAt = previewEnd(store.subscriptionEndsAt, months);
+  // The plan's price from «Настройки» × the period, until the admin types another sum.
+  const site = useSiteSettings();
+  const plan = site && store.aiFormEnabled !== undefined ? (store.aiFormEnabled ? site.plans.ai : site.plans.basic) : null;
+  const shownAmount = !amountTouched && plan?.price != null ? String(plan.price * months) : amount;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const rubles = amount.trim() === "" ? NaN : Number(amount.replace(/\s/g, ""));
+    const rubles = shownAmount.trim() === "" ? NaN : Number(shownAmount.replace(/\s/g, ""));
     if (!Number.isInteger(rubles) || rubles < 0) {
       setError("Сумма в рублях, целым числом. 0 — продлить бесплатно.");
       return;
@@ -83,13 +90,19 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
         </>
       }
     >
-      <Field label="Сумма, ₽" error={error} required>
+      <Field
+        label="Сумма, ₽"
+        hint={plan?.price != null ? `Тариф «${plan.name}» — ${formatMoney(plan.price)} в месяц` : undefined}
+        error={error}
+        required
+      >
         <Input
           inputMode="numeric"
           placeholder="1500"
-          value={amount}
+          value={shownAmount}
           onChange={(e) => {
             setAmount(e.target.value);
+            setAmountTouched(true);
             setError("");
           }}
         />

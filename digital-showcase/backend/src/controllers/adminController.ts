@@ -7,9 +7,11 @@ import {
   parseBody,
   paymentSchema,
   receiptSchema,
+  settingsSchema,
   storeCreateSchema,
   storeUpdateSchema
 } from "../utils/validation.js";
+import { knownModels } from "../services/aiPrices.js";
 import * as aiProvider from "../services/aiProvider.js";
 import * as auditService from "../services/auditService.js";
 import * as authService from "../services/authService.js";
@@ -18,6 +20,7 @@ import * as onboardingService from "../services/onboardingService.js";
 import * as overviewService from "../services/overviewService.js";
 import * as paymentService from "../services/paymentService.js";
 import * as reportService from "../services/reportService.js";
+import * as settingsService from "../services/settingsService.js";
 import * as userService from "../services/userService.js";
 import * as storeService from "../services/storeService.js";
 import { withSubscription } from "../services/subscriptionService.js";
@@ -230,6 +233,17 @@ export const startBackup = asyncHandler(async (req, res) => {
 /** Where AI requests go (no key) — for the admin panel. */
 export const aiStatus = asyncHandler(async (_req, res) => {
   res.json(aiProvider.aiSummary());
+});
+
+/** «Настройки»: plans, contacts, requisites, the trial and AI — plus priced model names to pick from. */
+export const getSettings = asyncHandler(async (_req, res) => {
+  res.json({ settings: settingsService.settings(), models: knownModels() });
+});
+
+export const updateSettings = asyncHandler(async (req, res) => {
+  const saved = settingsService.saveSettings(parseBody(settingsSchema, req.body));
+  await auditService.logAction(req.user!.userId, "SETTINGS_CHANGED");
+  res.json({ settings: saved, models: knownModels() });
 });
 
 /** «Проверить»: one tiny request to the configured provider, e.g. right after switching it. */

@@ -131,6 +131,7 @@ export function ProductEditorPage() {
           key={formKey}
           initial={product}
           aiDraftPath={`/owner/stores/${storeId}/products/ai-draft`}
+          aiPreviewPath={store?.aiPreviewEnabled ? `/owner/stores/${storeId}/products/ai-preview` : undefined}
           aiFormEnabled={Boolean(store?.aiFormEnabled)}
           draftKey={`product-form-draft:${storeId}:${id ?? "new"}`}
           onSubmit={handleSubmit}

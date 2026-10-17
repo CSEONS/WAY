@@ -12,7 +12,8 @@ export type AuditAction =
   | "OWNER_PASSWORD_SET"
   | "OWNER_DELETED"
   | "STORE_DELETED"
-  | "BACKUP_STARTED";
+  | "BACKUP_STARTED"
+  | "SETTINGS_CHANGED";
 
 export interface AuditTarget {
   type: "store" | "owner" | "payment";

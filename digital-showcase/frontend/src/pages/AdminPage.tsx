@@ -8,6 +8,7 @@ import {
   Note01Icon,
   Package01Icon,
   PlusSignIcon,
+  Settings02Icon,
   Store01Icon,
   UserAccountIcon
 } from "@hugeicons/core-free-icons";
@@ -17,8 +18,8 @@ import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
 import { AiProviderCard } from "../components/admin/AiProviderCard";
 import { BackupCard } from "../components/admin/BackupCard";
+import { useSiteSettings } from "../state/siteSettings";
 import type { AdminOverview, OverviewStore } from "../types/models";
-import { LEGAL } from "./legal/config";
 import { formatLastSeen, formatMoney, formatMonth, plural } from "../utils/format";
 import { phoneUrl } from "../utils/contact";
 import { subscriptionBadge } from "../utils/subscription";
@@ -31,16 +32,19 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/payments", label: "Оплаты", icon: Money03Icon },
   { to: "/admin/reports", label: "Отчёты владельцам", icon: Invoice01Icon },
   { to: "/admin/leads", label: "Заявки с сайта", icon: InboxIcon },
-  { to: "/admin/journal", label: "Журнал действий", icon: Note01Icon }
+  { to: "/admin/journal", label: "Журнал действий", icon: Note01Icon },
+  { to: "/admin/settings", label: "Настройки: тарифы, контакты, ИИ", icon: Settings02Icon }
 ];
 
-type PayTarget = Pick<OverviewStore, "id" | "name" | "subscriptionEndsAt" | "subscription">;
+type PayTarget = Pick<OverviewStore, "id" | "name" | "subscriptionEndsAt" | "subscription" | "aiFormEnabled">;
 
 /** The admin's first screen: who to call today, money, AI spend, every store at a glance. */
 export function AdminPage() {
   const [overview, setOverview] = useState<AdminOverview>();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
+  // The privacy policy promises to delete a store's data this long after the paid date («Настройки» → «Реквизиты»).
+  const keepDataDays = useSiteSettings()?.legal.keepDataDays ?? 90;
 
   function load() {
     api
@@ -84,8 +88,7 @@ export function AdminPage() {
 
   const workingStores = overview.stores.filter((store) => !["expired", "disabled"].includes(store.subscription.state)).length;
   const currentMonth = overview.revenue.byMonth[overview.revenue.byMonth.length - 1];
-  // The privacy policy promises to delete a store's data this long after the paid date.
-  const deleteAfter = Date.now() - LEGAL.keepDataDays * 24 * 60 * 60 * 1000;
+  const deleteAfter = Date.now() - keepDataDays * 24 * 60 * 60 * 1000;
   const dataToDelete = overview.overdue.filter((store) => store.subscription.endsAt && Date.parse(store.subscription.endsAt) < deleteAfter);
   const overdue = overview.overdue.filter((store) => !dataToDelete.includes(store));
   const needsAttention = overview.expiring.length + overview.overdue.length + overview.inactive.length > 0;
@@ -101,12 +104,12 @@ export function AdminPage() {
         <Stat
           icon={AiMagicIcon}
           label="ИИ за месяц"
-          value={`${overview.ai.cards} ${plural(overview.ai.cards, ["карточка", "карточки", "карточек"])}${overview.ai.costRub != null ? ` · ≈${formatMoney(overview.ai.costRub)}` : ""}`}
+          value={`${overview.ai.cards} ${plural(overview.ai.cards, ["карточка", "карточки", "карточек"])}${overview.ai.previews ? ` · ${overview.ai.previews} превью` : ""}${overview.ai.costRub != null ? ` · ≈${formatMoney(overview.ai.costRub)}` : ""}`}
         />
       </div>
 
       <BackupCard />
-      <AiProviderCard />
+      <AiProviderCard spend={overview.ai} />
 
       {needsAttention && (
         <Card as="section" padding="lg" className={styles.attention}>
@@ -118,7 +121,7 @@ export function AdminPage() {
           />
           <AttentionGroup title="Подписка закончилась" stores={overdue} onPay={setPayTarget} />
           <AttentionGroup
-            title={`Пора удалить данные: не платят больше ${LEGAL.keepDataDays} дней`}
+            title={`Пора удалить данные: не платят больше ${keepDataDays} дней`}
             stores={dataToDelete}
             detail={(store) => `${store.ownerName} — так обещано в политике конфиденциальности. Удаление: «Магазины» → «Удалить».`}
           />

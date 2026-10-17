@@ -1,8 +1,10 @@
 import { HttpError } from "../utils/http.js";
 import { reportTokens } from "./aiUsageService.js";
+import { settings } from "./settingsService.js";
 
 // The AI provider behind product drafts. Switching providers is a matter of
-// .env: any OpenAI-compatible API works, in one of two request formats.
+// .env: any OpenAI-compatible API works, in one of two request formats. The
+// models themselves are picked on «Настройки» in the admin panel.
 //   responses — OpenAI's Responses API (/responses): OpenAI itself.
 //   chat      — Chat Completions (/chat/completions): OpenRouter, Yandex AI
 //               Studio, DeepSeek, local servers and most others.
@@ -31,7 +33,7 @@ export function aiSettings() {
   return {
     apiKey,
     baseUrl,
-    model: env("AI_MODEL", "OPENAI_MODEL") || "gpt-5.6",
+    model: settings().aiModel,
     style,
     /** Ask for a JSON object explicitly; switch off (AI_JSON_MODE=off) for providers that reject response_format. */
     jsonMode: env("AI_JSON_MODE").toLowerCase() !== "off",
@@ -47,6 +49,28 @@ export function aiSettings() {
   };
 }
 
+/**
+ * The image model that draws product previews. Model and quality come from
+ * «Настройки», where previews can also be switched off; the provider is the
+ * main one unless AI_PREVIEW_BASE_URL / AI_PREVIEW_API_KEY are set.
+ */
+export function previewSettings() {
+  const main = aiSettings();
+  const { aiPreviewEnabled, aiPreviewModel, aiPreviewQuality } = settings();
+  if (!aiPreviewEnabled) return null;
+  const timeout = Number(env("AI_PREVIEW_TIMEOUT_MS"));
+  return {
+    baseUrl: (env("AI_PREVIEW_BASE_URL") || main.baseUrl).replace(/\/+$/, ""),
+    apiKey: env("AI_PREVIEW_API_KEY") || main.apiKey,
+    model: aiPreviewModel,
+    // 4:5 — the shape of a product card on the storefront, so nothing gets cropped.
+    size: env("AI_PREVIEW_SIZE") || "1024x1280",
+    quality: aiPreviewQuality,
+    // Pictures take up to a couple of minutes; nginx waits 180 s for /api.
+    timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 150000
+  };
+}
+
 export function isAiConfigured() {
   return Boolean(aiSettings().apiKey);
 }
@@ -54,12 +78,14 @@ export function isAiConfigured() {
 /** What the admin panel shows: where requests go, never the key. */
 export function aiSummary() {
   const settings = aiSettings();
+  const preview = previewSettings();
   return {
     configured: Boolean(settings.apiKey),
     host: new URL(settings.baseUrl).host,
     model: settings.model,
     style: settings.style,
-    voice: settings.transcribe ? `${new URL(settings.transcribe.baseUrl).host} · ${settings.transcribe.model}` : null
+    voice: settings.transcribe ? `${new URL(settings.transcribe.baseUrl).host} · ${settings.transcribe.model}` : null,
+    preview: preview ? `${new URL(preview.baseUrl).host} · ${preview.model}` : null
   };
 }
 
@@ -95,7 +121,8 @@ async function post(url: string, apiKey: string, body: unknown, timeoutMs: numbe
   }
   if (!response.ok) throw new HttpError(502, errorMessage(payload));
   const usage = payload && typeof payload === "object" ? (payload as { usage?: unknown }).usage : null;
-  reportTokens(usage);
+  const model = body && typeof body === "object" ? (body as { model?: unknown }).model : undefined;
+  reportTokens(usage, typeof model === "string" ? model : undefined);
   return payload;
 }
 
@@ -184,6 +211,57 @@ export interface AudioFile {
   buffer: Buffer;
   mimetype: string;
   filename: string;
+}
+
+export interface ImageFile {
+  buffer: Buffer;
+  mimetype: string;
+  filename: string;
+}
+
+/** Draws one picture from the reference photos (images/edits). Returns it as base64. */
+export async function editImage({ prompt, images }: { prompt: string; images: ImageFile[] }) {
+  const settings = previewSettings();
+  if (!settings) throw new HttpError(503, "Превью с ИИ выключено на сервере");
+  if (!settings.apiKey) throw new HttpError(503, "ИИ не настроен: укажите AI_API_KEY на сервере");
+
+  const form = new FormData();
+  form.append("model", settings.model);
+  form.append("prompt", prompt);
+  form.append("n", "1");
+  form.append("size", settings.size);
+  form.append("quality", settings.quality);
+  // WebP keeps the answer small; the photo is stored as WebP anyway.
+  form.append("output_format", "webp");
+  form.append("output_compression", "90");
+  for (const image of images) form.append("image[]", new Blob([new Uint8Array(image.buffer)], { type: image.mimetype }), image.filename);
+
+  let response: Response;
+  try {
+    response = await fetch(`${settings.baseUrl}/images/edits`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${settings.apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(settings.timeoutMs)
+    });
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    throw new HttpError(502, timedOut ? "ИИ рисовал слишком долго, попробуйте ещё раз" : "Не удалось связаться с AI-провайдером");
+  }
+  const text = await response.text();
+  let payload: unknown = text;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    // Plain-text error pages stay as text.
+  }
+  if (response.status === 404) throw new HttpError(502, "Этот AI-провайдер не рисует картинки — настройте AI_PREVIEW_* на сервере");
+  if (!response.ok) throw new HttpError(502, errorMessage(payload));
+  reportTokens(payload && typeof payload === "object" ? (payload as { usage?: unknown }).usage : null, settings.model);
+  const data = payload && typeof payload === "object" ? (payload as { data?: { b64_json?: unknown }[] }).data : undefined;
+  const base64 = data?.[0]?.b64_json;
+  if (typeof base64 !== "string" || !base64) throw new HttpError(502, "AI-провайдер не прислал картинку, попробуйте ещё раз");
+  return { base64, mimetype: "image/webp" };
 }
 
 /** Speech to text for voice descriptions. */

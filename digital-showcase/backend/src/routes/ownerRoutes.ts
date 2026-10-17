@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as controller from "../controllers/ownerController.js";
 import { authMiddleware, logActionsAsOwner, ownerOnly } from "../middleware/authMiddleware.js";
-import { aiDraftUpload, bulkAiDraftUpload, upload } from "../middleware/upload.js";
+import { aiDraftUpload, bulkAiDraftUpload, previewUpload, upload } from "../middleware/upload.js";
 
 export const ownerRoutes = Router();
 ownerRoutes.use(authMiddleware, ownerOnly, logActionsAsOwner);
@@ -15,6 +15,7 @@ ownerRoutes.get("/stores/:storeId/subscription", controller.getSubscription);
 ownerRoutes.get("/stores/:storeId/products", controller.listProducts);
 ownerRoutes.post("/stores/:storeId/products/ai-draft", aiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 8 }]), controller.createProductDraft);
 ownerRoutes.post("/stores/:storeId/products/bulk-ai-draft", bulkAiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 40 }]), controller.createBulkProductDraft);
+ownerRoutes.post("/stores/:storeId/products/ai-preview", previewUpload.single("image"), controller.createPreview);
 ownerRoutes.post("/stores/:storeId/products", controller.createProduct);
 ownerRoutes.get("/stores/:storeId/products/:id", controller.getProduct);
 ownerRoutes.patch("/stores/:storeId/products/:id", controller.updateProduct);

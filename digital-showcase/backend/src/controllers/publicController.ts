@@ -2,6 +2,12 @@ import { asyncHandler, HttpError } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
 import * as analyticsService from "../services/analyticsService.js";
+import { publicSettings } from "../services/settingsService.js";
+
+/** Plans and contacts for the landing, help videos, requisites for /offer and /privacy — from «Настройки». */
+export const getSite = asyncHandler(async (_req, res) => {
+  res.json(publicSettings());
+});
 
 async function publicStore(slug: string) {
   const store = await storeService.getStoreBySlug(slug);

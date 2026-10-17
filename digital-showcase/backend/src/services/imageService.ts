@@ -98,6 +98,22 @@ async function productPipeline(file: UploadedImage, dimension: number, quality: 
     .toBuffer();
 }
 
+/** A saved photo by its /uploads/… address; null when the address isn't one of ours or the file is gone. */
+export async function readStoredImage(url: string): Promise<UploadedImage | null> {
+  if (!url.startsWith("/uploads/")) return null;
+  let filename: string;
+  try {
+    filename = path.basename(decodeURIComponent(url.split("?")[0]));
+  } catch {
+    return null;
+  }
+  const dir = uploadDir();
+  const filePath = path.resolve(dir, filename);
+  if (!filePath.startsWith(`${dir}${path.sep}`) || !fs.existsSync(filePath)) return null;
+  const buffer = await fs.promises.readFile(filePath);
+  return { buffer, mimetype: "image/webp", originalname: filename, size: buffer.length };
+}
+
 export async function deleteStoredImage(url?: string | null) {
   if (!url?.startsWith("/uploads/")) return;
   const dir = uploadDir();

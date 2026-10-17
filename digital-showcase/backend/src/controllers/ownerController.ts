@@ -1,7 +1,11 @@
 import type { Request } from "express";
 import { createBulkProductAiDraft, createProductAiDraft } from "../services/aiDraftService.js";
 import * as aiUsageService from "../services/aiUsageService.js";
+import { previewSettings } from "../services/aiProvider.js";
+import { settings } from "../services/settingsService.js";
 import * as analyticsService from "../services/analyticsService.js";
+import { readStoredImage } from "../services/imageService.js";
+import { createProductPreview, parsePreviewOptions } from "../services/previewImageService.js";
 import * as paymentService from "../services/paymentService.js";
 import * as productService from "../services/productService.js";
 import * as reportService from "../services/reportService.js";
@@ -35,16 +39,14 @@ export const listStores = asyncHandler(async (req, res) => {
 });
 
 export const getStore = asyncHandler(async (req, res) => {
-  res.json(withSubscription(await scopedStore(req)));
+  // aiPreviewEnabled: the server can draw previews (AI_PREVIEW_MODEL isn't "off").
+  res.json({ ...withSubscription(await scopedStore(req)), aiPreviewEnabled: previewSettings() !== null });
 });
 
-/** Who to call about the subscription: SUPPORT_* in .env. */
+/** Who to call about the subscription: contacts on «Настройки». */
 function supportContacts() {
-  return {
-    whatsapp: process.env.SUPPORT_WHATSAPP?.trim() || null,
-    phone: process.env.SUPPORT_PHONE?.trim() || null,
-    telegram: process.env.SUPPORT_TELEGRAM?.trim() || null
-  };
+  const { whatsapp, phone, telegram } = settings().support;
+  return { whatsapp: whatsapp || null, phone: phone || null, telegram: telegram || null };
 }
 
 /** «Помощь» in the owner's app: who to write or call. */
@@ -124,6 +126,21 @@ export const createProductDraft = asyncHandler(async (req, res) => {
 
   const { result, usage } = await aiUsageService.measureTokens(() => createProductAiDraft({ prompt, voice, images, imageUrls: stringList(req.body.imageUrls) }));
   await aiUsageService.recordUsage(store.id, "DRAFT", 1, usage);
+  res.json(result);
+});
+
+/** «Превью с ИИ»: a storefront cover drawn from one photo of the product. */
+export const createPreview = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  if (!store.aiFormEnabled) throw new HttpError(403, "ИИ не подключён для этого магазина");
+  const options = parsePreviewOptions(req.body.options);
+  // A new photo comes as a file; one already saved with the product — as its address.
+  const photo = req.file ?? (typeof req.body.imageUrl === "string" ? await readStoredImage(req.body.imageUrl) : null);
+  if (!photo) throw new HttpError(400, "Добавьте фото товара — по нему ИИ нарисует превью");
+  await aiUsageService.assertWithinLimit(store);
+
+  const { result, usage } = await aiUsageService.measureTokens(() => createProductPreview(options, photo));
+  await aiUsageService.recordUsage(store.id, "PREVIEW", aiUsageService.previewUnits(), usage);
   res.json(result);
 });
 

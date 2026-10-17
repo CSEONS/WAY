@@ -69,6 +69,28 @@ test("повторный запуск ничего не меняет", () => {
   assert.deepEqual(migrate(db), []);
 });
 
+test("учёт ИИ принимает превью и хранит прежние записи", () => {
+  const db = legacyDatabase();
+  migrate(db, migrations.filter((migration) => migration.version < 6));
+  const now = new Date().toISOString();
+  db.prepare("INSERT INTO ai_usage (id, storeId, kind, units, inputTokens, outputTokens, createdAt) VALUES ('a1', 's1', 'DRAFT', 1, 10, 5, ?)").run(now);
+  assert.throws(() => db.prepare("INSERT INTO ai_usage (id, storeId, kind, units, createdAt) VALUES ('a2', 's1', 'PREVIEW', 1, ?)").run(now));
+
+  migrate(db);
+  db.prepare("INSERT INTO ai_usage (id, storeId, kind, units, createdAt) VALUES ('a2', 's1', 'PREVIEW', 1, ?)").run(now);
+  assert.deepEqual(
+    db.prepare("SELECT id, kind, inputTokens FROM ai_usage ORDER BY id").all(),
+    [
+      { id: "a1", kind: "DRAFT", inputTokens: 10 },
+      { id: "a2", kind: "PREVIEW", inputTokens: 0 }
+    ]
+  );
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE name = 'ai_usage_store'").get(), "index rebuilt");
+  // Deleting the store still removes its usage.
+  db.prepare("DELETE FROM stores WHERE id = 's1'").run();
+  assert.equal((db.prepare("SELECT COUNT(*) as count FROM ai_usage").get() as { count: number }).count, 0);
+});
+
 test("новая база создаётся с нуля", () => {
   const db = new Database(":memory:");
   migrate(db);

@@ -11,12 +11,14 @@ import { closeDb, initDatabase } from "./database/db.js";
 import { reportProblem } from "./services/alertService.js";
 import { startBackupSchedule } from "./services/backupService.js";
 import { ensureThumbnails } from "./services/imageService.js";
+import { loadSettings } from "./services/settingsService.js";
 
 const port = Number(process.env.PORT ?? 4000);
 
 // An unsafe production start stops here, before anything listens.
 assertProductionConfig();
 await initDatabase();
+loadSettings();
 
 const server = app.listen(port, () => {
   console.log(`Backend started on ${port}`);

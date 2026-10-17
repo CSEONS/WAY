@@ -42,6 +42,7 @@ Backend реализован на Express. Сервер принимает HTTP-
 - `GET /api/owner/stores/:storeId/products`, `POST /api/owner/stores/:storeId/products`, `GET /api/owner/stores/:storeId/products/:id`, `PATCH /api/owner/stores/:storeId/products/:id`, `DELETE /api/owner/stores/:storeId/products/:id` — управление товарами владельца.
 - `POST /api/owner/stores/:storeId/products/ai-draft` — создание AI-черновика товара.
 - `POST /api/owner/stores/:storeId/products/bulk-ai-draft` — группировка до 40 изображений и создание списка AI-предложений товаров.
+- `POST /api/owner/stores/:storeId/products/ai-preview` — «Превью с ИИ»: обложка для витрины по одному фото товара (файл `image` или адрес сохранённого фото `imageUrl`) и настройкам `options` (фон, цвета оформления, надписи, преимущества). Отвечает картинкой `data:image/webp`; в товар она попадает, только когда владелец сохранит товар.
 - `POST /api/owner/stores/:storeId/products/:id/images`, `PATCH /api/owner/stores/:storeId/products/:id/images/order`, `DELETE /api/owner/stores/:storeId/products/:id/images/:imageId` — управление изображениями товара.
 - `GET /api/owner/store`, `PATCH /api/owner/store`, `GET /api/owner/products`, `POST /api/owner/products/ai-draft`, `POST /api/owner/products`, `GET /api/owner/products/:id`, `PATCH /api/owner/products/:id`, `DELETE /api/owner/products/:id` — альтернативные маршруты с автоматическим выбором магазина владельца.
 - `GET /api/public/stores/:slug` — получение публичного магазина.
@@ -63,6 +64,8 @@ Backend реализован на Express. Сервер принимает HTTP-
 - `productService.ts` — CRUD товаров, чтение связанных изображений/размеров/цветов/вариантов, управление изображениями и их порядком.
 - `analyticsService.ts` — запись просмотров магазина и товара, вычисление количества просмотров.
 - `aiDraftService.ts` — генерация одиночных и массовых предложений товара на основе текста, голосовой записи и оптимизированных изображений через AI API.
+- `aiUsageService.ts` и `aiPrices.ts` — лимит ИИ-карточек в месяц, учёт запросов (токены и модель) и расход в рублях: цены моделей в долларах × курс из «Настроек».
+- `settingsService.ts` — «Настройки» из админки (таблица `settings`): тарифы, пробный период, модели и лимиты ИИ, курс, контакты, реквизиты, видео. Сохранённое важнее значений из `.env`; публичная часть — `GET /api/public/site`.
 - `imageService.ts` — серверная оптимизация, сохранение и удаление изображений товаров и логотипов.
 
 ### Middleware
@@ -115,6 +118,7 @@ Backend реализован на Express. Сервер принимает HTTP-
 ### Компоненты
 
 - `ProductForm.tsx` — форма товара с поддержкой AI-режима, голосового ввода, загрузки картинок, редактирования вариантов, цен и категорий.
+- `product-form/PreviewGenerator.tsx` — окно «Превью с ИИ» из блока «Фото товара»: выбор фото, фона, цветов оформления, надписей и преимуществ; готовую картинку можно «Сделать обложкой». Выбор оформления запоминается в браузере, чтобы витрина была в одном стиле.
 - `bulk/BulkProductCreator.tsx` — содержимое страницы `pages/BulkProductsPage.tsx` (`…/products/bulk`), массовое добавление в три шага: фото (голос и текст по желанию) → «Правильно разложил?» (перенос фото между товарами, объединение, удаление; логика в `bulk/grouping.ts`) → названия и цены. Шаг хранится в адресе (`?step=groups`), поэтому «Назад» в телефоне возвращает на предыдущий шаг. Сохранение уходит в фоновую очередь `state/backgroundJobs.tsx`.
 - `ProductCard.tsx` — отображение товара на публичной витрине.
 - `ConfirmModal.tsx` — подтверждение опасных действий.
@@ -200,6 +204,10 @@ Backend реализован на Express. Сервер принимает HTTP-
 ### Массовый AI Draft
 
 Владелец → `pages/BulkProductsPage.tsx` → `bulk/BulkProductCreator.tsx` → `api/client.ts` → `POST /api/owner/stores/:storeId/products/bulk-ai-draft` → `ownerController.ts` → `aiDraftService.ts` / `imageService.ts` → раскладка фото по товарам → владелец поправляет раскладку и ставит цены → `queueProductBatch` в `state/backgroundJobs.tsx`: товары сохраняются по одному существующими маршрутами создания товара и загрузки изображений, владелец при этом уже вернулся в кабинет. Сбой одного товара не останавливает остальные; «Повторить» продолжает с места сбоя и не создаёт дубль.
+
+### Превью с ИИ
+
+Владелец → `PreviewGenerator.tsx` → `POST /api/owner/stores/:storeId/products/ai-preview` → `ownerController.createPreview` (магазин с ИИ, лимит месяца) → `previewImageService.ts` собирает промпт из выбранных пресетов (свободный текст в промпт не попадает, кроме заголовка до 40 символов) → `aiProvider.editImage` → `POST {AI_PREVIEW_BASE_URL}/images/edits` с фото товара → картинка возвращается в форму и становится обложкой → сохраняется вместе с товаром обычной загрузкой фото. Учёт: строка `ai_usage` с видом `PREVIEW`.
 
 ### Загрузка изображения товара
 

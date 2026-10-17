@@ -1,8 +1,8 @@
-import { Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import type { Product } from "../../types/models";
 import { compressImages } from "../../utils/compressImage";
-import { Card, CardHeader, FileButton, Icon, cx } from "../../ui";
+import { Button, Card, CardHeader, FileButton, Icon, cx } from "../../ui";
 import { ProductPhoto } from "../ProductPhoto";
 import { createId, initialImages } from "./helpers";
 import type { ProductFormImage } from "./types";
@@ -23,6 +23,13 @@ export function useImageManager(initial?: Product) {
     setPreviewImageId((current) => current ?? nextImages[0]?.id ?? null);
   }
 
+  /** A picture drawn by «Превью с ИИ»: added to the photos and made the cover. */
+  function addCover(file: File) {
+    const image = { id: createId(), existingId: null, file, name: file.name, url: URL.createObjectURL(file) };
+    setImages((current) => [...current, image]);
+    setPreviewImageId(image.id);
+  }
+
   function removeImage(id: string) {
     setImages((current) => {
       const image = current.find((item) => item.id === id);
@@ -33,13 +40,13 @@ export function useImageManager(initial?: Product) {
     });
   }
 
-  return { images, previewImageId, previewImage, setPreviewImageId, addImages, removeImage };
+  return { images, previewImageId, previewImage, setPreviewImageId, addImages, addCover, removeImage };
 }
 
 export type ImageManagerState = ReturnType<typeof useImageManager>;
 
-/** «Фото товара»: take or pick photos, choose the cover, remove extras. */
-export function ImageManager({ manager }: { manager: ImageManagerState }) {
+/** «Фото товара»: take or pick photos, choose the cover, remove extras. `onCreatePreview` — the store has AI: «Превью с ИИ». */
+export function ImageManager({ manager, onCreatePreview }: { manager: ImageManagerState; onCreatePreview?: () => void }) {
   const { images, previewImage, setPreviewImageId, addImages, removeImage } = manager;
 
   return (
@@ -76,6 +83,11 @@ export function ImageManager({ manager }: { manager: ImageManagerState }) {
               </div>
             ))}
           </div>
+          {onCreatePreview && (
+            <Button variant="secondary" icon={AiMagicIcon} block onClick={onCreatePreview}>
+              Сделать превью с ИИ
+            </Button>
+          )}
         </>
       ) : (
         <label className={styles.dropzone}>

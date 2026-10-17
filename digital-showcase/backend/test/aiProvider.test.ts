@@ -19,6 +19,8 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ choices: [{ message: { content: '{"title":"Платье"}' } }], usage: { prompt_tokens: 120, completion_tokens: 30 } }));
     } else if (req.url === "/v1/responses") {
       res.end(JSON.stringify({ output_text: '{"title":"Юбка"}', usage: { input_tokens: 200, output_tokens: 40 } }));
+    } else if (req.url === "/v1/images/edits" || req.url === "/pictures/v1/images/edits") {
+      res.end(JSON.stringify({ data: [{ b64_json: "UklGRmFrZQ==" }], usage: { input_tokens: 300, output_tokens: 1500 } }));
     } else if (req.url === "/v1/audio/transcriptions") {
       res.statusCode = transcriptionStatus;
       res.setHeader("Content-Type", "text/plain");
@@ -32,11 +34,26 @@ const server = http.createServer((req, res) => {
 server.listen(0);
 const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
 
-const { aiSummary, completeJson, isAiConfigured, transcribe } = await import("../src/services/aiProvider.js");
+const { aiSummary, completeJson, editImage, isAiConfigured, transcribe } = await import("../src/services/aiProvider.js");
 const { measureTokens } = await import("../src/services/aiUsageService.js");
 
 function configure(values: Record<string, string | undefined>) {
-  for (const name of ["AI_API_KEY", "OPENAI_API_KEY", "AI_BASE_URL", "OPENAI_BASE_URL", "AI_API_STYLE", "AI_MODEL", "AI_JSON_MODE", "AI_TRANSCRIBE_MODEL", "AI_TRANSCRIBE_BASE_URL"]) {
+  for (const name of [
+    "AI_API_KEY",
+    "OPENAI_API_KEY",
+    "AI_BASE_URL",
+    "OPENAI_BASE_URL",
+    "AI_API_STYLE",
+    "AI_MODEL",
+    "AI_JSON_MODE",
+    "AI_TRANSCRIBE_MODEL",
+    "AI_TRANSCRIBE_BASE_URL",
+    "AI_PREVIEW_MODEL",
+    "AI_PREVIEW_BASE_URL",
+    "AI_PREVIEW_API_KEY",
+    "AI_PREVIEW_SIZE",
+    "AI_PREVIEW_QUALITY"
+  ]) {
     delete process.env[name];
   }
   Object.assign(process.env, values);
@@ -47,7 +64,7 @@ test("Chat Completions: сообщение, картинки и токены", a
   received.length = 0;
   const { result, usage } = await measureTokens(() => completeJson({ instructions: "Отвечай JSON", text: "Синее платье", images: ["data:image/webp;base64,AAA"] }));
   assert.equal(result, '{"title":"Платье"}');
-  assert.deepEqual(usage, { inputTokens: 120, outputTokens: 30 });
+  assert.deepEqual(usage, { inputTokens: 120, outputTokens: 30, model: "some/model" });
 
   const request = received[0];
   assert.equal(request.path, "/v1/chat/completions");
@@ -76,7 +93,7 @@ test("Responses API по умолчанию и старые переменные
   received.length = 0;
   const { result, usage } = await measureTokens(() => completeJson({ instructions: "x", text: "юбка" }));
   assert.equal(result, '{"title":"Юбка"}');
-  assert.deepEqual(usage, { inputTokens: 200, outputTokens: 40 });
+  assert.deepEqual(usage, { inputTokens: 200, outputTokens: 40, model: "gpt-5.6-luna" });
   assert.equal(received[0].path, "/v1/responses");
   assert.equal(received[0].auth, "Bearer old-key");
 });
@@ -110,8 +127,53 @@ test("голос: распознаётся, отключается, а без п
 test("сводка для админки без ключа", () => {
   configure({ AI_API_KEY: "secret-key", AI_BASE_URL: "https://llm.example.net/v1", AI_API_STYLE: "chat", AI_MODEL: "m1" });
   const summary = aiSummary();
-  assert.deepEqual(summary, { configured: true, host: "llm.example.net", model: "m1", style: "chat", voice: "llm.example.net · gpt-4o-mini-transcribe" });
+  assert.deepEqual(summary, {
+    configured: true,
+    host: "llm.example.net",
+    model: "m1",
+    style: "chat",
+    voice: "llm.example.net · gpt-4o-mini-transcribe",
+    preview: "llm.example.net · gpt-image-2.5-flare"
+  });
   assert.ok(!JSON.stringify(summary).includes("secret-key"));
+});
+
+test("превью: фото уходит в images/edits вместе с настройками, токены считаются", async () => {
+  configure({ AI_API_KEY: "img-key", AI_BASE_URL: base });
+  received.length = 0;
+  const photo = { buffer: Buffer.from("photo-bytes"), mimetype: "image/jpeg", filename: "product.jpg" };
+  const { result, usage } = await measureTokens(() => editImage({ prompt: "Product cover", images: [photo] }));
+  assert.deepEqual(result, { base64: "UklGRmFrZQ==", mimetype: "image/webp" });
+  assert.deepEqual(usage, { inputTokens: 300, outputTokens: 1500, model: "gpt-image-2.5-flare" });
+
+  const request = received[0];
+  assert.equal(request.path, "/v1/images/edits");
+  assert.equal(request.auth, "Bearer img-key");
+  const field = (name: string) => (request.body as string).match(new RegExp(`name="${name.replace(/[[\]]/g, "\\$&")}"\\r\\n\\r\\n([^\\r]*)`))?.[1];
+  assert.equal(field("model"), "gpt-image-2.5-flare");
+  assert.equal(field("size"), "1024x1280", "4:5, как карточка на витрине");
+  assert.equal(field("quality"), "medium");
+  assert.equal(field("output_format"), "webp");
+  assert.equal(field("prompt"), "Product cover");
+  assert.match(request.body as string, /name="image\[\]"; filename="product.jpg"/);
+});
+
+test("превью: свой провайдер для картинок, выключение и понятные ошибки", async () => {
+  const photo = { buffer: Buffer.from("x"), mimetype: "image/jpeg", filename: "p.jpg" };
+  configure({ AI_API_KEY: "text-key", AI_BASE_URL: `${base}/broken`, AI_PREVIEW_BASE_URL: `${base.replace("/v1", "")}/pictures/v1`, AI_PREVIEW_API_KEY: "pic-key", AI_PREVIEW_MODEL: "gpt-image-2", AI_PREVIEW_SIZE: "1024x1536" });
+  received.length = 0;
+  await editImage({ prompt: "p", images: [photo] });
+  assert.equal(received[0].path, "/pictures/v1/images/edits");
+  assert.equal(received[0].auth, "Bearer pic-key");
+  assert.match(received[0].body as string, /name="model"\r\n\r\ngpt-image-2\r\n/);
+  assert.match(received[0].body as string, /name="size"\r\n\r\n1024x1536\r\n/);
+
+  configure({ AI_API_KEY: "k", AI_BASE_URL: base, AI_PREVIEW_MODEL: "off" });
+  await assert.rejects(editImage({ prompt: "p", images: [photo] }), /выключено/);
+  assert.equal(aiSummary().preview, null);
+
+  configure({ AI_API_KEY: "k", AI_BASE_URL: `${base}/broken` });
+  await assert.rejects(editImage({ prompt: "p", images: [photo] }), (error: { status?: number; message?: string }) => error.status === 502 && /unknown model/.test(error.message ?? ""));
 });
 
 test.after(() => server.close());

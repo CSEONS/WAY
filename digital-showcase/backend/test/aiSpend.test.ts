@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+
+// A throwaway database: must be set before the db module is loaded.
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "showcase-ai-spend-test-"));
+process.env.DATABASE_URL = `file:${path.join(dir, "test.sqlite")}`;
+process.env.UPLOAD_DIR = path.join(dir, "uploads");
+process.env.ADMIN_EMAIL = "admin@test.local";
+process.env.ADMIN_PASSWORD = "test-password";
+process.env.JWT_SECRET = "test-secret-test-secret-test-secret";
+
+const { closeDb, getDb, initDatabase } = await import("../src/database/db.js");
+const { createStore } = await import("../src/services/storeService.js");
+const { createOwner } = await import("../src/services/userService.js");
+const { modelPrice, requestCostUsd } = await import("../src/services/aiPrices.js");
+const { monthSpend, recordUsage } = await import("../src/services/aiUsageService.js");
+
+await initDatabase();
+const db = await getDb();
+const owner = (await createOwner({ name: "Владелец", phone: "+79280000002", password: "secret123" }))!;
+const current = { text: "gpt-5.6-luna", preview: "gpt-image-2.5-flare" };
+
+test("цены моделей: снимки и имена OpenRouter, у неизвестной модели цены нет", () => {
+  assert.deepEqual(modelPrice("gpt-5.6-luna"), { input: 0.2, output: 1.2 });
+  assert.deepEqual(modelPrice("openai/gpt-5.6-luna-2026-08-01"), modelPrice("gpt-5.6-luna"));
+  assert.equal(modelPrice("gpt-5.6-luna-pro"), null);
+  assert.equal(modelPrice("yandexgpt"), null);
+  assert.equal(requestCostUsd("gpt-5.6-terra", 1_000_000, 1_000_000), 14);
+});
+
+test("расход за месяц в рублях: карточка, превью и самое дорогое превью", async () => {
+  process.env.AI_RUB_PER_USD = "100";
+  const store = (await createStore({ ownerId: owner.id, name: "ИИ", slug: "ai-spend", aiFormEnabled: 1 }))!;
+  // On Luna 1 500 + 1 000 tokens are $0.0015 — 0.15 ₽ a card; a bulk of two cards costs twice that.
+  await recordUsage(store.id, "DRAFT", 1, { inputTokens: 1500, outputTokens: 1000, model: "gpt-5.6-luna" });
+  await recordUsage(store.id, "BULK", 2, { inputTokens: 3000, outputTokens: 2000, model: "gpt-5.6-luna" });
+  // A row saved before the model was recorded is priced by the model in use now.
+  await db.run(
+    "INSERT INTO ai_usage (id, storeId, kind, units, inputTokens, outputTokens, createdAt) VALUES ('old', ?, 'DRAFT', 1, 1500, 1000, ?)",
+    store.id,
+    new Date().toISOString()
+  );
+  // Pictures: 2.24 ₽ and 1.70 ₽.
+  await recordUsage(store.id, "PREVIEW", 1, { inputTokens: 1300, outputTokens: 400, model: "gpt-image-2.5-flare" });
+  await recordUsage(store.id, "PREVIEW", 1, { inputTokens: 1000, outputTokens: 300, model: "gpt-image-2.5-flare" });
+  // No price — named, not summed; no tokens reported — nothing to learn from.
+  await recordUsage(store.id, "DRAFT", 1, { inputTokens: 900, outputTokens: 900, model: "yandexgpt" });
+  await recordUsage(store.id, "DRAFT", 1, { inputTokens: 0, outputTokens: 0, model: "gpt-5.6-luna" });
+
+  assert.deepEqual(await monthSpend(current), {
+    rubPerUsd: 100,
+    previews: 2,
+    costRub: 5,
+    cardRub: 0.15,
+    previewRub: 1.97,
+    previewMaxRub: 2.24,
+    unpricedModels: ["yandexgpt"]
+  });
+
+  delete process.env.AI_RUB_PER_USD;
+  const withoutRate = await monthSpend(current);
+  assert.equal(withoutRate.costRub, null);
+  assert.equal(withoutRate.cardRub, null);
+  assert.equal(withoutRate.previewMaxRub, null);
+  assert.equal(withoutRate.previews, 2);
+});
+
+test.after(() => {
+  closeDb();
+  fs.rmSync(dir, { recursive: true, force: true });
+});

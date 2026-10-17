@@ -268,6 +268,46 @@ export const migrations: Migration[] = [
       // Link to the receipt in «Мой налог» (self-employed) or a receipt number.
       addColumn(db, "payments", "receipt", "TEXT");
     }
+  },
+  {
+    version: 6,
+    name: "ai previews in usage",
+    // SQLite can't change a CHECK: the table is rebuilt with 'PREVIEW' allowed.
+    withoutForeignKeys: true,
+    up(db) {
+      db.exec(`
+        CREATE TABLE ai_usage_new (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+          kind TEXT NOT NULL CHECK(kind IN ('DRAFT', 'BULK', 'PREVIEW')),
+          units INTEGER NOT NULL,
+          inputTokens INTEGER NOT NULL DEFAULT 0,
+          outputTokens INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL
+        );
+        INSERT INTO ai_usage_new (id, storeId, kind, units, inputTokens, outputTokens, createdAt)
+          SELECT id, storeId, kind, units, inputTokens, outputTokens, createdAt FROM ai_usage;
+        DROP TABLE ai_usage;
+        ALTER TABLE ai_usage_new RENAME TO ai_usage;
+        CREATE INDEX IF NOT EXISTS ai_usage_store ON ai_usage(storeId, createdAt);
+      `);
+    }
+  },
+  {
+    version: 7,
+    name: "ai usage remembers the model",
+    // Its price turns tokens into rubles; older rows are priced by the model in use now.
+    up(db) {
+      addColumn(db, "ai_usage", "model", "TEXT");
+    }
+  },
+  {
+    version: 8,
+    name: "settings from the admin panel",
+    // One row per setting, the value as JSON (see settingsService).
+    up(db) {
+      db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updatedAt TEXT NOT NULL)");
+    }
   }
 ];
 

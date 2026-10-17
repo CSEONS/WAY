@@ -14,9 +14,10 @@ import {
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LeadForm } from "../components/landing/LeadForm";
-import { DEMO_STORE_SLUG, PLANS, SALES_CONTACTS, type Plan } from "../components/landing/config";
 import { PhoneMock } from "../components/landing/PhoneMock";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { useSiteSettings } from "../state/siteSettings";
+import type { Plan } from "../types/models";
 import { phoneUrl, whatsappUrl } from "../utils/contact";
 import { Badge, Button, ButtonLink, Card, Icon, Page, cx, type IconSvgElement } from "../ui";
 import styles from "./HomePage.module.css";
@@ -69,6 +70,9 @@ function scrollToLead() {
 
 export function HomePage() {
   useDocumentMeta(null);
+  // Plans, prices and contacts come from «Настройки» in the admin panel.
+  const site = useSiteSettings();
+  const sales = site?.salesContacts;
 
   return (
     <Page className={styles.page}>
@@ -83,8 +87,8 @@ export function HomePage() {
             <Button variant="primary" size="lg" iconEnd={ArrowRight01Icon} onClick={scrollToLead}>
               Подключить магазин
             </Button>
-            {DEMO_STORE_SLUG && (
-              <ButtonLink variant="outline" size="lg" to={`/m/${DEMO_STORE_SLUG}`}>
+            {site?.demoStoreSlug && (
+              <ButtonLink variant="outline" size="lg" to={`/m/${site.demoStoreSlug}`}>
                 Посмотреть пример
               </ButtonLink>
             )}
@@ -129,13 +133,18 @@ export function HomePage() {
         </div>
       </Section>
 
-      <Section id="pricing" eyebrow="Тарифы" title="Стоимость">
-        <div className={styles.plans}>
-          {PLANS.map((plan) => (
-            <PlanCard key={plan.name} plan={plan} />
-          ))}
-        </div>
-      </Section>
+      {site && (
+        <Section id="pricing" eyebrow="Тарифы" title="Стоимость">
+          <div className={styles.plans}>
+            <PlanCard plan={site.plans.basic} />
+            <PlanCard
+              plan={site.plans.ai}
+              extra={site.aiMonthlyLimit > 0 ? `До ${site.aiMonthlyLimit} карточек с ИИ в месяц` : undefined}
+              highlighted
+            />
+          </div>
+        </Section>
+      )}
 
       <Section eyebrow="Вопросы" title="Частые вопросы">
         <div className={styles.faq}>
@@ -168,16 +177,16 @@ export function HomePage() {
               Поможем добавить первые товары
             </li>
           </ul>
-          {(SALES_CONTACTS.whatsapp || SALES_CONTACTS.phone) && (
+          {sales && (sales.whatsapp || sales.phone) && (
             <div className={styles.salesContacts}>
-              {SALES_CONTACTS.whatsapp && (
-                <ButtonLink variant="outline" icon={WhatsappIcon} href={whatsappUrl(SALES_CONTACTS.whatsapp, "Здравствуйте! Хочу подключить витрину.")} target="_blank" rel="noreferrer">
+              {sales.whatsapp && (
+                <ButtonLink variant="outline" icon={WhatsappIcon} href={whatsappUrl(sales.whatsapp, "Здравствуйте! Хочу подключить витрину.")} target="_blank" rel="noreferrer">
                   Написать в WhatsApp
                 </ButtonLink>
               )}
-              {SALES_CONTACTS.phone && (
-                <ButtonLink variant="outline" icon={Call02Icon} href={phoneUrl(SALES_CONTACTS.phone)}>
-                  {SALES_CONTACTS.phone}
+              {sales.phone && (
+                <ButtonLink variant="outline" icon={Call02Icon} href={phoneUrl(sales.phone)}>
+                  {sales.phone}
                 </ButtonLink>
               )}
             </div>
@@ -212,9 +221,11 @@ function Section({ id, eyebrow, title, children }: { id?: string; eyebrow: strin
   );
 }
 
-function PlanCard({ plan }: { plan: Plan }) {
+/** highlighted — the plan most people should pick; extra — a feature line made from settings, e.g. the AI limit. */
+function PlanCard({ plan, highlighted = false, extra }: { plan: Plan; highlighted?: boolean; extra?: string }) {
+  const features = extra ? [...plan.features, extra] : plan.features;
   return (
-    <Card padding="lg" className={cx(styles.plan, plan.highlighted && styles.planHighlighted)}>
+    <Card padding="lg" className={cx(styles.plan, highlighted && styles.planHighlighted)}>
       <div className={styles.planHead}>
         <h3 className={styles.cardTitle}>{plan.name}</h3>
         <p className={styles.cardText}>{plan.description}</p>
@@ -222,21 +233,21 @@ function PlanCard({ plan }: { plan: Plan }) {
       <p className={styles.planPrice}>
         {plan.price != null ? (
           <>
-            {plan.price.toLocaleString("ru-RU")} ₽ <small>{plan.period}</small>
+            {plan.price.toLocaleString("ru-RU")} ₽ <small>в месяц</small>
           </>
         ) : (
           "Цена по запросу"
         )}
       </p>
       <ul className={styles.planFeatures}>
-        {plan.features.map((feature) => (
+        {features.map((feature) => (
           <li key={feature}>
             <Icon icon={CheckmarkCircle02Icon} size="sm" />
             {feature}
           </li>
         ))}
       </ul>
-      <Button variant={plan.highlighted ? "primary" : "outline"} size="lg" block onClick={scrollToLead}>
+      <Button variant={highlighted ? "primary" : "outline"} size="lg" block onClick={scrollToLead}>
         {plan.price != null ? "Подключить" : "Узнать цену"}
       </Button>
     </Card>

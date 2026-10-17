@@ -1,6 +1,7 @@
 import { getDb } from "../database/db.js";
 import type { Store } from "../types/models.js";
-import { estimateCost, monthlyLimit, monthStart, usageByStore } from "./aiUsageService.js";
+import { aiSettings, previewSettings } from "./aiProvider.js";
+import { monthlyLimit, monthSpend, monthStart, usageByStore } from "./aiUsageService.js";
 import { revenueByMonth } from "./paymentService.js";
 import { subscriptionInfo } from "./subscriptionService.js";
 
@@ -15,12 +16,13 @@ type StoreWithOwner = Store & { ownerName: string; ownerPhone: string | null; ow
 /** Everything the admin panel's first screen needs, in one request. */
 export async function adminOverview(now = new Date()) {
   const db = await getDb();
-  const [stores, products, aiUsage, contacts, revenue, newLeads] = await Promise.all([
+  const [stores, products, aiUsage, aiSpend, contacts, revenue, newLeads] = await Promise.all([
     db.all<StoreWithOwner>(
       "SELECT s.*, u.name as ownerName, u.phone as ownerPhone, u.lastSeenAt as ownerLastSeenAt FROM stores s JOIN users u ON u.id = s.ownerId"
     ),
     db.all<{ storeId: string; total: number; visible: number }>("SELECT storeId, COUNT(*) as total, SUM(isVisible) as visible FROM products GROUP BY storeId"),
     usageByStore(now),
+    monthSpend({ text: aiSettings().model, preview: previewSettings()?.model ?? null }, now),
     db.all<{ storeId: string; count: number }>(
       "SELECT storeId, COUNT(*) as count FROM analytics_events WHERE type = 'CONTACT_CLICK' AND createdAt >= ? GROUP BY storeId",
       monthStart(now)
@@ -56,18 +58,13 @@ export async function adminOverview(now = new Date()) {
     // Most urgent first: the earliest paid date; stores without a date last.
     .sort((a, b) => (a.subscriptionEndsAt ?? "9999").localeCompare(b.subscriptionEndsAt ?? "9999"));
 
-  const tokens = aiUsage.reduce(
-    (sum, row) => ({ inputTokens: sum.inputTokens + row.inputTokens, outputTokens: sum.outputTokens + row.outputTokens }),
-    { inputTokens: 0, outputTokens: 0 }
-  );
-
   return {
     stores: rows,
     expiring: rows.filter((row) => row.subscription.state === "expiring"),
     overdue: rows.filter((row) => row.subscription.state === "grace" || row.subscription.state === "expired"),
     inactive: inactiveOwners(rows, inactiveSince, now.getTime() - NEW_OWNER_DAYS * DAY_MS),
     revenue: { byMonth: revenue, thisMonth: revenue[revenue.length - 1]?.total ?? 0 },
-    ai: { cards: aiUsage.reduce((sum, row) => sum + row.units, 0), ...tokens, costRub: estimateCost(tokens) },
+    ai: { cards: aiUsage.reduce((sum, row) => sum + row.units, 0), ...aiSpend },
     newLeads: newLeads?.count ?? 0,
     inactiveDays: INACTIVE_DAYS
   };

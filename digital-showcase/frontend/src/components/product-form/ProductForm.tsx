@@ -7,6 +7,7 @@ import { AiBadge } from "./AiBadge";
 import { AiPanel } from "./AiPanel";
 import { ASK_SELLER, hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
+import { PreviewGenerator } from "./PreviewGenerator";
 import {
   CATEGORY_PRESETS,
   emptySimpleDetails,
@@ -29,6 +30,8 @@ import styles from "./ProductForm.module.css";
 interface ProductFormProps {
   initial?: Product;
   aiDraftPath: string;
+  /** POST endpoint of «Превью с ИИ»; without it (or without AI) there's no such button. */
+  aiPreviewPath?: string;
   aiFormEnabled: boolean;
   /** localStorage key for the unsaved draft and remembered values. */
   draftKey?: string;
@@ -48,7 +51,7 @@ function selectFieldText(event: KeyboardEvent<HTMLFormElement>) {
   event.target.select();
 }
 
-export function ProductForm({ initial, aiDraftPath, aiFormEnabled, draftKey, onSubmit }: ProductFormProps) {
+export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled, draftKey, onSubmit }: ProductFormProps) {
   const toast = useToast();
   const savedDraft = useMemo(() => readSavedDraft(draftKey), [draftKey]);
   const initialSimple = useMemo(() => simpleFromProduct(initial), [initial]);
@@ -70,6 +73,7 @@ export function ProductForm({ initial, aiDraftPath, aiFormEnabled, draftKey, onS
   const [mode, setMode] = useState<DetailsMode>(savedDraft?.mode ?? (initialSimple ? "simple" : "advanced"));
   const [simple, setSimple] = useState<SimpleDetailsValue>(savedDraft?.simple ?? initialSimple ?? emptySimpleDetails);
   const [isSimplifyConfirmOpen, setIsSimplifyConfirmOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const hasSubmittedRef = useRef(false);
   const imageManager = useImageManager(initial);
   const builder = useVariantBuilder(initial, savedDraft, draftKey);
@@ -263,7 +267,7 @@ export function ProductForm({ initial, aiDraftPath, aiFormEnabled, draftKey, onS
         </Notice>
       )}
 
-      <ImageManager manager={imageManager} />
+      <ImageManager manager={imageManager} onCreatePreview={aiFormEnabled && aiPreviewPath ? () => setIsPreviewOpen(true) : undefined} />
 
       {aiMode && !aiDraftApplied && (
         <AiPanel prompt={aiPrompt} onPromptChange={setAiPrompt} images={imageManager.images} aiDraftPath={aiDraftPath} onDraft={applyDraft} />
@@ -333,6 +337,20 @@ export function ProductForm({ initial, aiDraftPath, aiFormEnabled, draftKey, onS
         </>
       )}
       <VariantModal builder={builder} images={imageManager.images} />
+      {isPreviewOpen && aiPreviewPath && (
+        <PreviewGenerator
+          path={aiPreviewPath}
+          images={imageManager.images}
+          coverId={imageManager.previewImageId}
+          product={{
+            title: form.title,
+            category: form.category,
+            colors: mode === "simple" ? simple.colors.map((color) => color.name) : variants.map((variant) => variant.colorName).filter((name) => name !== ASK_SELLER)
+          }}
+          onUse={imageManager.addCover}
+          onClose={() => setIsPreviewOpen(false)}
+        />
+      )}
       {isSimplifyConfirmOpen && (
         <ConfirmModal
           title="Одна цена для всех?"

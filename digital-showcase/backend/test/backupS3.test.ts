@@ -23,6 +23,9 @@ const ACCESS_KEY = "test-access";
 const SECRET_KEY = "test-secret";
 const objects = new Map<string, { body: Buffer; lastModified: Date }>();
 const rejected: string[] = [];
+// What the admin panel would show at the moment each file arrives.
+const progressAtPut: { key: string; progress: unknown }[] = [];
+let currentProgress: () => unknown = () => null;
 
 const fakeS3 = http.createServer((req, res) => {
   const chunks: Buffer[] = [];
@@ -51,6 +54,7 @@ const fakeS3 = http.createServer((req, res) => {
     const key = decodeURIComponent(url.pathname.replace(/^\/backups-bucket\/?/, ""));
     if (req.method === "PUT") {
       objects.set(key, { body, lastModified: new Date() });
+      progressAtPut.push({ key, progress: currentProgress() });
       res.end();
     } else if (req.method === "DELETE") {
       objects.delete(key);
@@ -82,7 +86,8 @@ process.env.BACKUP_S3_PREFIX = "shop";
 process.env.BACKUP_KEEP_DAYS = "30";
 
 const { closeDb, initDatabase } = await import("../src/database/db.js");
-const { runBackup, verifyRemoteRestore } = await import("../src/services/backupService.js");
+const { backupProgress, runBackup, verifyRemoteRestore } = await import("../src/services/backupService.js");
+currentProgress = backupProgress;
 
 await initDatabase();
 fs.mkdirSync(process.env.UPLOAD_DIR, { recursive: true });
@@ -98,6 +103,15 @@ test("копия и фото уходят в хранилище с правил�
   assert.ok([...objects.keys()].some((key) => /^shop\/db\/database-.*\.sqlite\.gz$/.test(key)));
   assert.ok(objects.has("shop/uploads/photo-one.webp"));
   assert.ok(objects.has("shop/uploads/фото (2).webp"));
+
+  // The progress bar: step 5 of 7 sends the database, step 6 counts the photos, nothing once done.
+  const database = progressAtPut.find((entry) => entry.key.startsWith("shop/db/"));
+  assert.deepEqual(database?.progress, { stage: "uploadDatabase", step: 5, steps: 7, done: null, total: null });
+  const photo = progressAtPut.find((entry) => entry.key === "shop/uploads/photo-one.webp")?.progress as { stage: string; step: number; total: number };
+  assert.equal(photo.stage, "uploadPhotos");
+  assert.equal(photo.step, 6);
+  assert.equal(photo.total, 2);
+  assert.equal(backupProgress(), null);
 });
 
 test("повторная копия отправляет только новые фото", async () => {

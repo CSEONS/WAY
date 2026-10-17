@@ -26,6 +26,38 @@ export interface BackupRun {
   error: string | null;
 }
 
+export type BackupStage = "snapshot" | "verify" | "compress" | "save" | "uploadDatabase" | "uploadPhotos" | "pruneRemote";
+
+/** Where the running copy is now, for the progress bar in the admin panel. */
+export interface BackupProgress {
+  stage: BackupStage;
+  /** 1-based step of `steps`: 4 on the server only, 7 with S3. */
+  step: number;
+  steps: number;
+  /** Inside the stage, when it can be counted: database pages copied, photos sent. */
+  done: number | null;
+  total: number | null;
+}
+
+const LOCAL_STAGES: BackupStage[] = ["snapshot", "verify", "compress", "save"];
+const S3_STAGES: BackupStage[] = [...LOCAL_STAGES, "uploadDatabase", "uploadPhotos", "pruneRemote"];
+
+// One copy at a time in this process (see runBackup), so one progress is enough.
+let progress: BackupProgress | null = null;
+
+/** The running copy's stage, or null when none is running. */
+export function backupProgress() {
+  return progress;
+}
+
+function enterStage(stages: BackupStage[], stage: BackupStage, total: number | null = null) {
+  progress = { stage, step: stages.indexOf(stage) + 1, steps: stages.length, done: total == null ? null : 0, total };
+}
+
+function advance(done: number, total: number) {
+  if (progress) progress = { ...progress, done, total };
+}
+
 function numberEnv(name: string, fallback: number) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= 0 ? value : fallback;
@@ -84,13 +116,14 @@ function pruneLocal(dir: string, keep: number) {
   for (const name of copies.slice(keep)) fs.rmSync(path.join(dir, name), { force: true });
 }
 
-/** Sends photos the bucket doesn't have yet. Returns how many were sent. */
+/** Sends photos the bucket doesn't have yet, counting them in the progress. Returns how many were sent. */
 async function syncUploads(client: S3Client, prefix: string) {
   const db = await getDb();
   const sent = new Set((await db.all<{ name: string }>("SELECT name FROM backup_uploaded_files")).map((row) => row.name));
   const dir = uploadDir();
   if (!fs.existsSync(dir)) return 0;
   const pending = fs.readdirSync(dir).filter((name) => !sent.has(name) && fs.statSync(path.join(dir, name)).isFile());
+  advance(0, pending.length);
 
   let count = 0;
   // A few at a time: fast enough, gentle on a small server.
@@ -101,6 +134,7 @@ async function syncUploads(client: S3Client, prefix: string) {
         await client.put(`${prefix}/uploads/${name}`, body, MIME[path.extname(name).toLowerCase()]);
         await db.run("INSERT OR IGNORE INTO backup_uploaded_files (name, uploadedAt) VALUES (?, ?)", name, new Date().toISOString());
         count += 1;
+        advance(count, pending.length);
       })
     );
   }
@@ -146,21 +180,34 @@ async function doBackup(): Promise<BackupRun> {
   await db.run("INSERT INTO backup_runs (id, startedAt, status, target) VALUES (?, ?, 'RUNNING', ?)", run.id, run.startedAt, run.target);
 
   const temp = path.join(os.tmpdir(), `showcase-backup-${run.id}.sqlite`);
+  const stages = settings.s3 ? S3_STAGES : LOCAL_STAGES;
   try {
     fs.mkdirSync(settings.dir, { recursive: true });
-    await rawDb().backup(temp);
+    enterStage(stages, "snapshot");
+    await rawDb().backup(temp, {
+      progress({ totalPages, remainingPages }) {
+        advance(totalPages - remainingPages, totalPages);
+        return 100;
+      }
+    });
+    enterStage(stages, "verify");
     verifyDatabaseFile(temp);
 
+    enterStage(stages, "compress");
     const compressed = await gzip(await fs.promises.readFile(temp));
     const name = `database-${stamp()}.sqlite.gz`;
+    enterStage(stages, "save");
     await fs.promises.writeFile(path.join(settings.dir, name), compressed);
     pruneLocal(settings.dir, settings.keepLocal);
     run.databaseBytes = compressed.length;
 
     if (settings.s3) {
       const client = new S3Client(settings.s3);
+      enterStage(stages, "uploadDatabase");
       await client.put(`${settings.prefix}/db/${name}`, compressed, "application/gzip");
+      enterStage(stages, "uploadPhotos");
       run.uploadedFiles = await syncUploads(client, settings.prefix);
+      enterStage(stages, "pruneRemote");
       await pruneRemote(client, settings.prefix, settings.keepRemoteDays);
     }
     run.status = "OK";
@@ -169,6 +216,7 @@ async function doBackup(): Promise<BackupRun> {
     run.error = error instanceof Error ? error.message : String(error);
     await reportProblem("Резервная копия не сделана", error);
   } finally {
+    progress = null;
     fs.rmSync(temp, { force: true });
     run.finishedAt = new Date().toISOString();
     await db.run(

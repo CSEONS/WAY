@@ -19,6 +19,40 @@
   border-color: var(--color-warning);
 }
 
+/* Tabs under the urgent block: an even 2×2 grid on a phone, one row on wider screens. */
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  justify-self: stretch;
+}
+
+.tabs > * {
+  justify-content: center;
+}
+
+.section {
+  gap: var(--space-4);
+}
+
+.groupLink {
+  margin-left: auto;
+  color: var(--color-accent-strong);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.groupLink:hover {
+  text-decoration: underline;
+}
+
+@media (min-width: 720px) {
+  .tabs {
+    display: inline-flex;
+    justify-self: start;
+  }
+}
+
 .group {
   display: grid;
   gap: var(--space-2);

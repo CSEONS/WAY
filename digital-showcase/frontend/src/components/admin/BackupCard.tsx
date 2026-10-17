@@ -1,7 +1,7 @@
 import { DatabaseRestoreIcon } from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
-import { Badge, Button, Card, CardHeader, Notice, useToast } from "../../ui";
+import { Badge, Button, Card, CardHeader, Notice, ProgressBar, useToast } from "../../ui";
 import styles from "./BackupCard.module.css";
 
 interface BackupRun {
@@ -15,9 +15,37 @@ interface BackupRun {
   error: string | null;
 }
 
+type BackupStage = "snapshot" | "verify" | "compress" | "save" | "uploadDatabase" | "uploadPhotos" | "pruneRemote";
+
+/** Where the running copy is now: step of steps, and inside the step — database pages or photos, when counted. */
+interface BackupProgress {
+  stage: BackupStage;
+  step: number;
+  steps: number;
+  done: number | null;
+  total: number | null;
+}
+
 interface BackupsResponse {
   settings: { enabled: boolean; storage: string | null; hour: number; keepLocal: number; keepRemoteDays: number };
   runs: BackupRun[];
+  progress: BackupProgress | null;
+}
+
+const stageLabels: Record<BackupStage, string> = {
+  snapshot: "Снимаю копию базы",
+  verify: "Проверяю, что копия открывается",
+  compress: "Сжимаю копию",
+  save: "Сохраняю на сервере",
+  uploadDatabase: "Отправляю базу в хранилище",
+  uploadPhotos: "Отправляю новые фото в хранилище",
+  pruneRemote: "Удаляю старые копии из хранилища"
+};
+
+/** The whole copy in percent: finished steps plus the share of the current one. */
+function percent(progress: BackupProgress) {
+  const inside = progress.total ? (progress.done ?? 0) / progress.total : 0;
+  return ((progress.step - 1 + inside) / progress.steps) * 100;
 }
 
 const timeFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
@@ -33,18 +61,22 @@ export function BackupCard() {
   const [data, setData] = useState<BackupsResponse>();
   const [isStarting, setIsStarting] = useState(false);
   const poll = useRef<number | undefined>(undefined);
+  const wasRunning = useRef(false);
 
   const load = useCallback(() => {
     api
       .get<BackupsResponse>("/admin/backups")
       .then((res) => {
         setData(res.data);
-        // While a copy is being made, check again shortly.
+        const isRunning = res.data.runs[0]?.status === "RUNNING";
+        if (wasRunning.current && res.data.runs[0]?.status === "OK") toast.show("Копия готова", { tone: "success" });
+        wasRunning.current = isRunning;
+        // While a copy is being made, follow its steps.
         window.clearTimeout(poll.current);
-        if (res.data.runs[0]?.status === "RUNNING") poll.current = window.setTimeout(load, 3000);
+        if (isRunning) poll.current = window.setTimeout(load, 1000);
       })
       .catch(() => undefined);
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     load();
@@ -55,8 +87,9 @@ export function BackupCard() {
     setIsStarting(true);
     try {
       await api.post("/admin/backups");
-      toast.show("Копия делается — это займёт до пары минут");
-      window.setTimeout(load, 800);
+      // A small database is copied before the first check: still say it's done.
+      wasRunning.current = true;
+      window.setTimeout(load, 300);
     } catch {
       toast.show("Не удалось запустить копирование", { tone: "danger" });
     } finally {
@@ -65,7 +98,7 @@ export function BackupCard() {
   }
 
   if (!data) return null;
-  const { settings, runs } = data;
+  const { settings, runs, progress } = data;
   const lastOk = runs.find((run) => run.status === "OK");
   const latest = runs[0];
   // The nightly copy plus a couple of hours of slack.
@@ -82,6 +115,19 @@ export function BackupCard() {
           </Button>
         }
       />
+      {latest?.status === "RUNNING" && (
+        <div className={styles.progress}>
+          <div className={styles.progressText}>
+            <span>{progress ? `Шаг ${progress.step} из ${progress.steps}: ${stageLabels[progress.stage]}` : "Копия делается…"}</span>
+            {progress?.stage === "uploadPhotos" && progress.total != null && (
+              <span>
+                {progress.done} из {progress.total} фото
+              </span>
+            )}
+          </div>
+          <ProgressBar value={progress ? percent(progress) : 0} label="Ход копирования" />
+        </div>
+      )}
       <div className={styles.status}>
         {lastOk ? (
           <span>

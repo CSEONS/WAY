@@ -166,11 +166,14 @@ export interface JsonRequest {
 export async function completeJson({ instructions, text, images = [] }: JsonRequest) {
   const settings = aiSettings();
   if (!settings.apiKey) throw new HttpError(503, "ИИ не настроен: укажите AI_API_KEY на сервере");
+  // OpenAI refuses a JSON-only answer unless the request itself says «json»
+  // («input messages must contain the word 'json'»); instructions don't count.
+  const message = settings.jsonMode && !/json/i.test(text) ? `${text}\n\nОтветь JSON-объектом.` : text;
 
   if (settings.style === "chat") {
     const content = images.length
-      ? [{ type: "text", text }, ...images.map((url) => ({ type: "image_url", image_url: { url, detail: "low" } }))]
-      : text;
+      ? [{ type: "text", text: message }, ...images.map((url) => ({ type: "image_url", image_url: { url, detail: "low" } }))]
+      : message;
     const payload = await post(
       `${settings.baseUrl}/chat/completions`,
       settings.apiKey,
@@ -196,7 +199,7 @@ export async function completeJson({ instructions, text, images = [] }: JsonRequ
       input: [
         {
           role: "user",
-          content: [{ type: "input_text", text }, ...images.map((url) => ({ type: "input_image", image_url: url, detail: "low" }))]
+          content: [{ type: "input_text", text: message }, ...images.map((url) => ({ type: "input_image", image_url: url, detail: "low" }))]
         }
       ],
       ...(settings.jsonMode ? { text: { format: { type: "json_object" } } } : {}),

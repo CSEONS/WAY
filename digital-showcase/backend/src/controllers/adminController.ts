@@ -219,7 +219,9 @@ export const listBackups = asyncHandler(async (_req, res) => {
       keepLocal: settings.keepLocal,
       keepRemoteDays: settings.keepRemoteDays
     },
-    runs: await backupService.listBackupRuns(10)
+    runs: await backupService.listBackupRuns(10),
+    // The running copy's stage for the progress bar; null when none is running.
+    progress: backupService.backupProgress()
   });
 });
 

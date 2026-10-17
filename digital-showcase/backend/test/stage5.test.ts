@@ -160,6 +160,30 @@ test("вход от имени владельца: короткая сессия
   assert.notEqual((await db.get<{ lastSeenAt: string | null }>("SELECT lastSeenAt FROM users WHERE id = ?", owner.id))!.lastSeenAt, null);
 });
 
+test("наверху админки: новые заявки и проблема с резервной копией", async () => {
+  const { adminOverview } = await import("../src/services/overviewService.js");
+  const { createLead, setLeadStatus } = await import("../src/services/leadService.js");
+  const fresh = await createLead({ name: "Аминат", phone: "+79281234567", storeName: "Платья у Аминат" });
+  const handled = await createLead({ name: "Уже подключили", phone: "+79281234568" });
+  await setLeadStatus(handled.id, "DONE");
+
+  let overview = await adminOverview();
+  const leadIds = overview.latestLeads.map((lead) => lead.id);
+  assert.ok(leadIds.includes(fresh.id) && !leadIds.includes(handled.id), "только новые заявки");
+  // No copy has been made yet.
+  assert.deepEqual(overview.backupProblem, { kind: "stale", at: null, error: null });
+
+  const now = Date.now();
+  const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString();
+  await db.run("INSERT INTO backup_runs (id, startedAt, finishedAt, status, target) VALUES ('ok-run', ?, ?, 'OK', 'local')", at(30), at(29));
+  overview = await adminOverview();
+  assert.equal(overview.backupProblem, null);
+
+  await db.run("INSERT INTO backup_runs (id, startedAt, finishedAt, status, target, error) VALUES ('failed-run', ?, ?, 'FAILED', 'local', 'No space left')", at(5), at(4));
+  overview = await adminOverview();
+  assert.deepEqual(overview.backupProblem, { kind: "failed", at: at(5), error: "No space left" });
+});
+
 test.after(() => {
   closeDb();
   fs.rmSync(dir, { recursive: true, force: true });

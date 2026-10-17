@@ -73,7 +73,8 @@ test("Chat Completions: сообщение, картинки и токены", a
   assert.equal(body.model, "some/model");
   assert.deepEqual(body.messages[0], { role: "system", content: "Отвечай JSON" });
   assert.deepEqual(body.messages[1].content, [
-    { type: "text", text: "Синее платье" },
+    // JSON mode needs the word in the message itself, not only in the instructions.
+    { type: "text", text: "Синее платье\n\nОтветь JSON-объектом." },
     { type: "image_url", image_url: { url: "data:image/webp;base64,AAA", detail: "low" } }
   ]);
   assert.deepEqual(body.response_format, { type: "json_object" });
@@ -96,6 +97,8 @@ test("Responses API по умолчанию и старые переменные
   assert.deepEqual(usage, { inputTokens: 200, outputTokens: 40, model: "gpt-5.6-luna" });
   assert.equal(received[0].path, "/v1/responses");
   assert.equal(received[0].auth, "Bearer old-key");
+  const input = (received[0].body as { input: { content: { text?: string }[] }[] }).input;
+  assert.match(input[0].content[0].text ?? "", /JSON/);
 });
 
 test("ключ-заглушка из .env.example считается ненастроенным", () => {

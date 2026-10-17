@@ -199,6 +199,10 @@ export interface AdminOverview {
   revenue: { byMonth: MonthRevenue[]; thisMonth: number };
   ai: AiSpend;
   newLeads: number;
+  /** The newest of the new requests, for the top of the page. */
+  latestLeads: Lead[];
+  /** The last copy failed, or there has been none for over a day. */
+  backupProblem: { kind: "failed" | "stale"; at: string | null; error: string | null } | null;
   inactiveDays: number;
 }
 

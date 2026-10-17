@@ -1,7 +1,8 @@
 import { getDb } from "../database/db.js";
-import type { Store } from "../types/models.js";
+import type { Lead, Store } from "../types/models.js";
 import { aiSettings, previewSettings } from "./aiProvider.js";
 import { monthlyLimit, monthSpend, monthStart, usageByStore } from "./aiUsageService.js";
+import { backupSettings, lastSuccessfulBackup, listBackupRuns } from "./backupService.js";
 import { revenueByMonth } from "./paymentService.js";
 import { subscriptionInfo } from "./subscriptionService.js";
 
@@ -10,13 +11,17 @@ export const INACTIVE_DAYS = 14;
 /** A just-connected owner gets a few days to sign in before they count as inactive. */
 const NEW_OWNER_DAYS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** The nightly copy plus a couple of hours of slack. */
+const BACKUP_STALE_MS = 26 * 60 * 60 * 1000;
+/** New requests from the landing shown at the top of the admin panel. */
+const LATEST_LEADS = 5;
 
 type StoreWithOwner = Store & { ownerName: string; ownerPhone: string | null; ownerLastSeenAt: string | null };
 
 /** Everything the admin panel's first screen needs, in one request. */
 export async function adminOverview(now = new Date()) {
   const db = await getDb();
-  const [stores, products, aiUsage, aiSpend, contacts, revenue, newLeads] = await Promise.all([
+  const [stores, products, aiUsage, aiSpend, contacts, revenue, newLeads, latestLeads, backup] = await Promise.all([
     db.all<StoreWithOwner>(
       "SELECT s.*, u.name as ownerName, u.phone as ownerPhone, u.lastSeenAt as ownerLastSeenAt FROM stores s JOIN users u ON u.id = s.ownerId"
     ),
@@ -28,7 +33,9 @@ export async function adminOverview(now = new Date()) {
       monthStart(now)
     ),
     revenueByMonth(6, now),
-    db.get<{ count: number }>("SELECT COUNT(*) as count FROM leads WHERE status = 'NEW'")
+    db.get<{ count: number }>("SELECT COUNT(*) as count FROM leads WHERE status = 'NEW'"),
+    db.all<Lead>("SELECT * FROM leads WHERE status = 'NEW' ORDER BY createdAt DESC LIMIT ?", LATEST_LEADS),
+    backupProblem(now)
   ]);
 
   const inactiveSince = now.getTime() - INACTIVE_DAYS * DAY_MS;
@@ -66,8 +73,24 @@ export async function adminOverview(now = new Date()) {
     revenue: { byMonth: revenue, thisMonth: revenue[revenue.length - 1]?.total ?? 0 },
     ai: { cards: aiUsage.reduce((sum, row) => sum + row.units, 0), ...aiSpend },
     newLeads: newLeads?.count ?? 0,
+    latestLeads,
+    backupProblem: backup,
     inactiveDays: INACTIVE_DAYS
   };
+}
+
+/**
+ * A copy that failed, or none for over a day: the data are at risk, so it
+ * goes to the top of the admin panel. Null while a copy is running or all is well.
+ */
+async function backupProblem(now: Date) {
+  const [latest] = await listBackupRuns(1);
+  if (latest?.status === "FAILED") return { kind: "failed" as const, at: latest.startedAt, error: latest.error };
+  if (latest?.status === "RUNNING" || !backupSettings().enabled) return null;
+  const lastOk = await lastSuccessfulBackup();
+  const at = lastOk ? (lastOk.finishedAt ?? lastOk.startedAt) : null;
+  if (at && now.getTime() - Date.parse(at) <= BACKUP_STALE_MS) return null;
+  return { kind: "stale" as const, at, error: null };
 }
 
 type OverviewRow = { ownerId: string; name: string; isActive: number; ownerLastSeenAt: string | null; createdAt: string };

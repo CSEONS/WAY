@@ -11,6 +11,8 @@ export interface BackgroundJob {
   id: string;
   title: string;
   storeId: string;
+  /** Known once the product is created on the server: «Посмотреть товар» after saving. */
+  productId?: string;
   status: BackgroundJobStatus;
   percent: number;
   message: string;
@@ -195,6 +197,7 @@ async function runProductSave(
     ? await api.patch<Product>(`${basePath}/${progress.productId}`, payload)
     : await api.post<Product>(basePath, payload);
   progress.productId = data.id;
+  onProgress({ productId: data.id });
   doneWeight += WEIGHT_SAVE;
   setPercent();
 

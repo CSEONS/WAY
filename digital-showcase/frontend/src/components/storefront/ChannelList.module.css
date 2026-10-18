@@ -1,0 +1,89 @@
+/* One row per way to reach or share: the network's icon in its color, the name, the account. */
+.channels {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.channel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.channel:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+}
+
+.channel:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.channel:disabled {
+  cursor: progress;
+}
+
+.icon {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--control-md);
+  height: var(--control-md);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-ink);
+  background: var(--color-accent);
+}
+
+.whatsapp {
+  background: var(--color-whatsapp);
+}
+
+.telegram {
+  background: var(--color-telegram);
+}
+
+.instagram {
+  background: var(--color-instagram);
+}
+
+.vk {
+  background: var(--color-vk);
+}
+
+.phone {
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+}
+
+.text {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.text strong {
+  font-weight: var(--font-weight-semibold);
+}
+
+.text small {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spinner {
+  flex-shrink: 0;
+  color: var(--color-ink-muted);
+}

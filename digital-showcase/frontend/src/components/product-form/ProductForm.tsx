@@ -240,8 +240,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
             if (value === "ai") setAiDraftApplied(false);
           }}
           options={[
-            { value: "ai", label: "С помощью ИИ", icon: AiMagicIcon },
-            { value: "manual", label: "Вручную", icon: Edit02Icon }
+            { value: "manual", label: "Вручную", icon: Edit02Icon },
+            { value: "ai", label: "ИИ заполнение", icon: AiMagicIcon }
           ]}
         />
       ) : (

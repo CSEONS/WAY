@@ -16,7 +16,7 @@ import * as reportService from "../services/reportService.js";
 import * as storeService from "../services/storeService.js";
 import { addingProductsBlocked, GRACE_DAYS, withSubscription } from "../services/subscriptionService.js";
 import { asyncHandler, HttpError } from "../utils/http.js";
-import { imageOrderSchema, parseBody, productCreateSchema, productUpdateSchema, storeDetailsSchema } from "../utils/validation.js";
+import { imageOrderSchema, parseBody, productBulkSchema, productCreateSchema, productUpdateSchema, storeDetailsSchema } from "../utils/validation.js";
 
 /** The store from the URL, only if it belongs to the signed-in owner; someone else's store is «not found». */
 async function scopedStore(req: Request) {
@@ -251,6 +251,13 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const product = await productService.updateProduct(String(req.params.id), store.id, input);
   if (!product) throw new HttpError(404, "Товар не найден");
   res.json(product);
+});
+
+/** «Выбрать» in the cabinet: hide, show, mark in stock or not, delete — several products at once. */
+export const bulkProducts = asyncHandler(async (req, res) => {
+  const { ids, action } = parseBody(productBulkSchema, req.body);
+  const store = await scopedStore(req);
+  res.json({ ids: await productService.bulkUpdateProducts(store.id, ids, action), action });
 });
 
 export const deleteProduct = asyncHandler(async (req, res) => {

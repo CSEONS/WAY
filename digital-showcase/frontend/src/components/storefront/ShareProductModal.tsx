@@ -1,16 +1,9 @@
-import {
-  Copy01Icon,
-  Download04Icon,
-  InstagramIcon,
-  Settings02Icon,
-  Share08Icon,
-  TelegramIcon,
-  VkIcon,
-  WhatsappIcon
-} from "@hugeicons/core-free-icons";
+import { Copy01Icon, Download04Icon, Settings02Icon, Share08Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import type { Store } from "../../types/models";
-import { Button, ButtonLink, Field, Modal, Notice, Textarea, useCopyToClipboard, useToast, type IconSvgElement } from "../../ui";
+import { Button, ButtonLink, Field, Modal, Notice, Textarea, useCopyToClipboard, useToast } from "../../ui";
+import type { ContactChannel } from "../../utils/contact";
+import { ChannelList, ChannelRow } from "./ChannelList";
 import styles from "./ShareProductModal.module.css";
 
 interface ShareProductModalProps {
@@ -59,9 +52,13 @@ function download(file: File) {
 /**
  * «Поделиться в соцсетях» on the owner's own product: buttons for the networks
  * the store has in «Реквизиты». On a phone the photo goes to the share sheet,
- * where WhatsApp offers «Мой статус» and Instagram — stories; Telegram and VK
- * take a link with the text. Where a phone can't share a photo (a computer),
- * the photo is saved and the text copied, with a word on where to add them.
+ * where WhatsApp offers «Мой статус» and Instagram — stories. Telegram and VK
+ * take a link with the text (the photo comes in the link's preview): Telegram
+ * drops the text of a photo sent through the share sheet. A Telegram story
+ * can't be handed a photo from a site: the photo is saved, the text copied
+ * and Telegram's story editor opened (tg://post/photo) to pick it. Where a
+ * device can't share a photo (a computer), the photo is saved and the text
+ * copied, with a word on where to add them.
  */
 export function ShareProductModal({ store, title, priceText, photoUrl, productUrl, onClose }: ShareProductModalProps) {
   const toast = useToast();
@@ -111,37 +108,60 @@ export function ShareProductModal({ store, title, priceText, photoUrl, productUr
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  /** Stories are posted from the Telegram app on a phone; a computer gets the photo and directions. */
+  async function shareToTelegramStory() {
+    const isPhone = window.matchMedia?.("(pointer: coarse)").matches;
+    if (photo) download(photo);
+    const saved = photo ? "Фото сохранено, текст скопирован." : "Текст скопирован.";
+    await copy(
+      caption,
+      isPhone ? `${saved} Выберите фото в редакторе истории Telegram` : `${saved} Истории публикуются с телефона: Telegram → «Добавить историю»`
+    );
+    // A moment for the download to start before the app takes over.
+    if (isPhone) setTimeout(() => (window.location.href = "tg://post/photo"), 800);
+  }
+
   const text = caption.replace(productUrl, "").trim();
   const absolutePhoto = photoUrl ? new URL(photoUrl, window.location.origin).href : "";
   // needsPhoto: the button waits while the photo is being prepared; the others work with a link at once.
-  type Network = { key: string; icon: IconSvgElement; label: string; needsPhoto?: boolean; onClick: () => void };
+  type Network = { key: string; channel: ContactChannel; label: string; detail: string; needsPhoto?: boolean; onClick: () => void };
   const networks = ([
     store.whatsapp && {
       key: "whatsapp",
-      icon: WhatsappIcon,
+      channel: "whatsapp",
       label: "В статус WhatsApp",
+      detail: "Фото с подписью",
       needsPhoto: true,
       onClick: () => void sharePhotoTo("Откройте WhatsApp на телефоне → «Статус» и добавьте фото.")
     },
     store.instagram && {
       key: "instagram",
-      icon: InstagramIcon,
+      channel: "instagram",
       label: "В историю Instagram",
+      detail: "Фото, подпись скопируется",
       needsPhoto: true,
       onClick: () => void sharePhotoTo("Откройте Instagram на телефоне → «История» и добавьте фото.")
     },
     store.telegram && {
+      key: "telegram-story",
+      channel: "telegram",
+      label: "В историю Telegram",
+      detail: "Фото, подпись скопируется",
+      needsPhoto: true,
+      onClick: () => void shareToTelegramStory()
+    },
+    store.telegram && {
       key: "telegram",
-      icon: TelegramIcon,
-      label: "В Telegram",
-      onClick: async () => {
-        if (!(await sharePhoto())) openLink(`https://t.me/share/url?url=${encodeURIComponent(productUrl)}&text=${encodeURIComponent(text)}`);
-      }
+      channel: "telegram",
+      label: "В чат или канал Telegram",
+      detail: "Ссылка с фото и подписью",
+      onClick: () => openLink(`https://t.me/share/url?url=${encodeURIComponent(productUrl)}&text=${encodeURIComponent(text)}`)
     },
     store.vk && {
       key: "vk",
-      icon: VkIcon,
+      channel: "vk",
       label: "ВКонтакте",
+      detail: "На стену или в сообщения",
       onClick: () =>
         openLink(
           `https://vk.com/share.php?url=${encodeURIComponent(productUrl)}&title=${encodeURIComponent(text)}${absolutePhoto ? `&image=${encodeURIComponent(absolutePhoto)}` : ""}`
@@ -159,13 +179,18 @@ export function ShareProductModal({ store, title, priceText, photoUrl, productUr
       </div>
 
       {networks.length > 0 ? (
-        <div className={styles.networks}>
+        <ChannelList>
           {networks.map((network) => (
-            <Button key={network.key} variant="secondary" size="lg" block icon={network.icon} loading={network.needsPhoto && photo === undefined} onClick={network.onClick}>
-              {network.label}
-            </Button>
+            <ChannelRow
+              key={network.key}
+              channel={network.channel}
+              label={network.label}
+              detail={network.detail}
+              busy={network.needsPhoto && photo === undefined}
+              onClick={network.onClick}
+            />
           ))}
-        </div>
+        </ChannelList>
       ) : (
         <Notice
           tone="neutral"

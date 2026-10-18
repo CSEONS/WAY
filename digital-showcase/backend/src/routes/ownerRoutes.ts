@@ -19,6 +19,7 @@ ownerRoutes.post("/stores/:storeId/products/ai-draft", aiDraftUpload.fields([{ n
 ownerRoutes.post("/stores/:storeId/products/bulk-ai-draft", bulkAiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 40 }]), controller.createBulkProductDraft);
 ownerRoutes.post("/stores/:storeId/products/ai-preview", previewUpload.single("image"), controller.createPreview);
 ownerRoutes.post("/stores/:storeId/products", controller.createProduct);
+ownerRoutes.post("/stores/:storeId/products/bulk", controller.bulkProducts);
 ownerRoutes.get("/stores/:storeId/products/:id", controller.getProduct);
 ownerRoutes.patch("/stores/:storeId/products/:id", controller.updateProduct);
 ownerRoutes.delete("/stores/:storeId/products/:id", controller.deleteProduct);

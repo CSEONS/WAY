@@ -1,3 +1,4 @@
+import { ViewIcon } from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -10,13 +11,21 @@ import styles from "./ProductEditorPage.module.css";
 export function ProductEditorPage() {
   const { storeId, id } = useParams();
   const navigate = useNavigate();
-  const { queueProductSave } = useBackgroundJobs();
+  const { jobs, queueProductSave } = useBackgroundJobs();
   const [store, setStore] = useState<Store>();
   const [product, setProduct] = useState<Product>();
   const [isLoading, setIsLoading] = useState(Boolean(storeId));
   const [hasLoadError, setHasLoadError] = useState(false);
   const [stage, setStage] = useState<"form" | "queued">("form");
   const [formKey, setFormKey] = useState(0);
+  // The save running in the background, and the product it saved: kept here, the dock forgets a finished job.
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [savedProductId, setSavedProductId] = useState<string | null>(null);
+  const job = jobs.find((item) => item.id === jobId);
+
+  useEffect(() => {
+    if (job?.status === "done" && job.productId) setSavedProductId(job.productId);
+  }, [job?.status, job?.productId]);
 
   const load = useCallback(() => {
     if (!storeId) return;
@@ -55,13 +64,15 @@ export function ProductEditorPage() {
 
   function handleSubmit(payload: ProductPayload, imageSelection: ProductImageSelection) {
     if (!storeId) return;
-    queueProductSave({
+    const queued = queueProductSave({
       storeId,
       productId: id,
       payload,
       imageSelection,
       existingImageIds: product?.images.map((image) => image.id) ?? []
     });
+    setJobId(queued);
+    setSavedProductId(null);
     setStage("queued");
   }
 
@@ -75,6 +86,8 @@ export function ProductEditorPage() {
     // Already on the "new product" route — just reset locally, no navigation
     // needed (and none would remount the same route anyway).
     setStage("form");
+    setJobId(null);
+    setSavedProductId(null);
     setFormKey((key) => key + 1);
   }
 
@@ -118,6 +131,18 @@ export function ProductEditorPage() {
             Прогресс и результат можно посмотреть в любой момент — в правом нижнем углу экрана.
           </Notice>
           <div className={styles.actions}>
+            {savedProductId && store ? (
+              // Opens as the owner sees it: «Поделиться», «Редактировать», «Скрыть» — a draft hidden from the storefront too.
+              <ButtonLink variant="secondary" icon={ViewIcon} to={`/m/${store.slug}/p/${savedProductId}`}>
+                Посмотреть товар
+              </ButtonLink>
+            ) : (
+              job?.status !== "error" && (
+                <Button variant="secondary" icon={ViewIcon} loading disabled>
+                  Сохраняется…
+                </Button>
+              )
+            )}
             <Button variant="primary" onClick={createAnother}>
               Создать ещё один товар
             </Button>

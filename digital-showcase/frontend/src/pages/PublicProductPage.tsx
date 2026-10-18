@@ -2,11 +2,14 @@ import {
   CancelCircleIcon,
   CheckmarkCircle02Icon,
   Clock01Icon,
+  Edit02Icon,
   HelpCircleIcon,
   Image01Icon,
   Location01Icon,
   Share08Icon,
-  Store01Icon
+  Store01Icon,
+  ViewIcon,
+  ViewOffSlashIcon
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -32,6 +35,7 @@ import {
   BackLink,
   Badge,
   Button,
+  ButtonLink,
   Card,
   Chip,
   ChipGroup,
@@ -43,6 +47,7 @@ import {
   Page,
   SectionLabel,
   cx,
+  useToast,
   type IconSvgElement
 } from "../ui";
 import styles from "./PublicProductPage.module.css";
@@ -67,6 +72,8 @@ export function PublicProductPage() {
   const [selectedImageId, setSelectedImageId] = useState("");
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  const toast = useToast();
   const favorites = useFavorites(storeSlug);
 
   useDocumentMeta(data ? `${data.product.title} — ${data.store.name}` : null, data?.product.description);
@@ -159,6 +166,22 @@ export function PublicProductPage() {
     setFirstChoice(nextFirstChoice);
     setSelectedSize(size);
     setSelectedColor(nextColor);
+  }
+
+  /** «Скрыть с витрины» / «Показать на витрине» — the owner's own product, right from its page. */
+  async function toggleVisibility() {
+    if (!data) return;
+    const isVisible = !data.product.isVisible;
+    setIsTogglingVisibility(true);
+    try {
+      await api.patch(`/owner/stores/${data.store.id}/products/${data.product.id}`, { isVisible: isVisible ? 1 : 0 });
+      setData({ ...data, product: { ...data.product, isVisible: isVisible ? 1 : 0 } });
+      toast.show(isVisible ? "Товар снова на витрине" : "Товар скрыт с витрины", { tone: "success" });
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не удалось сохранить. Попробуйте ещё раз.", { tone: "danger" });
+    } finally {
+      setIsTogglingVisibility(false);
+    }
   }
 
   function resetVariantSelection() {
@@ -273,9 +296,28 @@ export function PublicProductPage() {
         </p>
         {data.viewerIsOwner ? (
           <div className={styles.ownerShare}>
-            <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
-              Поделиться в соцсетях
-            </Button>
+            {product.isVisible ? (
+              <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
+                Поделиться в соцсетях
+              </Button>
+            ) : (
+              <Notice tone="warning" title="Скрыт с витрины">
+                Покупатели не видят этот товар. Вам он открывается, потому что вы владелец.
+              </Notice>
+            )}
+            <div className={styles.ownerActions}>
+              <ButtonLink variant="secondary" icon={Edit02Icon} to={`/dashboard/stores/${store.id}/products/${product.id}/edit`}>
+                Редактировать
+              </ButtonLink>
+              <Button
+                variant={product.isVisible ? "secondary" : "primary"}
+                icon={product.isVisible ? ViewOffSlashIcon : ViewIcon}
+                loading={isTogglingVisibility}
+                onClick={() => void toggleVisibility()}
+              >
+                {product.isVisible ? "Скрыть с витрины" : "Показать на витрине"}
+              </Button>
+            </div>
             <small>Это ваш товар. Покупатели видят здесь «Связаться»: WhatsApp, Telegram, звонок и другие ваши контакты.</small>
           </div>
         ) : hasContacts(store) ? (
@@ -324,9 +366,15 @@ export function PublicProductPage() {
       <StorefrontFooter />
       {data.viewerIsOwner ? (
         <MobileActionBar>
-          <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
-            Поделиться в соцсетях
-          </Button>
+          {product.isVisible ? (
+            <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
+              Поделиться в соцсетях
+            </Button>
+          ) : (
+            <Button variant="primary" size="lg" block icon={ViewIcon} loading={isTogglingVisibility} onClick={() => void toggleVisibility()}>
+              Показать на витрине
+            </Button>
+          )}
         </MobileActionBar>
       ) : (
         <MobileContactBar store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} />

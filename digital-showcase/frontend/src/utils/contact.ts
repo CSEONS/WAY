@@ -21,7 +21,16 @@ export function whatsappUrl(phone: string, text?: string) {
   return `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
 }
 
-export function telegramUrl(value: string) {
+/** The account name of a Telegram contact, if it's one: «@name», «name», «t.me/name». Null for invite links (t.me/+…). */
+export function telegramUsername(value: string) {
+  const name = value.trim().replace(/^https?:\/\//, "").replace(/^(t|telegram)\.me\//, "").replace(/^@/, "").replace(/\/+$/, "");
+  return /^[A-Za-z0-9_]{4,32}$/.test(name) ? name : null;
+}
+
+/** A chat in Telegram; with `text`, the message is typed in for the buyer (t.me/<username>?text=), where the contact is an account. */
+export function telegramUrl(value: string, text?: string) {
+  const username = telegramUsername(value);
+  if (username) return `https://t.me/${username}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
   return value.startsWith("http") ? value : `https://t.me/${value.replace(/^@/, "")}`;
 }
 

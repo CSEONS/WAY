@@ -1,32 +1,48 @@
+/* Photo on the left, the text next to it, the everyday actions in a strip along the bottom. */
 .item {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: var(--space-2) var(--space-3);
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
+  color: var(--color-ink);
   background: var(--color-surface);
+  font: inherit;
+  text-align: left;
+}
+
+.photoCell {
+  position: relative;
+  display: block;
+  width: 88px;
+  height: 88px;
+  text-decoration: none;
 }
 
 .photo {
   display: grid;
-  grid-row: span 2;
   place-items: center;
-  width: 72px;
-  height: 72px;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   border-radius: var(--radius-md);
   color: var(--color-ink-subtle);
   background: var(--color-surface-muted);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
-  text-decoration: none;
 }
 
 .photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Hidden from the storefront: the photo fades, so the list shows what buyers see at a glance. */
+.dimmed {
+  opacity: 0.45;
 }
 
 .body {
@@ -37,39 +53,89 @@
 }
 
 .title {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-decoration: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.title:hover {
+a.title:hover {
   color: var(--color-accent);
 }
 
 .price {
   color: var(--color-ink);
   font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.category {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badges {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
+  gap: var(--space-1);
 }
 
-.category {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-sm);
+.badges:empty {
+  display: none;
 }
 
 .actions {
   display: flex;
+  grid-column: 1 / -1;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+}
+
+/* «Выбрать»: the whole card is a tick box. */
+.selectable {
+  cursor: pointer;
+}
+
+.selectable:hover {
+  border-color: var(--color-border-strong);
+}
+
+.selectable:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.selected,
+.selected:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.check {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-ink);
+  background: var(--color-overlay);
+}
+
+.checked {
+  background: var(--color-accent);
 }

@@ -205,7 +205,56 @@
   gap: var(--space-3);
 }
 
-.productsHead {
+/* «Товары | Статистика»: full width on a phone, by its labels from a tablet up. */
+.viewSwitch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-self: stretch;
+}
+
+.viewSwitch > * {
+  justify-content: center;
+}
+
+.more {
+  gap: var(--space-4);
+}
+
+.statsMore {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-1);
+  color: var(--color-accent-strong);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.statsMore:hover {
+  text-decoration: underline;
+}
+
+/* Search, then the filter chips, then sorting and the category side by side. */
+.toolbar,
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.search {
+  flex: 1 1 240px;
+}
+
+.sort,
+.category {
+  flex: 1 1 160px;
+  max-width: 260px;
+}
+
+.listHead {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -213,34 +262,42 @@
   gap: var(--space-2);
 }
 
-.productsTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-}
-
-.productsCount {
-  border-radius: var(--radius-pill);
-  padding: 0 var(--space-2);
+.listCount {
   color: var(--color-ink-muted);
-  background: var(--color-surface-muted);
   font-size: var(--font-size-sm);
 }
 
-.moreToggle svg:last-child {
-  transition: transform var(--duration-fast) var(--ease-standard);
+.listHeadActions {
+  display: flex;
+  gap: var(--space-1);
 }
 
-.moreOpen svg:last-child {
-  transform: rotate(180deg);
+/* «Выбрать»: what to do with the ticked products, kept in view at the bottom while scrolling the list. */
+.bulkBar {
+  position: sticky;
+  bottom: calc(var(--space-3) + var(--safe-bottom));
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-bar);
 }
 
-.more {
-  gap: var(--space-4);
+.bulkCount {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.bulkActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .stats {
@@ -249,24 +306,17 @@
   gap: var(--space-3);
 }
 
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
-
-.filter {
-  flex: 1 1 160px;
-  min-width: 140px;
-}
-
 .list {
   display: grid;
   gap: var(--space-3);
 }
 
 @media (min-width: 720px) {
+  .viewSwitch {
+    display: inline-flex;
+    justify-self: start;
+  }
+
   .storeGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

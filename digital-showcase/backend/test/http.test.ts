@@ -144,6 +144,48 @@ test("свой товар владелец видит с «Поделиться�
   assert.equal(views?.count, 3);
 });
 
+test("скрытый с витрины товар открывается только его владельцу — чтобы вернуть его", async () => {
+  const product = (await createProduct({ storeId: storeB.id, title: "Скрытая юбка", isVisible: 0 }))!;
+  const url = `/api/public/stores/shop-b/products/${product.id}`;
+  const tokenB = await login("+79280000022", "password-b");
+  const tokenA = await login("+79280000011", "password-a");
+  const own = await call("GET", url, { token: tokenB });
+  assert.deepEqual([own.status, own.data.viewerIsOwner, own.data.product.isVisible], [200, true, 0]);
+  assert.equal((await call("GET", url)).status, 404);
+  assert.equal((await call("GET", url, { token: tokenA })).status, 404);
+  // «Показать на витрине» from the page: the owner's own route.
+  assert.equal((await call("PATCH", `/api/owner/stores/${storeB.id}/products/${product.id}`, { token: tokenB, body: { isVisible: 1 } })).status, 200);
+  assert.equal((await call("GET", url)).status, 200);
+});
+
+test("«Выбрать» в кабинете: скрыть, вернуть, наличие, удалить — сразу несколько товаров, чужие не трогаются", async () => {
+  const tokenB = await login("+79280000022", "password-b");
+  const first = (await createProduct({ storeId: storeB.id, title: "Платье 1", isVisible: 1 }))!;
+  const second = (await createProduct({ storeId: storeB.id, title: "Платье 2", isVisible: 1 }))!;
+  const foreign = (await createProduct({ storeId: storeA.id, title: "Чужой", isVisible: 1 }))!;
+  const bulk = (action: string, ids: string[]) => call("POST", `/api/owner/stores/${storeB.id}/products/bulk`, { token: tokenB, body: { action, ids } });
+
+  const hidden = await bulk("hide", [first.id, second.id, foreign.id, "missing"]);
+  assert.equal(hidden.status, 200);
+  assert.deepEqual([...hidden.data.ids].sort(), [first.id, second.id].sort());
+  const db = await getDb();
+  const state = async (id: string) => db.get<{ isVisible: number; status: string }>("SELECT isVisible, status FROM products WHERE id = ?", id);
+  assert.deepEqual(await state(first.id), { isVisible: 0, status: "AVAILABLE" });
+  assert.equal((await state(foreign.id))?.isVisible, 1);
+
+  await bulk("show", [first.id]);
+  await bulk("unavailable", [first.id, second.id]);
+  assert.deepEqual(await state(first.id), { isVisible: 1, status: "NOT_AVAILABLE" });
+  assert.deepEqual(await state(second.id), { isVisible: 0, status: "NOT_AVAILABLE" });
+
+  assert.equal((await bulk("archive", [first.id])).status, 400);
+  assert.equal((await bulk("hide", [])).status, 400);
+
+  assert.deepEqual((await bulk("delete", [second.id, foreign.id])).data.ids, [second.id]);
+  assert.equal(await state(second.id), undefined);
+  assert.ok(await state(foreign.id));
+});
+
 test("«Связаться»: обращения через Instagram и ВКонтакте тоже считаются", async () => {
   for (const channel of ["instagram", "vk", "whatsapp"]) {
     assert.equal((await call("POST", "/api/public/stores/shop-b/contact-click", { body: { channel } })).status, 204);

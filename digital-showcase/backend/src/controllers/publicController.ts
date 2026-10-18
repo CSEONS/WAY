@@ -80,11 +80,13 @@ export const recordContactClick = asyncHandler(async (req, res) => {
 
 export const getProduct = asyncHandler(async (req, res) => {
   const store = await publicStore(String(req.params.slug));
-  const product = await productService.getProduct(String(req.params.productId), store.id, true);
-  if (!product) throw new HttpError(404, "Товар не найден");
-  // The owner looking at their own product: «Поделиться» instead of «Спросить», and the look isn't a buyer's view.
+  // The owner looking at their own product: «Поделиться», «Редактировать», «Скрыть» instead of «Связаться»,
+  // and the look isn't a buyer's view. A product hidden from the storefront opens for them too, to put it back.
   const viewer = optionalUser(req);
   const viewerIsOwner = viewer?.role === "OWNER" && viewer.userId === store.ownerId;
+  const productId = String(req.params.productId);
+  const product = (await productService.getProduct(productId, store.id, true)) ?? (viewerIsOwner ? await productService.getProduct(productId, store.id) : null);
+  if (!product) throw new HttpError(404, "Товар не найден");
   if (!viewerIsOwner) await analyticsService.recordProductView(store.id, product.id);
   res.json({ store, product, viewerIsOwner });
 });

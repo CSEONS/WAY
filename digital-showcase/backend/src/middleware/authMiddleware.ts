@@ -69,6 +69,7 @@ export function notWhileImpersonating(req: Request, _res: Response, next: NextFu
 
 const OWNER_ACTIONS: [method: string, path: RegExp, label: string][] = [
   ["POST", /\/products\/bulk-ai-draft$/, "ИИ-черновики нескольких товаров"],
+  ["POST", /\/products\/bulk$/, "Изменил несколько товаров сразу"],
   ["POST", /\/products\/ai-draft$/, "ИИ-черновик товара"],
   ["POST", /\/products\/ai-preview$/, "ИИ-превью товара"],
   ["PATCH", /\/products\/[^/]+\/images\/order$/, "Изменил порядок фото"],

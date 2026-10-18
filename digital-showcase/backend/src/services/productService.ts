@@ -1,5 +1,5 @@
 import { getDb } from "../database/db.js";
-import type { Product, ProductColor, ProductFull, ProductImage, ProductSize, ProductVariant } from "../types/models.js";
+import type { Product, ProductColor, ProductFull, ProductImage, ProductSize, ProductStatus, ProductVariant } from "../types/models.js";
 import { deleteStoredImage, storeProductImage, type UploadedImage } from "./imageService.js";
 import { forgetImage, moderationOf, visibleToBuyers } from "./imageModerationService.js";
 
@@ -282,6 +282,45 @@ export async function updateProduct(
 
 function productField<K extends keyof Product>(input: Partial<Product>, key: K, fallback: Product[K]) {
   return Object.prototype.hasOwnProperty.call(input, key) ? input[key] : fallback;
+}
+
+/** What «Выбрать» in the owner's cabinet can do with several products at once. */
+export type BulkAction = "show" | "hide" | "available" | "unavailable" | "delete";
+
+const BULK_CHANGES: Record<Exclude<BulkAction, "delete">, { column: "isVisible" | "status"; value: number | ProductStatus }> = {
+  show: { column: "isVisible", value: 1 },
+  hide: { column: "isVisible", value: 0 },
+  available: { column: "status", value: "AVAILABLE" },
+  unavailable: { column: "status", value: "NOT_AVAILABLE" }
+};
+
+/**
+ * One action on many products of a store: shown or hidden on the storefront,
+ * in stock or not, deleted. Ids of other stores and unknown ones are skipped;
+ * returns the ids it changed.
+ */
+export async function bulkUpdateProducts(storeId: string, ids: string[], action: BulkAction) {
+  const db = await getDb();
+  const wanted = [...new Set(ids)];
+  if (!wanted.length) return [];
+  const owned = (
+    await db.all<{ id: string }>(`SELECT id FROM products WHERE storeId = ? AND id IN (${wanted.map(() => "?").join(", ")})`, storeId, ...wanted)
+  ).map((row) => row.id);
+  if (!owned.length) return [];
+  if (action === "delete") {
+    // One by one: each takes its photos off the disk.
+    for (const id of owned) await deleteProduct(id, storeId);
+    return owned;
+  }
+  const { column, value } = BULK_CHANGES[action];
+  await db.run(
+    `UPDATE products SET ${column} = ?, updatedAt = ? WHERE storeId = ? AND id IN (${owned.map(() => "?").join(", ")})`,
+    value,
+    new Date().toISOString(),
+    storeId,
+    ...owned
+  );
+  return owned;
 }
 
 export async function deleteProduct(id: string, storeId: string) {

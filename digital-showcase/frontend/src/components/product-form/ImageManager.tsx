@@ -1,4 +1,4 @@
-import { AiMagicIcon, Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, Camera01Icon, Cancel01Icon, ImageAdd01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import type { Product } from "../../types/models";
 import { compressImages } from "../../utils/compressImage";
@@ -46,7 +46,9 @@ export function useImageManager(initial?: Product) {
 export type ImageManagerState = ReturnType<typeof useImageManager>;
 
 /**
- * «Фото товара»: take or pick photos, choose the cover, remove extras.
+ * «Фото товара»: take or pick photos, choose the cover (a tap on a photo; it's
+ * marked «Обложка» and goes first on the storefront), remove extras, add more
+ * with the «+» tile after the last photo.
  * `onCreatePreview` — the store has AI: «Превью с ИИ»; `previewLabel` says how
  * the drawing goes, `previewReady` — a finished picture waits to be seen.
  */
@@ -65,7 +67,7 @@ export function ImageManager({
 
   return (
     <Card as="section" className={styles.section}>
-      <CardHeader title="Фото товара" description="Первое фото — обложка на витрине. Нажмите на фото, чтобы сделать его обложкой." />
+      <CardHeader title="Фото товара" description="Обложку покупатели видят в каталоге. Нажмите на фото, чтобы сделать его обложкой." />
       <div className={styles.photoActions}>
         <FileButton variant="primary" icon={Camera01Icon} accept="image/*" capture="environment" onFiles={addImages}>
           Сфотографировать
@@ -78,6 +80,9 @@ export function ImageManager({
         <>
           <div className={styles.imagePreview}>
             <img src={previewImage.url} alt={previewImage.name} />
+            <Badge tone="accent" className={styles.coverLabel}>
+              Обложка в каталоге
+            </Badge>
           </div>
           <div className={styles.imageGrid}>
             {images.map((image) => (
@@ -85,12 +90,18 @@ export function ImageManager({
                 <button
                   type="button"
                   className={cx(styles.imageThumbButton, image.id === previewImage.id && styles.imageThumbActive)}
-                  aria-label={`Выбрать ${image.name} как превью`}
+                  aria-label={`Сделать обложкой ${image.name}`}
+                  title={image.id === previewImage.id ? "Обложка" : "Сделать обложкой"}
                   aria-pressed={image.id === previewImage.id}
                   onClick={() => setPreviewImageId(image.id)}
                 >
                   <ProductPhoto src={image.url} sizes="96px" />
                 </button>
+                {image.id === previewImage.id && (
+                  <Badge tone="accent" className={styles.coverBadge}>
+                    Обложка
+                  </Badge>
+                )}
                 <button type="button" className={styles.imageRemove} aria-label={`Удалить ${image.name}`} title="Удалить" onClick={() => removeImage(image.id)}>
                   <Icon icon={Cancel01Icon} size="xs" strokeWidth={2} />
                 </button>
@@ -101,6 +112,20 @@ export function ImageManager({
                 )}
               </div>
             ))}
+            <label className={styles.imageAdd} title="Добавить фото">
+              <Icon icon={PlusSignIcon} size="md" />
+              <span className={styles.srOnly}>Добавить фото</span>
+              <input
+                type="file"
+                className={styles.dropzoneInput}
+                accept={ACCEPT}
+                multiple
+                onChange={(event) => {
+                  addImages([...(event.target.files ?? [])]);
+                  event.target.value = "";
+                }}
+              />
+            </label>
           </div>
           {images.some((image) => image.moderation && image.moderation.status !== "APPROVED") && (
             <Notice tone="warning" title="Покупатели не видят часть фото">

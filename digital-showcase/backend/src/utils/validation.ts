@@ -77,7 +77,9 @@ const LABELS: Record<string, string> = {
   fills: "Карточки с ИИ",
   isService: "Услуга",
   contents: "Что в пакете",
-  packageId: "Пакет"
+  packageId: "Пакет",
+  ids: "Товары",
+  action: "Действие"
 };
 
 function valueAt(data: unknown, path: PropertyKey[]) {
@@ -169,6 +171,11 @@ const productFields = {
 };
 
 export const productCreateSchema = z.object(productFields);
+/** «Выбрать» in the cabinet: one action on several products. */
+export const productBulkSchema = z.object({
+  ids: z.array(z.string().min(1).max(100)).min(1).max(500),
+  action: z.enum(["show", "hide", "available", "unavailable", "delete"])
+});
 export const productUpdateSchema = z.object(productFields).partial();
 export const imageOrderSchema = z.object({ imageIds: z.array(z.string().max(100)).max(100) });
 

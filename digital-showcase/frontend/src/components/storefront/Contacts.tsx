@@ -1,8 +1,20 @@
-import { BubbleChatIcon, Call02Icon, Copy01Icon, InstagramIcon, TelegramIcon, VkIcon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { type ReactNode, useState } from "react";
 import type { Store } from "../../types/models";
-import { Button, Icon, Modal, cx, useCopyToClipboard, type ButtonSize, type IconSvgElement } from "../../ui";
-import { hasContacts, instagramUrl, phoneUrl, socialHandle, telegramUrl, trackContact, vkUrl, whatsappUrl, type ContactChannel } from "../../utils/contact";
+import { Button, Modal, useCopyToClipboard, type ButtonSize } from "../../ui";
+import {
+  hasContacts,
+  instagramUrl,
+  phoneUrl,
+  socialHandle,
+  telegramUrl,
+  telegramUsername,
+  trackContact,
+  vkUrl,
+  whatsappUrl,
+  type ContactChannel
+} from "../../utils/contact";
+import { ChannelList, ChannelRow } from "./ChannelList";
 import styles from "./Contacts.module.css";
 
 type StoreContacts = Pick<Store, "name" | "phone" | "whatsapp" | "telegram" | "instagram" | "vk">;
@@ -18,62 +30,66 @@ interface ContactProps {
 
 interface Channel {
   channel: ContactChannel;
-  icon: IconSvgElement;
   label: string;
   /** Under the name: the number, the account, or that the message is ready. */
   detail: string;
   href: string;
+  /** The question about the product is typed in when the chat opens. */
+  prefilled?: boolean;
 }
+
+const READY = "Сообщение о товаре уже готово";
 
 /** The ways to reach the store the owner filled in, in this order. */
 function channelsOf(store: StoreContacts, message?: string) {
+  // A Telegram account takes the message too; an invite link (t.me/+…) doesn't.
+  const telegramPrefilled = Boolean(message && store.telegram && telegramUsername(store.telegram));
   return [
     store.whatsapp && {
       channel: "whatsapp",
-      icon: WhatsappIcon,
       label: "WhatsApp",
-      detail: message ? "Сообщение о товаре уже готово" : store.whatsapp,
-      href: whatsappUrl(store.whatsapp, message)
+      detail: message ? READY : store.whatsapp,
+      href: whatsappUrl(store.whatsapp, message),
+      prefilled: Boolean(message)
     },
-    store.telegram && { channel: "telegram", icon: TelegramIcon, label: "Telegram", detail: socialHandle(store.telegram), href: telegramUrl(store.telegram) },
-    store.instagram && { channel: "instagram", icon: InstagramIcon, label: "Instagram", detail: socialHandle(store.instagram), href: instagramUrl(store.instagram) },
-    store.vk && { channel: "vk", icon: VkIcon, label: "ВКонтакте", detail: socialHandle(store.vk), href: vkUrl(store.vk) },
-    store.phone && { channel: "phone", icon: Call02Icon, label: "Позвонить", detail: store.phone, href: phoneUrl(store.phone) }
+    store.telegram && {
+      channel: "telegram",
+      label: "Telegram",
+      detail: telegramPrefilled ? READY : socialHandle(store.telegram),
+      href: telegramUrl(store.telegram, message),
+      prefilled: telegramPrefilled
+    },
+    store.instagram && { channel: "instagram", label: "Instagram", detail: socialHandle(store.instagram), href: instagramUrl(store.instagram) },
+    store.vk && { channel: "vk", label: "ВКонтакте", detail: socialHandle(store.vk), href: vkUrl(store.vk) },
+    store.phone && { channel: "phone", label: "Позвонить", detail: store.phone, href: phoneUrl(store.phone) }
   ].filter(Boolean) as Channel[];
 }
 
 /**
- * «Связаться с магазином»: every way the owner left — WhatsApp with the
- * question about the product filled in, Telegram, Instagram, VK, a call.
+ * «Связаться с магазином»: every way the owner left — WhatsApp and Telegram
+ * with the question about the product typed in, Instagram, VK, a call.
  * Chats that can't take a ready text get it to copy.
  */
 export function ContactModal({ onClose, ...props }: ContactProps & { onClose: () => void }) {
   const copy = useCopyToClipboard();
   const channels = channelsOf(props.store, props.message);
-  const canPaste = channels.some((item) => item.channel === "telegram" || item.channel === "instagram" || item.channel === "vk");
+  // Instagram and VK can't take a ready text: the buyer pastes it.
+  const canPaste = channels.some((item) => item.channel !== "phone" && !item.prefilled);
 
   return (
     <Modal title="Связаться с магазином" description={props.store.name} size="sm" onClose={onClose}>
-      <div className={styles.channels}>
+      <ChannelList>
         {channels.map((item) => (
-          <a
+          <ChannelRow
             key={item.channel}
+            channel={item.channel}
+            label={item.label}
+            detail={item.detail}
             href={item.href}
-            target={item.channel === "phone" ? undefined : "_blank"}
-            rel={item.channel === "phone" ? undefined : "noreferrer"}
-            className={styles.channel}
             onClick={() => trackContact(props.storeSlug, item.channel, props.productId)}
-          >
-            <span className={cx(styles.channelIcon, styles[item.channel])}>
-              <Icon icon={item.icon} size="md" />
-            </span>
-            <span className={styles.channelText}>
-              <strong>{item.label}</strong>
-              <small>{item.detail}</small>
-            </span>
-          </a>
+          />
         ))}
-      </div>
+      </ChannelList>
       {props.message && canPaste && (
         <Button variant="ghost" icon={Copy01Icon} className={styles.copy} onClick={() => void copy(props.message!, "Вопрос о товаре скопирован — вставьте его в чат")}>
           Скопировать вопрос о товаре

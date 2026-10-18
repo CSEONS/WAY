@@ -4,25 +4,27 @@ import { HttpError } from "../utils/http.js";
 import { completeJson, isAiConfigured } from "./aiProvider.js";
 import { measureTokens } from "./aiUsageService.js";
 
-// Photos must not show living beings: people, animals, their faces — alive,
-// on prints, drawings or toys, and faces of mannequins and dolls. Every
-// uploaded product photo and logo is checked by the AI model; a photo where
-// it finds any goes to moderation and buyers don't see it until a moderator
-// (the admin, for now) approves it. Nothing is painted over: the product
-// just waits for the moderator's decision.
+// Photos must not show faces: of people and animals — alive, on photos,
+// prints, drawings or toys — and of mannequins and dolls. A body without a
+// face is fine: hands, legs, a model cut off at the nose, a person from the
+// back — that's how clothes are shown. Every uploaded product photo and logo
+// is checked by the AI model; a photo with a face goes to moderation and
+// buyers don't see it until a moderator (the admin, for now) approves it.
+// Nothing is painted over: the product just waits for the moderator's decision.
 
 export interface LivingBeings {
-  /** Short Russian descriptions: «лицо человека», «кот на принте». Empty — nothing found. */
+  /** Short Russian descriptions: «лицо человека», «морда кота на принте». Empty — no faces. */
   found: string[];
 }
 
 export type ImageKind = "PRODUCT" | "LOGO";
 export type ModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
 
-const INSTRUCTIONS = `Ты проверяешь фото для витрины магазина одежды. Найди на изображении живых существ: людей и животных (включая птиц, рыб и насекомых) — настоящих или изображённых на фото, рисунках, принтах и вышивке на одежде, игрушках, а также лица и головы манекенов и кукол. Части тела человека (руки, ноги, силуэт) тоже считаются. Растения не считаются.
+const INSTRUCTIONS = `Ты проверяешь фото для витрины магазина одежды. Найди на изображении только лица: лица людей и морды животных (включая птиц, рыб и насекомых) — настоящие или изображённые на фото, рисунках, принтах и вышивке на одежде, игрушках, а также лица манекенов и кукол.
+Лицо считается, если видны глаза или большая часть лица. Не считаются: тело без лица — руки, ноги, торс, шея, силуэт; человек со спины; модель, у которой лицо обрезано кадром (видны только губы или подбородок) или закрыто; манекен без головы. Растения не считаются.
 Ответ — только JSON-объект:
-{"found": ["коротко по-русски, что найдено, например «лицо человека», «кот на принте футболки»"]}
-Если никого нет — {"found": []}.`;
+{"found": ["коротко по-русски, чьё лицо найдено, например «лицо человека», «морда кота на принте футболки»"]}
+Если лиц нет — {"found": []}.`;
 
 /** The model's answer, made safe: a few short strings. */
 export function parseLivingBeings(answer: string): LivingBeings {
@@ -55,7 +57,7 @@ export async function findLivingBeings(image: Buffer): Promise<LivingBeings | nu
   const { result } = await measureTokens(() =>
     completeJson({
       instructions: INSTRUCTIONS,
-      text: "Кто изображён на этой картинке? Ответь JSON.",
+      text: "Чьи лица есть на этой картинке? Ответь JSON.",
       images: [`data:image/jpeg;base64,${small.toString("base64")}`]
     })
   );
@@ -89,8 +91,8 @@ export async function flagImage(ref: ImageRef, found: string[]) {
 }
 
 /**
- * Checks an uploaded photo or logo; when living beings are found, it waits
- * for moderation. Runs after the upload has answered, so failures are only
+ * Checks an uploaded photo or logo; when a face is found, it waits for
+ * moderation. Runs after the upload has answered, so failures are only
  * logged: the photo stays as it is.
  */
 export async function checkImage(ref: ImageRef, image: Buffer) {

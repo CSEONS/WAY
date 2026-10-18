@@ -108,7 +108,7 @@ export function ImageManager({
                 .filter((image) => image.moderation && image.moderation.status !== "APPROVED")
                 .map((image) => image.moderation!.findings)
                 .join("; ")}
-              . На витрине нельзя показывать людей и животных: такие фото проверяет администратор. «Скрыто» — фото не прошло проверку, его лучше удалить.
+              . На витрине нельзя показывать лица людей и животных: такие фото проверяет администратор. «Скрыто» — фото не прошло проверку, его лучше удалить.
             </Notice>
           )}
           {onCreatePreview && (

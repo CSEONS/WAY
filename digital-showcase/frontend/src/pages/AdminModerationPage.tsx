@@ -61,7 +61,7 @@ export function AdminModerationPage() {
     <Page>
       <PageHeader
         title="Проверка фото"
-        description="ИИ нашёл на фото людей или животных. Пока вы не решите, покупатели их не видят"
+        description="ИИ нашёл на фото лица людей или животных. Пока вы не решите, покупатели их не видят"
         back={{ to: "/admin", label: "В админку" }}
       />
       <SegmentedControl label="Какие фото показать" value={status} onChange={setStatus} options={filters} />

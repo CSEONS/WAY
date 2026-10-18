@@ -239,7 +239,7 @@ export function AdminPage() {
                 </ButtonLink>
               }
             >
-              ИИ нашёл на них людей или животных. Покупатели их не видят, пока вы не решите.
+              ИИ нашёл на них лица людей или животных. Покупатели их не видят, пока вы не решите.
             </Notice>
           )}
           <AttentionGroup title="Подписка скоро закончится" tone="warning" icon={Calendar03Icon} stores={overview.expiring} onPay={setPayTarget} />

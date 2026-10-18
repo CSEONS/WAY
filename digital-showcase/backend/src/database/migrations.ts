@@ -524,6 +524,15 @@ export const migrations: Migration[] = [
         update.run(JSON.stringify(features.filter((feature) => feature !== line)), row.id);
       }
     }
+  },
+  {
+    version: 14,
+    name: "instagram and vk of a store",
+    // The owner's networks besides WhatsApp and Telegram: «Поделиться» on their product offers them.
+    up(db) {
+      addColumn(db, "stores", "instagram", "TEXT");
+      addColumn(db, "stores", "vk", "TEXT");
+    }
   }
 ];
 

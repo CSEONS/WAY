@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { ProductCard } from "../components/ProductCard";
 import { MobileContactBar, StoreHeader, StorefrontFooter } from "../components/storefront";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { useFavicon } from "../hooks/useFavicon";
 import { useFavorites } from "../hooks/useFavorites";
 import type { Product, Store, StoreFacets } from "../types/models";
 import { plural, sortSizes } from "../utils/format";
@@ -87,6 +88,8 @@ export function PublicStorePage() {
   const skipFirstLoad = useRef(Boolean(restored));
 
   useDocumentMeta(store?.name, store?.description);
+  // The store's logo in the browser tab.
+  useFavicon(store?.logoUrl);
 
   useEffect(() => {
     if (restored?.store.slug === storeSlug) return;

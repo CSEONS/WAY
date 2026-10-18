@@ -5,14 +5,25 @@ import {
   HelpCircleIcon,
   Image01Icon,
   Location01Icon,
+  Share08Icon,
   Store01Icon
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { ProductPhoto } from "../components/ProductPhoto";
-import { ContactButtons, FavoriteButton, MobileContactBar, ShareButton, StorefrontFooter } from "../components/storefront";
+import { ProductPhoto, photoSources } from "../components/ProductPhoto";
+import {
+  ContactButtons,
+  FavoriteButton,
+  MobileActionBar,
+  MobileContactBar,
+  PhotoViewer,
+  ShareButton,
+  ShareProductModal,
+  StorefrontFooter
+} from "../components/storefront";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { useFavicon } from "../hooks/useFavicon";
 import { useFavorites } from "../hooks/useFavorites";
 import type { Product, Store } from "../types/models";
 import { hasContacts, mapsUrl } from "../utils/contact";
@@ -36,6 +47,9 @@ import {
 } from "../ui";
 import styles from "./PublicProductPage.module.css";
 
+/** How wide the main photo is shown: the same for the photo and for preloading the others. */
+const MAIN_PHOTO_SIZES = "(min-width: 720px) 55vw, 100vw";
+
 const AVAILABILITY_CONFIG: Record<Product["status"], { icon: IconSvgElement; label: string; tone: string }> = {
   AVAILABLE: { icon: CheckmarkCircle02Icon, label: "в наличии", tone: styles.available },
   NOT_AVAILABLE: { icon: CancelCircleIcon, label: "нет в наличии", tone: styles.unavailable },
@@ -44,15 +58,19 @@ const AVAILABILITY_CONFIG: Record<Product["status"], { icon: IconSvgElement; lab
 
 export function PublicProductPage() {
   const { storeSlug = "", productId = "" } = useParams();
-  const [data, setData] = useState<{ store: Store; product: Product }>();
+  // viewerIsOwner: the store's owner is looking — share buttons instead of the buyer's «Спросить».
+  const [data, setData] = useState<{ store: Store; product: Product; viewerIsOwner?: boolean }>();
   const [error, setError] = useState("");
   const [firstChoice, setFirstChoice] = useState<"color" | "size" | null>(null);
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedImageId, setSelectedImageId] = useState("");
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const favorites = useFavorites(storeSlug);
 
   useDocumentMeta(data ? `${data.product.title} — ${data.store.name}` : null, data?.product.description);
+  useFavicon(data?.store.logoUrl);
 
   useEffect(() => {
     api
@@ -64,6 +82,17 @@ export function PublicProductPage() {
       })
       .catch((err) => setError(err.response?.data?.message ?? "Товар недоступен"));
   }, [storeSlug, productId]);
+
+  // The other photos load in the background at the main photo's size: picking one shows it at once.
+  useEffect(() => {
+    for (const image of data?.product.images.slice(1) ?? []) {
+      const { src, srcSet } = photoSources(image.url);
+      const preload = new Image();
+      preload.sizes = MAIN_PHOTO_SIZES;
+      if (srcSet) preload.srcset = srcSet;
+      preload.src = src;
+    }
+  }, [data]);
 
   if (error) {
     return (
@@ -146,9 +175,9 @@ export function PublicProductPage() {
       <div className={styles.gallery}>
         {selectedImage ? (
           <>
-            <div className={styles.galleryMain}>
-              <ProductPhoto src={selectedImage.url} sizes="(min-width: 720px) 55vw, 100vw" alt={product.title} loading="eager" />
-            </div>
+            <button type="button" className={styles.galleryMain} aria-label="Открыть фото на весь экран" onClick={() => setIsViewerOpen(true)}>
+              <ProductPhoto key={selectedImage.id} src={selectedImage.url} sizes={MAIN_PHOTO_SIZES} alt={product.title} loading="eager" />
+            </button>
             {product.images.length > 1 && (
               <div className={styles.thumbs}>
                 {product.images.map((image) => (
@@ -242,7 +271,14 @@ export function PublicProductPage() {
           <Icon icon={availability.icon} size="sm" />
           <strong>Наличие:</strong> {availability.label}
         </p>
-        {hasContacts(store) ? (
+        {data.viewerIsOwner ? (
+          <div className={styles.ownerShare}>
+            <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
+              Поделиться в соцсетях
+            </Button>
+            <small>Это ваш товар. Покупатели видят здесь «Спросить в WhatsApp» и «Позвонить».</small>
+          </div>
+        ) : hasContacts(store) ? (
           <ContactButtons
             layout="stack"
             store={store}
@@ -273,8 +309,35 @@ export function PublicProductPage() {
           )}
         </div>
       </Card>
+      {isViewerOpen && selectedImage && (
+        <PhotoViewer
+          images={product.images.map((image) => image.url)}
+          index={product.images.indexOf(selectedImage)}
+          alt={product.title}
+          onIndexChange={(index) => setSelectedImageId(product.images[index].id)}
+          onClose={() => setIsViewerOpen(false)}
+        />
+      )}
+      {isShareOpen && (
+        <ShareProductModal
+          store={store}
+          title={product.title}
+          priceText={displayedPriceText}
+          photoUrl={selectedImage?.url ?? null}
+          productUrl={productUrl}
+          onClose={() => setIsShareOpen(false)}
+        />
+      )}
       <StorefrontFooter />
-      <MobileContactBar store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} whatsappLabel="Спросить в WhatsApp" />
+      {data.viewerIsOwner ? (
+        <MobileActionBar>
+          <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
+            Поделиться в соцсетях
+          </Button>
+        </MobileActionBar>
+      ) : (
+        <MobileContactBar store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} whatsappLabel="Спросить в WhatsApp" />
+      )}
     </Page>
   );
 }

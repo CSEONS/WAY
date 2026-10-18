@@ -23,6 +23,9 @@ export interface Store {
   phone: string | null;
   whatsapp: string | null;
   telegram: string | null;
+  /** «@name» or a link; with vk — where the owner shares their products. */
+  instagram?: string | null;
+  vk?: string | null;
   logoUrl: string | null;
   /** Free text, e.g. «Ежедневно 10:00–20:00». */
   workingHours: string | null;

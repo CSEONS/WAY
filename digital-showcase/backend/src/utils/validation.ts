@@ -20,6 +20,8 @@ const LABELS: Record<string, string> = {
   storePhone: "Номер для покупателей",
   whatsapp: "WhatsApp",
   telegram: "Telegram",
+  instagram: "Instagram",
+  vk: "ВКонтакте",
   workingHours: "Часы работы",
   email: "Почта",
   title: "Название",
@@ -180,6 +182,8 @@ export const storeDetailsSchema = z.object({
   phone: optionalText(40),
   whatsapp: optionalText(40),
   telegram: optionalText(100),
+  instagram: optionalText(100),
+  vk: optionalText(100),
   workingHours: optionalText(120)
 });
 

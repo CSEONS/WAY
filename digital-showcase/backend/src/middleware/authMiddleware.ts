@@ -17,6 +17,18 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
   }
 }
 
+/** Who sent the request, if signed in — for public pages that look different to their owner. Never fails. */
+export function optionalUser(req: Request): JwtPayload | null {
+  const header = req.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token) return null;
+  try {
+    return jwt.verify(token, jwtSecret()) as JwtPayload;
+  } catch {
+    return null;
+  }
+}
+
 export function adminOnly(req: Request, _res: Response, next: NextFunction) {
   if (req.user?.role !== "ADMIN") return next(new HttpError(403, "Доступ только для администратора"));
   next();

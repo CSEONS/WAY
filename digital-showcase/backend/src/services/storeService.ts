@@ -61,8 +61,8 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   await db.run(
-    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, logoUrl, workingHours, isActive, planId, aiFormEnabled, subscriptionEndsAt, aiMonthlyLimit, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO stores (id, ownerId, name, slug, description, address, phone, whatsapp, telegram, instagram, vk, logoUrl, workingHours, isActive, planId, aiFormEnabled, subscriptionEndsAt, aiMonthlyLimit, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.ownerId,
     input.name,
@@ -72,6 +72,8 @@ export async function createStore(input: Partial<Store> & { ownerId: string; nam
     input.phone ?? null,
     input.whatsapp ?? null,
     input.telegram ?? null,
+    input.instagram ?? null,
+    input.vk ?? null,
     input.logoUrl ?? null,
     input.workingHours ?? null,
     input.isActive ?? 1,
@@ -94,7 +96,7 @@ export async function updateStore(id: string, input: Partial<Store>) {
   if (slug !== current.slug) await assertSlugAvailable(slug, id);
   const db = await getDb();
   await db.run(
-    `UPDATE stores SET ownerId = ?, name = ?, slug = ?, description = ?, address = ?, phone = ?, whatsapp = ?, telegram = ?,
+    `UPDATE stores SET ownerId = ?, name = ?, slug = ?, description = ?, address = ?, phone = ?, whatsapp = ?, telegram = ?, instagram = ?, vk = ?,
      logoUrl = ?, workingHours = ?, isActive = ?, planId = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, aiMonthlyLimit = ?, updatedAt = ? WHERE id = ?`,
     input.ownerId ?? current.ownerId,
     input.name ?? current.name,
@@ -104,6 +106,8 @@ export async function updateStore(id: string, input: Partial<Store>) {
     field(input, "phone", current.phone),
     field(input, "whatsapp", current.whatsapp),
     field(input, "telegram", current.telegram),
+    field(input, "instagram", current.instagram),
+    field(input, "vk", current.vk),
     field(input, "logoUrl", current.logoUrl),
     field(input, "workingHours", current.workingHours),
     input.isActive ?? current.isActive,

@@ -36,6 +36,8 @@ interface StoreFormState {
   phone: string;
   whatsapp: string;
   telegram: string;
+  instagram: string;
+  vk: string;
   subscriptionEndsAt: string;
   /** Empty — the first plan (the server's default). */
   planId: string;
@@ -53,6 +55,8 @@ const emptyStoreForm: StoreFormState = {
   phone: "",
   whatsapp: "",
   telegram: "",
+  instagram: "",
+  vk: "",
   subscriptionEndsAt: "",
   planId: "",
   aiMonthlyLimit: ""
@@ -83,6 +87,8 @@ function storePayload(form: StoreFormState) {
     phone: form.phone || null,
     whatsapp: form.whatsapp || null,
     telegram: form.telegram || null,
+    instagram: form.instagram || null,
+    vk: form.vk || null,
     subscriptionEndsAt: toIsoDate(form.subscriptionEndsAt),
     ...(form.planId ? { planId: form.planId } : {}),
     aiMonthlyLimit: form.aiMonthlyLimit.trim() === "" ? null : Number(form.aiMonthlyLimit)
@@ -157,6 +163,8 @@ export function AdminStoresPage() {
       phone: store.phone ?? "",
       whatsapp: store.whatsapp ?? "",
       telegram: store.telegram ?? "",
+      instagram: store.instagram ?? "",
+      vk: store.vk ?? "",
       subscriptionEndsAt: toDateTimeLocal(store.subscriptionEndsAt),
       planId: store.planId ?? "",
       aiMonthlyLimit: store.aiMonthlyLimit == null ? "" : String(store.aiMonthlyLimit)
@@ -330,6 +338,12 @@ export function AdminStoresPage() {
           </Field>
           <Field label="Telegram">
             <Input placeholder="@Name" {...field("telegram")} />
+          </Field>
+          <Field label="Instagram">
+            <Input placeholder="@name" {...field("instagram")} />
+          </Field>
+          <Field label="ВКонтакте">
+            <Input placeholder="vk.com/name" {...field("vk")} />
           </Field>
           <Field label="Подписка до" hint="Чтобы продлить с оплатой, нажмите «Продлить» у магазина — так платёж попадёт в учёт">
             <Input type="datetime-local" {...field("subscriptionEndsAt")} />

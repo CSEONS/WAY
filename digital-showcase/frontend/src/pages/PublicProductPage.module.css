@@ -30,10 +30,21 @@
   background: var(--color-surface);
 }
 
+/* A button: a tap opens the photo on the whole screen. */
 .galleryMain {
+  display: block;
+  width: 100%;
   overflow: hidden;
+  border: 0;
   border-radius: var(--radius-lg);
+  padding: 0;
   background: var(--color-surface-muted);
+  cursor: zoom-in;
+}
+
+.galleryMain:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
 }
 
 .galleryMain img {
@@ -218,4 +229,15 @@ a.storeFact:hover {
 .storeFact svg {
   flex-shrink: 0;
   margin-top: var(--space-0-5);
+}
+
+/* The owner's own product: «Поделиться» where buyers have the contact buttons. */
+.ownerShare {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ownerShare small {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
 }

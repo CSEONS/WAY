@@ -47,7 +47,9 @@ export function SettingsPage() {
         workingHours: store.workingHours,
         phone: store.phone,
         whatsapp: store.whatsapp,
-        telegram: store.telegram
+        telegram: store.telegram,
+        instagram: store.instagram ?? null,
+        vk: store.vk ?? null
       });
       let updated = data;
       if (logoFile) {
@@ -125,6 +127,12 @@ export function SettingsPage() {
           </Field>
           <Field label="Telegram">
             <Input value={store.telegram ?? ""} placeholder="@Name" onChange={(e) => setStore({ ...store, telegram: e.target.value })} />
+          </Field>
+          <Field label="Instagram" hint="Для кнопки «Поделиться» на ваших товарах">
+            <Input value={store.instagram ?? ""} placeholder="@name" onChange={(e) => setStore({ ...store, instagram: e.target.value })} />
+          </Field>
+          <Field label="ВКонтакте" hint="Для кнопки «Поделиться» на ваших товарах">
+            <Input value={store.vk ?? ""} placeholder="vk.com/name" onChange={(e) => setStore({ ...store, vk: e.target.value })} />
           </Field>
           <div className={styles.logo}>
             <span className={styles.logoLabel}>Логотип магазина</span>

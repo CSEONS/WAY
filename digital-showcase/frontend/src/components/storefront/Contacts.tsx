@@ -1,4 +1,5 @@
 import { Call02Icon, TelegramIcon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import type { ReactNode } from "react";
 import type { Store } from "../../types/models";
 import { ButtonLink, cx } from "../../ui";
 import { phoneUrl, telegramUrl, trackContact, whatsappUrl, type ContactChannel } from "../../utils/contact";
@@ -71,6 +72,16 @@ export function ContactButtons({
 }
 
 /** Pinned to the bottom of the screen on phones, so the buyer can write from anywhere in the catalog. */
+/** The bar fixed to the bottom of a phone screen, with any buttons — e.g. the owner's «Поделиться». */
+export function MobileActionBar({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <div className={styles.barSpacer} aria-hidden="true" />
+      <div className={styles.bar}>{children}</div>
+    </>
+  );
+}
+
 export function MobileContactBar({ whatsappLabel = "Написать в WhatsApp", ...props }: ContactProps & { whatsappLabel?: string }) {
   const { store } = props;
   if (!store.whatsapp && !store.phone) return null;

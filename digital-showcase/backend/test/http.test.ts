@@ -14,7 +14,7 @@ process.env.ADMIN_PASSWORD = "admin-test-password";
 process.env.JWT_SECRET = "http-test-secret-http-test-secret-0123";
 process.env.TELEGRAM_BOT_TOKEN = "";
 
-const { closeDb, initDatabase } = await import("../src/database/db.js");
+const { closeDb, getDb, initDatabase } = await import("../src/database/db.js");
 const { app } = await import("../src/app.js");
 const { createOwner } = await import("../src/services/userService.js");
 const { createStore } = await import("../src/services/storeService.js");
@@ -126,6 +126,22 @@ test("неверные данные — понятная ошибка 400, а н
   assert.equal(priceAsText.data.isVisible, 1);
   assert.deepEqual(priceAsText.data.sizes.map((size: { value: string }) => size.value), ["M"]);
   assert.deepEqual(priceAsText.data.colors.map((color: { name: string; hex: string | null }) => [color.name, color.hex]), [["Красный", null], ["Синий", null]]);
+});
+
+test("свой товар владелец видит с «Поделиться», и его просмотр не идёт в статистику", async () => {
+  const product = (await createProduct({ storeId: storeB.id, title: "Платье на витрине", isVisible: 1 }))!;
+  const url = `/api/public/stores/shop-b/products/${product.id}`;
+  const tokenB = await login("+79280000022", "password-b");
+  const tokenA = await login("+79280000011", "password-a");
+  assert.equal((await call("GET", url, { token: tokenB })).data.viewerIsOwner, true);
+  // Another owner, a guest, a broken token: buyers.
+  assert.equal((await call("GET", url, { token: tokenA })).data.viewerIsOwner, false);
+  assert.equal((await call("GET", url)).data.viewerIsOwner, false);
+  assert.equal((await call("GET", url, { token: "broken" })).data.viewerIsOwner, false);
+
+  const db = await getDb();
+  const views = await db.get<{ count: number }>("SELECT COUNT(*) as count FROM analytics_events WHERE productId = ? AND type = 'PRODUCT_VIEW'", product.id);
+  assert.equal(views?.count, 3);
 });
 
 test("после 10 неверных паролей вход блокируется на 15 минут", async () => {

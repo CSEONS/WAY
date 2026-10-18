@@ -1,3 +1,4 @@
+import { optionalUser } from "../middleware/authMiddleware.js";
 import { asyncHandler, HttpError } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
 import * as productService from "../services/productService.js";
@@ -81,6 +82,9 @@ export const getProduct = asyncHandler(async (req, res) => {
   const store = await publicStore(String(req.params.slug));
   const product = await productService.getProduct(String(req.params.productId), store.id, true);
   if (!product) throw new HttpError(404, "Товар не найден");
-  await analyticsService.recordProductView(store.id, product.id);
-  res.json({ store, product });
+  // The owner looking at their own product: «Поделиться» instead of «Спросить», and the look isn't a buyer's view.
+  const viewer = optionalUser(req);
+  const viewerIsOwner = viewer?.role === "OWNER" && viewer.userId === store.ownerId;
+  if (!viewerIsOwner) await analyticsService.recordProductView(store.id, product.id);
+  res.json({ store, product, viewerIsOwner });
 });

@@ -8,6 +8,12 @@ function thumbnail(url: string, width: 400 | 800) {
   return url.replace(/\.webp$/, `-${width}.webp`);
 }
 
+/** What <ProductPhoto> gives the browser to choose from: also for preloading and the full-screen view. */
+export function photoSources(src: string): { src: string; srcSet?: string } {
+  if (!UPLOADED.test(src)) return { src };
+  return { src: thumbnail(src, 800), srcSet: `${thumbnail(src, 400)} 400w, ${thumbnail(src, 800)} 800w, ${src} 2048w` };
+}
+
 export type ProductPhotoProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "srcSet"> & {
   src: string;
   /**
@@ -23,10 +29,11 @@ export function ProductPhoto({ src, sizes = "100vw", loading = "lazy", alt = "",
   const [useOriginal, setUseOriginal] = useState(false);
   if (!UPLOADED.test(src) || useOriginal) return <img src={src} alt={alt} loading={loading} {...rest} />;
 
+  const sources = photoSources(src);
   return (
     <img
-      src={thumbnail(src, 800)}
-      srcSet={`${thumbnail(src, 400)} 400w, ${thumbnail(src, 800)} 800w, ${src} 2048w`}
+      src={sources.src}
+      srcSet={sources.srcSet}
       sizes={sizes}
       alt={alt}
       loading={loading}

@@ -183,7 +183,7 @@ export interface MonthReport {
   storeViews: number;
   productViews: number;
   contactClicks: number;
-  contactsByChannel: { whatsapp: number; telegram: number; phone: number };
+  contactsByChannel: { whatsapp: number; telegram: number; instagram: number; vk: number; phone: number };
   newProducts: number;
   topProducts: { id: string; title: string; views: number }[];
 }

@@ -87,3 +87,15 @@
     font-size: var(--font-size-xl);
   }
 }
+
+/* «Связаться»: full width on a phone, by its text on a wider screen. */
+.contact {
+  width: 100%;
+}
+
+@media (min-width: 720px) {
+  .contact {
+    justify-self: start;
+    width: auto;
+  }
+}

@@ -65,9 +65,9 @@ export const getFilters = asyncHandler(async (req, res) => {
   res.json(await productService.listFacets(store.id));
 });
 
-const CHANNELS: analyticsService.ContactChannel[] = ["whatsapp", "telegram", "phone"];
+const CHANNELS: analyticsService.ContactChannel[] = ["whatsapp", "telegram", "instagram", "vk", "phone"];
 
-/** Sent with navigator.sendBeacon when a buyer opens WhatsApp/Telegram or calls. */
+/** Sent with navigator.sendBeacon when a buyer opens a chat (WhatsApp, Telegram, Instagram, VK) or calls. */
 export const recordContactClick = asyncHandler(async (req, res) => {
   const store = await publicStore(String(req.params.slug));
   const channel = CHANNELS.find((value) => value === req.body?.channel);

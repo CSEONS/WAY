@@ -21,7 +21,7 @@ export async function recordProductView(storeId: string, productId: string) {
   );
 }
 
-export type ContactChannel = "whatsapp" | "telegram" | "phone";
+export type ContactChannel = "whatsapp" | "telegram" | "instagram" | "vk" | "phone";
 
 /** A buyer tapped «Написать в WhatsApp», Telegram or «Позвонить» — the number owners care about most. */
 export async function recordContactClick(storeId: string, productId: string | null, channel: ContactChannel) {

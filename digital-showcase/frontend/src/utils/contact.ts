@@ -1,8 +1,8 @@
 import type { Store } from "../types/models";
 
-export type ContactChannel = "whatsapp" | "telegram" | "phone";
+export type ContactChannel = "whatsapp" | "telegram" | "instagram" | "vk" | "phone";
 
-/** Counts a tap on WhatsApp/Telegram/call for the owner. sendBeacon survives leaving the page for wa.me. */
+/** Counts a tap on WhatsApp/Telegram/Instagram/VK/call for the owner. sendBeacon survives leaving the page for wa.me. */
 export function trackContact(storeSlug: string, channel: ContactChannel, productId?: string) {
   const url = `/api/public/stores/${encodeURIComponent(storeSlug)}/contact-click`;
   const body = JSON.stringify({ channel, productId });
@@ -25,6 +25,23 @@ export function telegramUrl(value: string) {
   return value.startsWith("http") ? value : `https://t.me/${value.replace(/^@/, "")}`;
 }
 
+/** The account name from «@name», «name», «instagram.com/name/» or a full link. */
+export function socialHandle(value: string) {
+  const trimmed = value.trim().replace(/\/+$/, "");
+  const name = trimmed.includes("/") ? trimmed.slice(trimmed.lastIndexOf("/") + 1) : trimmed;
+  return `@${name.replace(/^@/, "").split("?")[0]}`;
+}
+
+/** A chat with the account in Instagram Direct. */
+export function instagramUrl(value: string) {
+  return `https://ig.me/m/${socialHandle(value).slice(1)}`;
+}
+
+/** A chat with the page or community in VK messages. */
+export function vkUrl(value: string) {
+  return `https://vk.me/${socialHandle(value).slice(1)}`;
+}
+
 export function phoneUrl(phone: string) {
   return `tel:${phone.replace(/[^\d+]/g, "")}`;
 }
@@ -33,8 +50,8 @@ export function mapsUrl(address: string) {
   return `https://yandex.ru/maps/?text=${encodeURIComponent(address)}`;
 }
 
-export function hasContacts(store: Pick<Store, "phone" | "whatsapp" | "telegram">) {
-  return Boolean(store.phone || store.whatsapp || store.telegram);
+export function hasContacts(store: Pick<Store, "phone" | "whatsapp" | "telegram" | "instagram" | "vk">) {
+  return Boolean(store.phone || store.whatsapp || store.telegram || store.instagram || store.vk);
 }
 
 /** Shares a link with the phone's share sheet, or copies it where sharing isn't available. */

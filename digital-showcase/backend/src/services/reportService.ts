@@ -8,7 +8,7 @@ export interface MonthReport {
   storeViews: number;
   productViews: number;
   contactClicks: number;
-  contactsByChannel: { whatsapp: number; telegram: number; phone: number };
+  contactsByChannel: { whatsapp: number; telegram: number; instagram: number; vk: number; phone: number };
   newProducts: number;
   /** Most viewed products of the month. */
   topProducts: { id: string; title: string; views: number }[];
@@ -63,7 +63,13 @@ export async function storeMonthReport(storeId: string, month: string): Promise<
     storeViews: count("STORE_VIEW"),
     productViews: count("PRODUCT_VIEW"),
     contactClicks: count("CONTACT_CLICK"),
-    contactsByChannel: { whatsapp: channel("whatsapp"), telegram: channel("telegram"), phone: channel("phone") },
+    contactsByChannel: {
+      whatsapp: channel("whatsapp"),
+      telegram: channel("telegram"),
+      instagram: channel("instagram"),
+      vk: channel("vk"),
+      phone: channel("phone")
+    },
     newProducts: newProducts?.count ?? 0,
     topProducts
   };

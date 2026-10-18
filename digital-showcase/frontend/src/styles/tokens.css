@@ -105,6 +105,10 @@
   /* WhatsApp buttons on the storefront: buyers look for the familiar green. */
   --color-whatsapp: #167f3f;
   --color-whatsapp-strong: #11672f;
+  /* The networks' own colors, for their icons in «Связаться». */
+  --color-telegram: #1f8fd0;
+  --color-instagram: #d6246e;
+  --color-vk: #0070f0;
   /* Favorite heart. */
   --color-favorite: #e0245e;
 

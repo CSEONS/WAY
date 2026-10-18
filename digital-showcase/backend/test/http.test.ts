@@ -144,6 +144,16 @@ test("свой товар владелец видит с «Поделиться�
   assert.equal(views?.count, 3);
 });
 
+test("«Связаться»: обращения через Instagram и ВКонтакте тоже считаются", async () => {
+  for (const channel of ["instagram", "vk", "whatsapp"]) {
+    assert.equal((await call("POST", "/api/public/stores/shop-b/contact-click", { body: { channel } })).status, 204);
+  }
+  assert.equal((await call("POST", "/api/public/stores/shop-b/contact-click", { body: { channel: "fax" } })).status, 400);
+  const db = await getDb();
+  const rows = await db.all<{ channel: string }>("SELECT channel FROM analytics_events WHERE storeId = ? AND type = 'CONTACT_CLICK' ORDER BY channel", storeB.id);
+  assert.deepEqual(rows.map((row) => row.channel), ["instagram", "vk", "whatsapp"]);
+});
+
 test("после 10 неверных паролей вход блокируется на 15 минут", async () => {
   for (let attempt = 0; attempt < 10; attempt++) {
     assert.equal((await call("POST", "/api/auth/login", { body: { login: "+79280000022", password: "wrong" } })).status, 401);

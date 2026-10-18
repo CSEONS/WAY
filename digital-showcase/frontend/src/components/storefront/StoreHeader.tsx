@@ -2,7 +2,7 @@ import { Clock01Icon, Location01Icon } from "@hugeicons/core-free-icons";
 import type { Store } from "../../types/models";
 import { Card, Icon } from "../../ui";
 import { mapsUrl } from "../../utils/contact";
-import { ContactButtons } from "./Contacts";
+import { ContactButton } from "./Contacts";
 import { ShareButton } from "./ShareButton";
 import styles from "./StoreHeader.module.css";
 
@@ -43,7 +43,7 @@ export function StoreHeader({ store }: { store: Store }) {
           )}
         </ul>
       )}
-      <ContactButtons layout="adaptive" store={store} storeSlug={store.slug} />
+      <ContactButton store={store} storeSlug={store.slug} className={styles.contact} />
     </Card>
   );
 }

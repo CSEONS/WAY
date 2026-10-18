@@ -13,7 +13,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ProductPhoto, photoSources } from "../components/ProductPhoto";
 import {
-  ContactButtons,
+  ContactButton,
   FavoriteButton,
   MobileActionBar,
   MobileContactBar,
@@ -276,17 +276,10 @@ export function PublicProductPage() {
             <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
               Поделиться в соцсетях
             </Button>
-            <small>Это ваш товар. Покупатели видят здесь «Спросить в WhatsApp» и «Позвонить».</small>
+            <small>Это ваш товар. Покупатели видят здесь «Связаться»: WhatsApp, Telegram, звонок и другие ваши контакты.</small>
           </div>
         ) : hasContacts(store) ? (
-          <ContactButtons
-            layout="stack"
-            store={store}
-            storeSlug={storeSlug}
-            productId={product.id}
-            message={askMessage}
-            whatsappLabel="Спросить в WhatsApp"
-          />
+          <ContactButton block store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} />
         ) : (
           <Notice tone="neutral">Магазин не указал контакты — загляните к ним лично{store.address ? ` по адресу: ${store.address}` : ""}.</Notice>
         )}
@@ -336,7 +329,7 @@ export function PublicProductPage() {
           </Button>
         </MobileActionBar>
       ) : (
-        <MobileContactBar store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} whatsappLabel="Спросить в WhatsApp" />
+        <MobileContactBar store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} />
       )}
     </Page>
   );

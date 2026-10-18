@@ -1,50 +1,80 @@
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
+/* «Связаться»: one row per way to reach the store — its icon in its color, the name, the account. */
+.channels {
+  display: grid;
   gap: var(--space-2);
 }
 
-/* Main button on its own line, the rest share the line under it. */
-.stack {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.channel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: var(--color-ink);
+  text-decoration: none;
 }
 
-.stack > * {
-  min-width: 0;
+.channel:hover {
+  background: var(--color-surface-muted);
 }
 
-.stack > .main {
-  grid-column: 1 / -1;
+.channel:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
 }
 
-/* A lone secondary button under the main one stretches too. */
-.stack > :last-child:nth-child(2) {
-  grid-column: 1 / -1;
-}
-
-@media (min-width: 720px) {
-  .adaptive {
-    display: flex;
-  }
-}
-
-/* Same specificity as the kit's .primary:hover so the green wins. */
-.whatsapp,
-.whatsapp:hover:not(:disabled) {
+.channelIcon {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--control-md);
+  height: var(--control-md);
+  border-radius: var(--radius-sm);
   color: var(--color-accent-ink);
+  background: var(--color-accent);
+}
+
+.whatsapp {
   background: var(--color-whatsapp);
 }
 
-.whatsapp:hover:not(:disabled),
-.whatsapp:active:not(:disabled) {
-  background: var(--color-whatsapp-strong);
+.telegram {
+  background: var(--color-telegram);
 }
 
-.callButton {
-  flex-shrink: 0;
-  width: var(--control-lg);
-  padding: 0;
+.instagram {
+  background: var(--color-instagram);
+}
+
+.vk {
+  background: var(--color-vk);
+}
+
+.phone {
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+}
+
+.channelText {
+  display: grid;
+  min-width: 0;
+}
+
+.channelText strong {
+  font-weight: var(--font-weight-semibold);
+}
+
+.channelText small {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy {
+  justify-self: start;
 }
 
 /* Phone-only bottom bar */

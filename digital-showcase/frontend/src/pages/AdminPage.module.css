@@ -71,9 +71,48 @@
 .groupCount {
   border-radius: var(--radius-pill);
   padding: 0 var(--space-2);
-  color: var(--color-ink-muted);
-  background: var(--color-surface-muted);
+  color: var(--tone, var(--color-ink-muted));
+  background: var(--tone-soft, var(--color-surface-muted));
   font-size: var(--font-size-xs);
+}
+
+.groupIcon {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--tone, var(--color-ink-muted));
+  background: var(--tone-soft, var(--color-surface-muted));
+}
+
+/*
+ * The color of a group in «Нужно сделать сейчас» (data-tone): its icon, its
+ * count and a stripe on the left of each row.
+ */
+.group[data-tone="danger"] {
+  --tone: var(--color-danger);
+  --tone-soft: var(--color-danger-soft);
+}
+
+.group[data-tone="warning"] {
+  --tone: var(--color-warning);
+  --tone-soft: var(--color-warning-soft);
+}
+
+.group[data-tone="accent"] {
+  --tone: var(--color-accent);
+  --tone-soft: var(--color-accent-soft);
+}
+
+.group[data-tone="success"] {
+  --tone: var(--color-success);
+  --tone-soft: var(--color-success-soft);
+}
+
+.group[data-tone] .attentionRow {
+  border-left: 3px solid var(--tone);
 }
 
 .attentionRow,

@@ -1,10 +1,10 @@
 import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { Button, Checkbox, Field, Icon, Input, Notice, Textarea } from "../../ui";
 import styles from "./LeadForm.module.css";
 
-const emptyForm = { name: "", phone: "", storeName: "", city: "", comment: "", website: "" };
+const emptyForm = { name: "", phone: "", comment: "", website: "" };
 type Errors = Partial<Record<"name" | "phone" | "consent", string>>;
 
 function validate(form: typeof emptyForm, consent: boolean): Errors {
@@ -15,14 +15,19 @@ function validate(form: typeof emptyForm, consent: boolean): Errors {
   return errors;
 }
 
-/** «Оставить заявку»: saved in the admin panel and sent to Telegram. */
+/**
+ * «Оставить заявку»: a name, a phone and a comment if any — saved in the admin
+ * panel and sent to Telegram. `filledMs` tells the server how long it took:
+ * a form sent within a moment of appearing is a script.
+ */
 export function LeadForm() {
   const [form, setForm] = useState(emptyForm);
+  const shownAt = useRef(Date.now());
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [serverError, setServerError] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [sentTo, setSentTo] = useState("");
+  const [sent, setSent] = useState<{ phone: string; repeat: boolean } | null>(null);
 
   const field = (name: keyof typeof emptyForm) => ({
     value: form[name],
@@ -42,8 +47,8 @@ export function LeadForm() {
     setIsSending(true);
     setServerError("");
     try {
-      await api.post("/public/leads", { ...form, consent });
-      setSentTo(form.phone);
+      const { data } = await api.post<{ ok: boolean; repeat?: boolean }>("/public/leads", { ...form, consent, filledMs: Date.now() - shownAt.current });
+      setSent({ phone: form.phone, repeat: Boolean(data.repeat) });
       setForm(emptyForm);
       setConsent(false);
     } catch (err: any) {
@@ -53,17 +58,25 @@ export function LeadForm() {
     }
   }
 
-  if (sentTo) {
+  if (sent) {
     return (
       <div className={styles.done} role="status">
         <span className={styles.doneIcon}>
           <Icon icon={CheckmarkCircle02Icon} size="lg" />
         </span>
-        <h3 className={styles.doneTitle}>Заявка отправлена</h3>
+        <h3 className={styles.doneTitle}>{sent.repeat ? "Заявка уже у нас" : "Заявка отправлена"}</h3>
         <p className={styles.doneText}>
-          Мы позвоним на номер <span className={styles.nowrap}>{sentTo}</span>, расскажем о подключении и ответим на вопросы.
+          {sent.repeat ? "С номера " : "Мы позвоним на номер "}
+          <span className={styles.nowrap}>{sent.phone}</span>
+          {sent.repeat ? " заявка уже есть — мы перезвоним, отправлять ещё раз не нужно." : ", расскажем о подключении и ответим на вопросы."}
         </p>
-        <Button variant="ghost" onClick={() => setSentTo("")}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setSent(null);
+            shownAt.current = Date.now();
+          }}
+        >
           Отправить ещё одну
         </Button>
       </div>
@@ -80,16 +93,8 @@ export function LeadForm() {
           <Input type="tel" autoComplete="tel" inputMode="tel" placeholder="+7 900 000-00-00" {...field("phone")} />
         </Field>
       </div>
-      <div className={styles.row}>
-        <Field label="Магазин">
-          <Input autoComplete="organization" placeholder="Название, если есть" {...field("storeName")} />
-        </Field>
-        <Field label="Город">
-          <Input autoComplete="address-level2" {...field("city")} />
-        </Field>
-      </div>
-      <Field label="Комментарий">
-        <Textarea rows={3} placeholder="Сколько товаров, удобное время для звонка…" {...field("comment")} />
+      <Field label="Комментарий" hint="Необязательно">
+        <Textarea rows={3} maxLength={1000} placeholder="Удобное время для звонка, вопросы…" {...field("comment")} />
       </Field>
       {/* Honeypot for bots: hidden from people and screen readers. */}
       <div className={styles.trap} aria-hidden="true">

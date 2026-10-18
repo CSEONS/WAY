@@ -1,10 +1,12 @@
 import {
   AiMagicIcon,
   ArrowRight01Icon,
+  Calendar03Icon,
   Call02Icon,
   Cancel01Icon,
   ContactBookIcon,
   DatabaseRestoreIcon,
+  Delete02Icon,
   HourglassIcon,
   ImageNotFound01Icon,
   InboxIcon,
@@ -70,6 +72,13 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/legal", label: "Реквизиты", icon: LegalDocument01Icon },
   { to: "/admin/settings", label: "Настройки ИИ", icon: Settings02Icon }
 ];
+
+/**
+ * Each kind of urgent thing has its color and icon, so the groups don't blur
+ * together: money owed — amber (still open) and red (closed, data due for
+ * deletion), requests — blue (landing) and green (a package to take money for).
+ */
+type GroupTone = "danger" | "warning" | "accent" | "success";
 
 type PayTarget = Pick<OverviewStore, "id" | "name" | "subscriptionEndsAt" | "subscription" | "planId">;
 
@@ -190,11 +199,13 @@ export function AdminPage() {
         <Card as="section" padding="lg" className={styles.attention}>
           <CardHeader title="Нужно сделать сейчас" description="Оплаты, заявки и всё, что не может ждать" />
           {overview.backupProblem && <BackupAlert problem={overview.backupProblem} onOpen={() => openTab("system")} />}
-          <AttentionGroup title="Ждут оплаты — витрина ещё видна покупателям" stores={awaitingPayment} onPay={setPayTarget} />
-          <AttentionGroup title="Просрочено — витрина закрыта" stores={pastDueToCall} onPay={setPayTarget} />
+          <AttentionGroup title="Ждут оплаты — витрина ещё видна покупателям" tone="warning" icon={HourglassIcon} stores={awaitingPayment} onPay={setPayTarget} />
+          <AttentionGroup title="Просрочено — витрина закрыта" tone="danger" icon={StoreRemove01Icon} stores={pastDueToCall} onPay={setPayTarget} />
           <LeadGroup leads={overview.latestLeads} total={overview.newLeads} />
           <PackageGroup
             title="Просят пакет — примите оплату"
+            tone="success"
+            icon={ShoppingBasketAdd01Icon}
             orders={overview.packageRequests}
             actions={(order) => (
               <>
@@ -209,6 +220,8 @@ export function AdminPage() {
           />
           <PackageGroup
             title="Оплачено — сделайте услугу"
+            tone="accent"
+            icon={TaskDone01Icon}
             orders={overview.packageServices}
             actions={(order) => (
               <Button variant="secondary" size="sm" icon={TaskDone01Icon} onClick={() => closeOrder(order, "done")}>
@@ -229,9 +242,11 @@ export function AdminPage() {
               ИИ нашёл на них людей или животных. Покупатели их не видят, пока вы не решите.
             </Notice>
           )}
-          <AttentionGroup title="Подписка скоро закончится" stores={overview.expiring} onPay={setPayTarget} />
+          <AttentionGroup title="Подписка скоро закончится" tone="warning" icon={Calendar03Icon} stores={overview.expiring} onPay={setPayTarget} />
           <AttentionGroup
             title={`Пора удалить данные: не платят больше ${keepDataDays} дней`}
+            tone="danger"
+            icon={Delete02Icon}
             stores={dataToDelete}
             detail={(store) => `${store.ownerName} — так обещано в политике конфиденциальности. Удаление: «Магазины» → «Удалить».`}
           />
@@ -338,23 +353,40 @@ export function AdminPage() {
   );
 }
 
+/** A group's heading: its icon in the group's color, the title and how many. */
+function GroupTitle({ title, count, icon, children }: { title: string; count: number; icon?: IconSvgElement; children?: ReactNode }) {
+  return (
+    <h3 className={styles.groupTitle}>
+      {icon && (
+        <span className={styles.groupIcon}>
+          <Icon icon={icon} size="sm" />
+        </span>
+      )}
+      {title} <span className={styles.groupCount}>{count}</span>
+      {children}
+    </h3>
+  );
+}
+
 function AttentionGroup({
   title,
+  tone,
+  icon,
   stores,
   onPay,
   detail
 }: {
   title: string;
+  tone?: GroupTone;
+  icon?: IconSvgElement;
   stores: OverviewStore[];
   onPay?: (store: OverviewStore) => void;
   detail?: (store: OverviewStore) => string;
 }) {
   if (!stores.length) return null;
   return (
-    <div className={styles.group}>
-      <h3 className={styles.groupTitle}>
-        {title} <span className={styles.groupCount}>{stores.length}</span>
-      </h3>
+    <div className={styles.group} data-tone={tone}>
+      <GroupTitle title={title} count={stores.length} icon={icon} />
       {stores.map((store) => {
         const badge = subscriptionBadge(store.subscription);
         return (
@@ -383,15 +415,14 @@ function AttentionGroup({
 function LeadGroup({ leads, total }: { leads: Lead[]; total: number }) {
   if (!leads.length) return null;
   return (
-    <div className={styles.group}>
-      <h3 className={styles.groupTitle}>
-        Новые заявки <span className={styles.groupCount}>{total}</span>
+    <div className={styles.group} data-tone="accent">
+      <GroupTitle title="Новые заявки" count={total} icon={InboxIcon}>
         {total > leads.length && (
           <Link to="/admin/leads" className={styles.groupLink}>
             Все заявки
           </Link>
         )}
-      </h3>
+      </GroupTitle>
       {leads.map((lead) => (
         <div key={lead.id} className={styles.attentionRow}>
           <div className={styles.rowText}>
@@ -414,13 +445,23 @@ function LeadGroup({ leads, total }: { leads: Lead[]; total: number }) {
 }
 
 /** Package requests to take money for, or paid services to do: who, what, and the buttons for it. */
-function PackageGroup({ title, orders, actions }: { title: string; orders: OpenPackageOrder[]; actions: (order: OpenPackageOrder) => ReactNode }) {
+function PackageGroup({
+  title,
+  tone,
+  icon,
+  orders,
+  actions
+}: {
+  title: string;
+  tone: GroupTone;
+  icon: IconSvgElement;
+  orders: OpenPackageOrder[];
+  actions: (order: OpenPackageOrder) => ReactNode;
+}) {
   if (!orders.length) return null;
   return (
-    <div className={styles.group}>
-      <h3 className={styles.groupTitle}>
-        {title} <span className={styles.groupCount}>{orders.length}</span>
-      </h3>
+    <div className={styles.group} data-tone={tone}>
+      <GroupTitle title={title} count={orders.length} icon={icon} />
       {orders.map((order) => (
         <div key={order.id} className={styles.attentionRow}>
           <div className={styles.rowText}>

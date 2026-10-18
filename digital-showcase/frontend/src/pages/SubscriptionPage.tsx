@@ -2,17 +2,34 @@ import { AiMagicIcon, Call02Icon, Calendar03Icon, TelegramIcon, WhatsappIcon } f
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { OwnerSubscription, Store } from "../types/models";
+import { PackageCard } from "../components/landing/PackageCard";
+import type { OwnerSubscription, PackageOrder, PackageOrderStatus, Store } from "../types/models";
 import { phoneUrl, telegramUrl, whatsappUrl } from "../utils/contact";
-import { formatDate, formatMoney, formatMonth } from "../utils/format";
+import { formatDate, formatMoney, formatMonth, plural } from "../utils/format";
 import { subscriptionNotice } from "../utils/subscription";
-import { Badge, ButtonLink, Card, CardHeader, ErrorState, Icon, LoadingState, Notice, Page, PageHeader, ProgressBar } from "../ui";
+import { Badge, Button, ButtonLink, Card, CardHeader, ErrorState, Icon, LoadingState, Notice, Page, PageHeader, ProgressBar, useToast, type Tone } from "../ui";
 import { ReceiptLink } from "../components/ReceiptLink";
 import styles from "./SubscriptionPage.module.css";
 
-/** «Оплачено до 12 октября», the AI left this month, results of the last months and payments — for the owner. */
+type OwnerOrder = OwnerSubscription["orders"][number];
+
+const orderStatuses: Record<PackageOrderStatus, { label: string; tone: Tone }> = {
+  REQUESTED: { label: "Запрошен — администратор свяжется", tone: "accent" },
+  PAID: { label: "Оплачен — выполняем", tone: "warning" },
+  DONE: { label: "Готово", tone: "success" },
+  DECLINED: { label: "Отклонён", tone: "neutral" },
+  CANCELLED: { label: "Отменён", tone: "neutral" }
+};
+
+/**
+ * «Оплачено до 12 октября», the AI left this month and from packages,
+ * packages to ask for, results of the last months and payments — for the owner.
+ */
 export function SubscriptionPage() {
   const { storeId = "" } = useParams();
+  const toast = useToast();
+  // The package being asked for or withdrawn right now.
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [store, setStore] = useState<Store>();
   const [data, setData] = useState<OwnerSubscription>();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -29,6 +46,37 @@ export function SubscriptionPage() {
   }
 
   useEffect(load, [storeId]);
+
+  function setOrders(update: (orders: OwnerOrder[]) => OwnerOrder[]) {
+    setData((current) => current && { ...current, orders: update(current.orders) });
+  }
+
+  /** «Запросить»: the admin sees the request at the top of the admin panel and takes the money. */
+  async function requestPackage(packageId: string) {
+    setBusyId(packageId);
+    try {
+      const { data: order } = await api.post<PackageOrder>(`/owner/stores/${storeId}/packages/${packageId}/request`);
+      setOrders((orders) => [order, ...orders]);
+      toast.show("Запрос отправлен — администратор свяжется с вами", { tone: "success" });
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не удалось отправить запрос", { tone: "danger" });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function withdraw(order: OwnerOrder) {
+    setBusyId(order.id);
+    try {
+      await api.delete(`/owner/stores/${storeId}/package-orders/${order.id}`);
+      setOrders((orders) => orders.map((item) => (item.id === order.id ? { ...item, status: "CANCELLED" } : item)));
+      toast.show("Запрос отменён");
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не удалось отменить запрос", { tone: "danger" });
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const back = { to: `/dashboard/stores/${storeId}`, label: "В кабинет" };
   if (state === "error") {
@@ -48,7 +96,14 @@ export function SubscriptionPage() {
     );
   }
 
-  const { subscription, ai, payments, reports, support } = data;
+  const { subscription, ai, payments, reports, support, packages, orders } = data;
+  const extra = [
+    ai.extraFills ? `${ai.extraFills} ${plural(ai.extraFills, ["карточка", "карточки", "карточек"])}` : "",
+    ai.extraPreviews ? `${ai.extraPreviews} превью` : ""
+  ]
+    .filter(Boolean)
+    .join(" и ");
+  const requested = new Set(orders.filter((order) => order.status === "REQUESTED").map((order) => order.packageId));
   const notice = subscriptionNotice(subscription);
   const isTrial = payments.length === 0 && Boolean(subscription.endsAt);
   const renewText = `Здравствуйте! Хочу продлить подписку витрины «${store.name}».`;
@@ -116,13 +171,23 @@ export function SubscriptionPage() {
         <CardHeader title="ИИ-помощник" />
         {ai.enabled ? (
           <>
-            <ProgressBar value={ai.limit ? (ai.used / ai.limit) * 100 : 100} label="Использовано карточек ИИ" />
-            <p className={styles.aiText}>
-              <Icon icon={AiMagicIcon} size="sm" />
-              {ai.used >= ai.limit
-                ? `В этом месяце карточки ИИ закончились (${ai.limit}). Товары можно добавлять вручную, лимит обновится 1-го числа.`
-                : `Использовано ${ai.used} из ${ai.limit} карточек в этом месяце. Осталось ${ai.limit - ai.used}.`}
-            </p>
+            {ai.limit > 0 && (
+              <>
+                <ProgressBar value={(ai.used / ai.limit) * 100} label="Использовано карточек ИИ" />
+                <p className={styles.aiText}>
+                  <Icon icon={AiMagicIcon} size="sm" />
+                  {ai.used >= ai.limit
+                    ? `В этом месяце карточки ИИ по тарифу закончились (${ai.limit}).${extra ? "" : " Товары можно добавлять вручную, лимит обновится 1-го числа."}`
+                    : `Использовано ${ai.used} из ${ai.limit} карточек в этом месяце. Осталось ${ai.limit - ai.used}.`}
+                </p>
+              </>
+            )}
+            {extra && (
+              <p className={styles.aiText}>
+                <Icon icon={AiMagicIcon} size="sm" />
+                Из пакетов осталось: {extra}. Они тратятся, когда закончится месячный лимит тарифа, и не сгорают.
+              </p>
+            )}
           </>
         ) : (
           <p className={styles.muted}>
@@ -130,6 +195,54 @@ export function SubscriptionPage() {
           </p>
         )}
       </Card>
+
+      {(packages.length > 0 || orders.length > 0) && (
+        <Card as="section" padding="lg" className={styles.card}>
+          <CardHeader title="Пакеты" description="Докупаются разово к любому тарифу. Запросите — администратор свяжется и примет оплату" />
+          {packages.length > 0 && (
+            <div className={styles.packages}>
+              {packages.map((item) => (
+                <PackageCard
+                  key={item.id}
+                  item={item}
+                  action={
+                    requested.has(item.id) ? (
+                      <Button variant="secondary" block disabled>
+                        Запрос отправлен
+                      </Button>
+                    ) : (
+                      <Button variant="primary" block loading={busyId === item.id} onClick={() => void requestPackage(item.id)}>
+                        Запросить
+                      </Button>
+                    )
+                  }
+                />
+              ))}
+            </div>
+          )}
+          {orders.length > 0 && (
+            <div className={styles.orders}>
+              <span className={styles.ordersTitle}>Ваши запросы и покупки</span>
+              {orders.map((order) => (
+                <div key={order.id} className={styles.order}>
+                  <div className={styles.orderText}>
+                    <strong>{order.name}</strong>
+                    <small>
+                      {formatDate(order.paidAt ?? order.createdAt)} · {order.price ? formatMoney(order.price) : "Бесплатно"}
+                    </small>
+                  </div>
+                  <Badge tone={orderStatuses[order.status].tone}>{orderStatuses[order.status].label}</Badge>
+                  {order.status === "REQUESTED" && (
+                    <Button variant="ghost" size="sm" loading={busyId === order.id} onClick={() => void withdraw(order)}>
+                      Отменить запрос
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card as="section" padding="lg" className={styles.card}>
         <CardHeader title="Итоги по месяцам" description="Сколько людей смотрели витрину и связались с вами" />
@@ -169,7 +282,7 @@ export function SubscriptionPage() {
                 <span>{formatDate(payment.createdAt)}</span>
                 <strong>{payment.amount ? formatMoney(payment.amount) : "Бесплатно"}</strong>
                 <small>
-                  {payment.months} мес., до {formatDate(payment.periodEnd)}
+                  {payment.packageName ? `Пакет «${payment.packageName}»` : `${payment.months} мес., до ${formatDate(payment.periodEnd)}`}
                   {payment.receipt && (
                     <>
                       {" · "}

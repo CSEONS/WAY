@@ -533,6 +533,14 @@ export const migrations: Migration[] = [
       addColumn(db, "stores", "instagram", "TEXT");
       addColumn(db, "stores", "vk", "TEXT");
     }
+  },
+  {
+    version: 15,
+    name: "no demo store setting",
+    // «Посмотреть пример» and its demo store are gone; the saved address of it goes too.
+    up(db) {
+      db.prepare("DELETE FROM settings WHERE key = 'demoStoreSlug'").run();
+    }
   }
 ];
 

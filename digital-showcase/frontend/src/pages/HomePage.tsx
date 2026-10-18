@@ -15,6 +15,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { LeadForm } from "../components/landing/LeadForm";
 import { PhoneMock } from "../components/landing/PhoneMock";
+import { PackageCard } from "../components/landing/PackageCard";
 import { PlanCard } from "../components/landing/PlanCard";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { useSiteSettings } from "../state/siteSettings";
@@ -96,11 +97,6 @@ export function HomePage() {
             <Button variant="primary" size="lg" iconEnd={ArrowRight01Icon} onClick={scrollToLead}>
               Подключить магазин
             </Button>
-            {site?.demoStoreSlug && (
-              <ButtonLink variant="outline" size="lg" to={`/m/${site.demoStoreSlug}`}>
-                Посмотреть пример
-              </ButtonLink>
-            )}
           </div>
           <ul className={styles.heroPoints}>
             <li>
@@ -155,6 +151,27 @@ export function HomePage() {
               />
             ))}
           </div>
+          {site.packages.length > 0 && (
+            <div className={styles.addons}>
+              <div className={styles.addonsHead}>
+                <h3 className={styles.cardTitle}>Можно докупить</h3>
+                <p className={styles.cardText}>Разово, к любому тарифу: больше ИИ-превью и карточек с ИИ, помощь с витриной.</p>
+              </div>
+              <div className={styles.plans} data-count={Math.min(site.packages.length, 3)}>
+                {site.packages.map((item) => (
+                  <PackageCard
+                    key={item.id}
+                    item={item}
+                    action={
+                      <Button variant="outline" size="lg" block onClick={scrollToLead}>
+                        Узнать подробнее
+                      </Button>
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </Section>
       )}
 

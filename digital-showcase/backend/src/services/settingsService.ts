@@ -42,8 +42,6 @@ export interface TrialPeriod {
 }
 
 export interface Settings {
-  /** Slug of a store with sample products: «Посмотреть пример» on the landing. Empty — no button. */
-  demoStoreSlug: string;
   /** «Написать нам» on the landing. */
   salesContacts: { whatsapp: string; phone: string };
   /** Who owners write or call: «Помощь» and «Подписка и итоги». */
@@ -85,7 +83,6 @@ export function defaultSettings(): Settings {
   const quality = envText("AI_PREVIEW_QUALITY");
   const rate = Number(process.env.AI_RUB_PER_USD);
   return {
-    demoStoreSlug: "demo",
     salesContacts: { whatsapp: "", phone: "" },
     support: { whatsapp: envText("SUPPORT_WHATSAPP"), phone: envText("SUPPORT_PHONE"), telegram: envText("SUPPORT_TELEGRAM") },
     helpVideos: [],
@@ -158,6 +155,6 @@ export function saveSettings(next: Settings) {
 
 /** What any visitor may see: contacts for the landing, help videos, requisites for /offer and /privacy. Plans come from planService. */
 export function publicSettings() {
-  const { demoStoreSlug, salesContacts, helpVideos, legal } = settings();
-  return { demoStoreSlug, salesContacts, helpVideos, legal };
+  const { salesContacts, helpVideos, legal } = settings();
+  return { salesContacts, helpVideos, legal };
 }

@@ -60,7 +60,6 @@ const LABELS: Record<string, string> = {
   trial: "Пробный период",
   count: "Пробный период",
   days: "Дни",
-  demoStoreSlug: "Демо-магазин",
   url: "Ссылка",
   operator: "Исполнитель",
   taxStatus: "Статус",
@@ -318,7 +317,6 @@ const rate = z.preprocess(
 );
 
 export const settingsSchema = z.object({
-  demoStoreSlug: text(40),
   salesContacts: z.object({ whatsapp: text(40), phone: text(40) }),
   support: z.object({ whatsapp: text(40), phone: text(40), telegram: text(100) }),
   helpVideos: z.array(z.object({ title: requiredText(120), url: link })).max(20),

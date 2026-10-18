@@ -370,7 +370,7 @@ export default function DevUiPage() {
         <Row label="toast">
           <Button onClick={() => toast.show("Товар сохранён", { tone: "success" })}>Успех</Button>
           <Button onClick={() => toast.show("Не удалось сохранить", { tone: "danger" })}>Ошибка</Button>
-          <Button icon={Copy01Icon} onClick={() => copy(`${location.origin}/m/demo`, "Ссылка скопирована")}>
+          <Button icon={Copy01Icon} onClick={() => copy(`${location.origin}/m/my-shop`, "Ссылка скопирована")}>
             Копировать ссылку
           </Button>
         </Row>
@@ -379,11 +379,11 @@ export default function DevUiPage() {
       {isModalOpen && (
         <Modal
           title="QR-код витрины"
-          description={`${location.origin}/m/demo`}
+          description={`${location.origin}/m/my-shop`}
           onClose={() => setIsModalOpen(false)}
           footer={
             <>
-              <Button variant="secondary" onClick={() => copy(`${location.origin}/m/demo`, "Ссылка скопирована")}>
+              <Button variant="secondary" onClick={() => copy(`${location.origin}/m/my-shop`, "Ссылка скопирована")}>
                 Копировать
               </Button>
               <Button variant="primary" onClick={() => setIsModalOpen(false)}>

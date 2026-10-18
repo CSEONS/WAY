@@ -233,6 +233,18 @@
   }
 }
 
+/* «Можно докупить»: packages under the plans, laid out the same way. */
+.addons {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.addonsHead {
+  display: grid;
+  gap: var(--space-1);
+}
+
 /* FAQ */
 
 .faq {

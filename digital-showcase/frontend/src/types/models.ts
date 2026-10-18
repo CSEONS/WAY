@@ -372,8 +372,6 @@ export interface SiteSettings {
   plans: PublicPlan[];
   /** Packages bought on top of a plan, in order. */
   packages: PublicPackage[];
-  /** «Посмотреть пример» on the landing; empty — no button. */
-  demoStoreSlug: string;
   /** «Написать нам» on the landing. */
   salesContacts: { whatsapp: string; phone: string };
   helpVideos: HelpVideo[];

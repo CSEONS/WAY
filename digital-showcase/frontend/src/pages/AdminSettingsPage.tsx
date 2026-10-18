@@ -200,9 +200,6 @@ export function AdminSettingsPage({ part }: { part: SettingsPart }) {
               <Field label="Телефон для заявок">
                 <Input type="tel" {...bind(draft.salesContacts.phone, (phone) => change({ salesContacts: { ...draft.salesContacts, phone } }))} />
               </Field>
-              <Field label="Демо-магазин" hint="Адрес витрины для «Посмотреть пример». Пусто — без кнопки">
-                <Input autoComplete="off" {...bind(draft.demoStoreSlug, (demoStoreSlug) => change({ demoStoreSlug }))} />
-              </Field>
             </div>
           </Section>
         )}

@@ -541,6 +541,33 @@ export const migrations: Migration[] = [
     up(db) {
       db.prepare("DELETE FROM settings WHERE key = 'demoStoreSlug'").run();
     }
+  },
+  {
+    version: 16,
+    name: "notifications and products taken off by the admin",
+    up(db) {
+      db.exec(`
+        -- The bell in the owner's app: from the system (photo checks) or the admin (see notificationService).
+        CREATE TABLE IF NOT EXISTS notifications (
+          id TEXT PRIMARY KEY,
+          userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          storeId TEXT REFERENCES stores(id) ON DELETE CASCADE,
+          source TEXT NOT NULL CHECK(source IN ('SYSTEM', 'ADMIN')),
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          link TEXT,
+          topic TEXT,
+          batchId TEXT,
+          createdAt TEXT NOT NULL,
+          readAt TEXT
+        );
+        CREATE INDEX IF NOT EXISTS notifications_user ON notifications(userId, createdAt);
+        CREATE INDEX IF NOT EXISTS notifications_batch ON notifications(batchId);
+      `);
+      // A product the admin took off the storefront: buyers don't see it, whatever the owner's switch says.
+      addColumn(db, "products", "blockedAt", "TEXT");
+      addColumn(db, "products", "blockedReason", "TEXT");
+    }
   }
 ];
 

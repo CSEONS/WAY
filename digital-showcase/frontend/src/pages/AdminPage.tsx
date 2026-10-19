@@ -1,6 +1,7 @@
 import {
   AiMagicIcon,
   ArrowRight01Icon,
+  BellIcon,
   Calendar03Icon,
   Call02Icon,
   Cancel01Icon,
@@ -66,6 +67,7 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/leads", label: "Заявки с сайта", icon: InboxIcon },
   { to: "/admin/journal", label: "Журнал действий", icon: Note01Icon },
   { to: "/admin/moderation", label: "Проверка фото", icon: ImageNotFound01Icon },
+  { to: "/admin/notifications", label: "Уведомления владельцам", icon: BellIcon },
   { to: "/admin/plans", label: "Тарифы, пакеты и цены", icon: Tag01Icon },
   { to: "/admin/contacts", label: "Контакты", icon: ContactBookIcon },
   { to: "/admin/videos", label: "Видеоинструкции", icon: PlayCircleIcon },
@@ -239,7 +241,7 @@ export function AdminPage() {
                 </ButtonLink>
               }
             >
-              ИИ нашёл на них лица людей или животных. Покупатели их не видят, пока вы не решите.
+              ИИ нашёл на них лица людей или животных. Покупатели их видят, пока вы не решите: показывать, скрыть фото или снять товар.
             </Notice>
           )}
           <AttentionGroup title="Подписка скоро закончится" tone="warning" icon={Calendar03Icon} stores={overview.expiring} onPay={setPayTarget} />

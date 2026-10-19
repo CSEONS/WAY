@@ -36,6 +36,7 @@ const LABELS: Record<string, string> = {
   headline: "Заголовок",
   features: "Преимущества",
   showColors: "Показать все цвета",
+  body: "Текст",
   isActive: "Магазин включён",
   aiFormEnabled: "Тариф",
   planId: "Тариф",
@@ -253,7 +254,16 @@ export const connectSchema = z.object({
 
 export const leadStatusSchema = z.object({ status: z.enum(["NEW", "DONE"]) });
 
-export const moderationReviewSchema = z.object({ status: z.enum(["APPROVED", "REJECTED"]) });
+export const moderationReviewSchema = z.object({ status: z.enum(["APPROVED", "REJECTED", "PRODUCT_BLOCKED"]) });
+
+/** «Уведомления» in the admin panel: storeId null — to every owner. */
+export const notificationSendSchema = z.object({
+  storeId: z.string().trim().min(1).nullable().default(null),
+  title: requiredText(120),
+  body: requiredText(2000)
+});
+
+export const notificationReadSchema = z.object({ ids: z.array(z.string()).max(200).optional() });
 
 // «Тарифы и цены»
 

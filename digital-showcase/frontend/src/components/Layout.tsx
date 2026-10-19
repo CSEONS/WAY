@@ -1,8 +1,9 @@
-import { HelpCircleIcon, Logout01Icon, ShieldUserIcon } from "@hugeicons/core-free-icons";
+import { DashboardSquare01Icon, HelpCircleIcon, Logout01Icon, ShieldUserIcon, UserCircleIcon } from "@hugeicons/core-free-icons";
 import { lazy, Suspense, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Button, ConfirmModal, Icon } from "../ui";
 import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
+import { NotificationBell } from "./notifications/NotificationBell";
 import type { User } from "../types/models";
 import { stopImpersonation } from "../utils/impersonation";
 import styles from "./Layout.module.css";
@@ -44,10 +45,12 @@ export function Layout({ user }: { user: User | null }) {
               </NavLink>
             )}
             {user?.role === "OWNER" && !isInDashboard && (
-              <NavLink to="/dashboard" className={styles.navLink}>
-                Кабинет
+              <NavLink to="/dashboard" className={`${styles.navLink} ${styles.navIconLink}`}>
+                <Icon icon={DashboardSquare01Icon} size="sm" />
+                <span className={styles.navLabel}>Кабинет</span>
               </NavLink>
             )}
+            {user?.role === "OWNER" && <NotificationBell />}
             {user?.role === "OWNER" && (
               <button type="button" className={`${styles.navLink} ${styles.navButton}`} onClick={() => setIsHelpOpen(true)} aria-label="Помощь">
                 <Icon icon={HelpCircleIcon} size="sm" />
@@ -55,8 +58,9 @@ export function Layout({ user }: { user: User | null }) {
               </button>
             )}
             {user && !isInAccount && (
-              <NavLink to="/account" className={styles.navLink}>
-                Аккаунт
+              <NavLink to="/account" className={`${styles.navLink} ${styles.navIconLink}`}>
+                <Icon icon={UserCircleIcon} size="sm" />
+                <span className={styles.navLabel}>Аккаунт</span>
               </NavLink>
             )}
             {user ? (

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as controller from "../controllers/adminController.js";
 import * as leadController from "../controllers/leadController.js";
+import * as notificationController from "../controllers/notificationController.js";
 import { adminOnly, authMiddleware } from "../middleware/authMiddleware.js";
 
 export const adminRoutes = Router();
@@ -13,6 +14,8 @@ adminRoutes.patch("/payments/:id", controller.setPaymentReceipt);
 adminRoutes.delete("/payments/:id", controller.cancelPayment);
 adminRoutes.get("/reports", controller.listReports);
 adminRoutes.get("/journal", controller.listJournal);
+adminRoutes.get("/notifications", notificationController.adminHistory);
+adminRoutes.post("/notifications", notificationController.sendFromAdmin);
 adminRoutes.get("/backups", controller.listBackups);
 adminRoutes.post("/backups", controller.startBackup);
 adminRoutes.get("/ai", controller.aiStatus);

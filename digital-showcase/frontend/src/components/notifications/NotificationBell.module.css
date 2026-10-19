@@ -1,0 +1,102 @@
+/* The bell in the header (NotificationBell.tsx); sized like the other header items. */
+.bell {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-sm);
+  min-height: var(--control-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 0;
+  color: var(--color-ink-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bell:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+}
+
+.bell:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.count {
+  position: absolute;
+  top: calc(-1 * var(--space-0-5));
+  right: calc(-1 * var(--space-0-5));
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-1);
+  color: var(--color-accent-ink);
+  background: var(--color-danger);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+/* Unread when the list was opened. */
+.fresh {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-xs);
+}
+
+.newMark {
+  color: var(--color-accent-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.body {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-snug);
+  white-space: pre-line;
+}
+
+.link {
+  justify-self: start;
+  margin-top: var(--space-1);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}

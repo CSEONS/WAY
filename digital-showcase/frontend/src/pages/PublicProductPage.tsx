@@ -6,14 +6,16 @@ import {
   HelpCircleIcon,
   Image01Icon,
   Location01Icon,
+  MoreHorizontalIcon,
   Share08Icon,
   Store01Icon,
-  ViewIcon,
-  ViewOffSlashIcon
+  ViewIcon
 } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { PriceModal } from "../components/dashboard/PriceModal";
+import { ProductActionsModal } from "../components/dashboard/ProductActionsModal";
 import { ProductPhoto, photoSources } from "../components/ProductPhoto";
 import {
   ContactButton,
@@ -40,6 +42,7 @@ import {
   Chip,
   ChipGroup,
   ColorSwatch,
+  ConfirmModal,
   EmptyState,
   Icon,
   LoadingState,
@@ -73,6 +76,9 @@ export function PublicProductPage() {
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  // The owner's «Ещё действия» and the windows it leads to.
+  const [ownerWindow, setOwnerWindow] = useState<"actions" | "price" | "delete" | null>(null);
+  const navigate = useNavigate();
   const toast = useToast();
   const favorites = useFavorites(storeSlug);
 
@@ -296,7 +302,11 @@ export function PublicProductPage() {
         </p>
         {data.viewerIsOwner ? (
           <div className={styles.ownerShare}>
-            {product.isVisible ? (
+            {product.blockedAt ? (
+              <Notice tone="danger" title="Снят с витрины администратором">
+                {product.blockedReason ? `${product.blockedReason} ` : ""}Покупатели не видят этот товар. Замените фото и напишите администратору, чтобы вернуть его.
+              </Notice>
+            ) : product.isVisible ? (
               <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
                 Поделиться в соцсетях
               </Button>
@@ -309,13 +319,8 @@ export function PublicProductPage() {
               <ButtonLink variant="secondary" icon={Edit02Icon} to={`/dashboard/stores/${store.id}/products/${product.id}/edit`}>
                 Редактировать
               </ButtonLink>
-              <Button
-                variant={product.isVisible ? "secondary" : "primary"}
-                icon={product.isVisible ? ViewOffSlashIcon : ViewIcon}
-                loading={isTogglingVisibility}
-                onClick={() => void toggleVisibility()}
-              >
-                {product.isVisible ? "Скрыть с витрины" : "Показать на витрине"}
+              <Button variant="secondary" icon={MoreHorizontalIcon} onClick={() => setOwnerWindow("actions")}>
+                Ещё действия
               </Button>
             </div>
             <small>Это ваш товар. Покупатели видят здесь «Связаться»: WhatsApp, Telegram, звонок и другие ваши контакты.</small>
@@ -363,10 +368,52 @@ export function PublicProductPage() {
           onClose={() => setIsShareOpen(false)}
         />
       )}
+      {data.viewerIsOwner && ownerWindow === "actions" && (
+        <ProductActionsModal
+          product={product}
+          storeId={store.id}
+          onClose={() => setOwnerWindow(null)}
+          onChanged={(updated) => setData({ ...data, product: { ...product, ...updated } })}
+          onEditPrice={() => setOwnerWindow("price")}
+          onDelete={() => setOwnerWindow("delete")}
+        />
+      )}
+      {data.viewerIsOwner && ownerWindow === "price" && (
+        <PriceModal
+          product={product}
+          storeId={store.id}
+          onClose={() => setOwnerWindow(null)}
+          onSaved={(updated) => setData({ ...data, product: { ...product, ...updated } })}
+        />
+      )}
+      {data.viewerIsOwner && ownerWindow === "delete" && (
+        <ConfirmModal
+          danger
+          title="Удалить товар?"
+          description={`Товар «${product.title}» исчезнет из кабинета и с витрины. Если товар просто закончился, лучше отметьте «Нет в наличии» или скройте его.`}
+          confirmLabel="Удалить"
+          onCancel={() => setOwnerWindow(null)}
+          onConfirm={async () => {
+            try {
+              await api.delete(`/owner/stores/${store.id}/products/${product.id}`);
+              toast.show("Товар удалён", { tone: "success" });
+              navigate(`/dashboard/stores/${store.id}`, { replace: true });
+            } catch (err: any) {
+              toast.show(err?.response?.data?.message ?? "Не удалось удалить. Попробуйте ещё раз.", { tone: "danger" });
+              setOwnerWindow(null);
+            }
+          }}
+        />
+      )}
       <StorefrontFooter />
       {data.viewerIsOwner ? (
         <MobileActionBar>
-          {product.isVisible ? (
+          {product.blockedAt ? (
+            // Taken off by the admin: a shared link would show buyers «Товар недоступен».
+            <Button variant="secondary" size="lg" block icon={MoreHorizontalIcon} onClick={() => setOwnerWindow("actions")}>
+              Ещё действия
+            </Button>
+          ) : product.isVisible ? (
             <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
               Поделиться в соцсетях
             </Button>

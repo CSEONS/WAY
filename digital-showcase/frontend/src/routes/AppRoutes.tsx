@@ -29,6 +29,7 @@ const AdminJournalPage = lazy(() => import("../pages/AdminJournalPage").then((m)
 const AdminPlanEditPage = lazy(() => import("../pages/AdminPlanEditPage").then((m) => ({ default: m.AdminPlanEditPage })));
 const AdminPackageEditPage = lazy(() => import("../pages/AdminPackageEditPage").then((m) => ({ default: m.AdminPackageEditPage })));
 const AdminPlansPage = lazy(() => import("../pages/AdminPlansPage").then((m) => ({ default: m.AdminPlansPage })));
+const AdminNotificationsPage = lazy(() => import("../pages/AdminNotificationsPage").then((m) => ({ default: m.AdminNotificationsPage })));
 const AdminModerationPage = lazy(() => import("../pages/AdminModerationPage").then((m) => ({ default: m.AdminModerationPage })));
 const AdminSettingsPage = lazy(() => import("../pages/AdminSettingsPage").then((m) => ({ default: m.AdminSettingsPage })));
 const PrivacyPage = lazy(() => import("../pages/legal/PrivacyPage").then((m) => ({ default: m.PrivacyPage })));
@@ -96,6 +97,7 @@ export function AppRoutes({ user, isAuthLoading, onLogin, onLogout }: Props) {
             <Route path="/admin/legal" element={<AdminSettingsPage part="legal" />} />
             <Route path="/admin/settings" element={<AdminSettingsPage part="ai" />} />
             <Route path="/admin/moderation" element={<AdminModerationPage />} />
+            <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
           </Route>
         </Routes>
       </Suspense>

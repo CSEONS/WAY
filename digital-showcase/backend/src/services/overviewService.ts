@@ -82,7 +82,7 @@ export async function adminOverview(now = new Date()) {
     newLeads: newLeads?.count ?? 0,
     latestLeads,
     backupProblem: backup,
-    /** Photos with living beings waiting for moderation: hidden from buyers until then. */
+    /** Photos with living beings waiting for the moderator's decision (still visible to buyers). */
     moderationPending,
     /** Owners asking for a package: take the money (or turn it down). */
     packageRequests: packageOrders.filter((order) => order.status === "REQUESTED"),

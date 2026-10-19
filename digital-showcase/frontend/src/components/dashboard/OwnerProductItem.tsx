@@ -51,12 +51,13 @@ export function OwnerProductItem({ product, storeId, storeSlug, onUpdated, onEdi
   }
 
   const photo = (
-    <span className={cx(styles.photo, !isVisible && styles.dimmed)}>
+    <span className={cx(styles.photo, (!isVisible || product.blockedAt) && styles.dimmed)}>
       {image ? <ProductPhoto src={image.url} sizes="88px" /> : <span>{product.title.slice(0, 1)}</span>}
     </span>
   );
   const badges = (
     <div className={styles.badges}>
+      {product.blockedAt && <Badge tone="danger">Снят администратором</Badge>}
       {!isVisible && <Badge tone="warning">Скрыт с витрины</Badge>}
       {onModeration && <Badge tone="warning">На проверке</Badge>}
       {hasHiddenPhotos && <Badge tone="danger">Фото скрыто</Badge>}

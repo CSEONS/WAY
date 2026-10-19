@@ -64,3 +64,10 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Why a product was taken off, in «Снятые товары». */
+.reason {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-snug);
+}

@@ -133,12 +133,13 @@ export function ImageManager({
             </label>
           </div>
           {images.some((image) => image.moderation && image.moderation.status !== "APPROVED") && (
-            <Notice tone="warning" title="Покупатели не видят часть фото">
-              На них {images
+            <Notice tone="warning" title="Подозрение на нарушение правил площадки">
+              На фото: {images
                 .filter((image) => image.moderation && image.moderation.status !== "APPROVED")
                 .map((image) => image.moderation!.findings)
                 .join("; ")}
-              . На витрине нельзя показывать лица людей и животных: такие фото проверяет администратор. «Скрыто» — фото не прошло проверку, его лучше удалить.
+              . На витрине нельзя показывать лица людей и морды животных. Фото с пометкой «Проверка» покупатели пока видят: администратор проверит их и, если
+              нарушение подтвердится, скроет фото или весь товар. «Скрыто» — администратор уже скрыл фото. Лучше заменить такие фото другими.
             </Notice>
           )}
           {onFillWithAi && (

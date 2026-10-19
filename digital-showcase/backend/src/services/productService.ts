@@ -84,7 +84,7 @@ const ORDER_BY: Record<ProductSort, string> = {
 function productWhere(storeId: string, publicOnly: boolean, filters: ProductFilters) {
   const where = ["p.storeId = ?"];
   const params: unknown[] = [storeId];
-  if (publicOnly) where.push("p.isVisible = 1");
+  if (publicOnly) where.push("p.isVisible = 1 AND p.blockedAt IS NULL");
   if (filters.q) {
     // ulower(): Unicode-aware lower(); SQLite's own LOWER() ignores Cyrillic.
     where.push("(ulower(p.title) LIKE ? OR ulower(p.category) LIKE ?)");
@@ -138,15 +138,15 @@ export async function listFacets(storeId: string) {
   const db = await getDb();
   const [categories, sizes, colors] = await Promise.all([
     db.all<{ category: string }>(
-      "SELECT DISTINCT category FROM products WHERE storeId = ? AND isVisible = 1 AND category IS NOT NULL AND category != '' ORDER BY category",
+      "SELECT DISTINCT category FROM products WHERE storeId = ? AND isVisible = 1 AND blockedAt IS NULL AND category IS NOT NULL AND category != '' ORDER BY category",
       storeId
     ),
     db.all<{ value: string }>(
-      "SELECT DISTINCT s.value FROM product_sizes s JOIN products p ON p.id = s.productId WHERE p.storeId = ? AND p.isVisible = 1",
+      "SELECT DISTINCT s.value FROM product_sizes s JOIN products p ON p.id = s.productId WHERE p.storeId = ? AND p.isVisible = 1 AND p.blockedAt IS NULL",
       storeId
     ),
     db.all<{ name: string; hex: string | null }>(
-      "SELECT c.name, MAX(c.hex) as hex FROM product_colors c JOIN products p ON p.id = c.productId WHERE p.storeId = ? AND p.isVisible = 1 GROUP BY c.name ORDER BY c.name",
+      "SELECT c.name, MAX(c.hex) as hex FROM product_colors c JOIN products p ON p.id = c.productId WHERE p.storeId = ? AND p.isVisible = 1 AND p.blockedAt IS NULL GROUP BY c.name ORDER BY c.name",
       storeId
     )
   ]);
@@ -160,7 +160,7 @@ export async function listFacets(storeId: string) {
 export async function getProduct(id: string, storeId?: string, publicOnly = false) {
   const db = await getDb();
   const product = await db.get<Product>(
-    `SELECT * FROM products WHERE id = ? ${storeId ? "AND storeId = ?" : ""} ${publicOnly ? "AND isVisible = 1" : ""}`,
+    `SELECT * FROM products WHERE id = ? ${storeId ? "AND storeId = ?" : ""} ${publicOnly ? "AND isVisible = 1 AND blockedAt IS NULL" : ""}`,
     ...(storeId ? [id, storeId] : [id])
   );
   return product ? enrich(product, publicOnly) : null;

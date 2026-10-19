@@ -8,6 +8,7 @@ import { trustProxy } from "./config.js";
 import { rawDb } from "./database/db.js";
 import { adminRoutes } from "./routes/adminRoutes.js";
 import { moderationRoutes } from "./routes/moderationRoutes.js";
+import { notificationRoutes } from "./routes/notificationRoutes.js";
 import { authRoutes } from "./routes/authRoutes.js";
 import { ogRoutes } from "./routes/ogRoutes.js";
 import { ownerRoutes } from "./routes/ownerRoutes.js";
@@ -74,6 +75,7 @@ app.get("/api/health", async (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/moderation", moderationRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/owner", ownerRoutes);
 app.use("/api/public", publicRoutes);
 app.use(seoRoutes);

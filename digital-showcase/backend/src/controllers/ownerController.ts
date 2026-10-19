@@ -167,7 +167,7 @@ export const updateStoreLogo = asyncHandler(async (req, res) => {
   if (!req.file) throw new HttpError(400, "Выберите изображение логотипа");
   const store = await scopedStore(req);
   const updated = await storeService.updateStoreLogo(store.id, req.file);
-  // People or animals on it: hidden from buyers until a moderator looks (after the answer, it takes a few seconds).
+  // People or animals on it: moderation and a notice to the owner (after the answer, it takes a few seconds).
   if (updated?.logoUrl) void checkImage({ url: updated.logoUrl, kind: "LOGO", storeId: store.id }, req.file.buffer);
   res.json(updated);
 });
@@ -275,7 +275,7 @@ export const addImage = asyncHandler(async (req, res) => {
   if (!added) throw new HttpError(404, "Товар не найден");
   const ref = { url: added.url, kind: "PRODUCT" as const, storeId: store.id, productId: added.product.id };
   // «Превью с ИИ» already found people or animals on it: straight to moderation.
-  // Otherwise the AI checks it after the answer (a few seconds). Either way buyers don't see it until a moderator looks.
+  // Otherwise the AI checks it after the answer (a few seconds). Either way it stays visible; the moderator decides.
   const previewFindings = cleanFindings(parseJsonList(req.body.livingBeings));
   if (previewFindings.length) {
     await flagImage(ref, previewFindings);

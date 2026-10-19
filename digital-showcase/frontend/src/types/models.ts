@@ -90,6 +90,45 @@ export interface ImageCheck {
   storeSlug: string;
   productId: string | null;
   productTitle: string | null;
+  /** The admin took the whole product off the storefront. */
+  productBlocked: number;
+}
+
+/** GET /moderation/products/blocked — «Снятые товары». */
+export interface BlockedProduct {
+  id: string;
+  title: string;
+  blockedAt: string;
+  blockedReason: string | null;
+  storeId: string;
+  storeName: string;
+  storeSlug: string;
+  imageUrl: string | null;
+}
+
+/** The bell: GET /notifications. SYSTEM — photo checks; ADMIN — written by the admin. */
+export interface AppNotification {
+  id: string;
+  storeId: string | null;
+  source: "SYSTEM" | "ADMIN";
+  title: string;
+  body: string;
+  /** In-app address, e.g. the product's edit page. */
+  link: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+/** GET /admin/notifications — one row per sending. */
+export interface AdminNotificationBatch {
+  batchId: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  recipients: number;
+  read: number;
+  /** The store when it went to one store's owner; null — to all owners. */
+  storeName: string | null;
 }
 
 export interface ProductSize {
@@ -121,6 +160,9 @@ export interface Product {
   category: string | null;
   status: ProductStatus;
   isVisible: number;
+  /** Taken off the storefront by the admin after a photo check; buyers don't see it. */
+  blockedAt?: string | null;
+  blockedReason?: string | null;
   createdAt: string;
   updatedAt: string;
   images: ProductImage[];
@@ -252,7 +294,7 @@ export interface AdminOverview {
   newLeads: number;
   /** The newest of the new requests, for the top of the page. */
   latestLeads: Lead[];
-  /** Photos with living beings waiting for moderation: buyers don't see them until then. */
+  /** Photos with living beings waiting for moderation (buyers still see them until the admin decides). */
   moderationPending: number;
   /** The last copy failed, or there has been none for over a day. */
   backupProblem: { kind: "failed" | "stale"; at: string | null; error: string | null } | null;

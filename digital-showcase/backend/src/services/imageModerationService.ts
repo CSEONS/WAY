@@ -3,14 +3,16 @@ import { getDb } from "../database/db.js";
 import { HttpError } from "../utils/http.js";
 import { completeJson, isAiConfigured } from "./aiProvider.js";
 import { measureTokens } from "./aiUsageService.js";
+import { notifyStoreOwner } from "./notificationService.js";
 
 // Photos must not show faces: of people and animals — alive, on photos,
 // prints, drawings or toys — and of mannequins and dolls. A body without a
 // face is fine: hands, legs, a model cut off at the nose, a person from the
 // back — that's how clothes are shown. Every uploaded product photo and logo
-// is checked by the AI model; a photo with a face goes to moderation and
-// buyers don't see it until a moderator (the admin, for now) approves it.
-// Nothing is painted over: the product just waits for the moderator's decision.
+// is checked by the AI model; a photo with a face goes to moderation and the
+// owner gets a notification with the rule. The photo stays on the storefront:
+// the moderator (the admin, for now) shows it, hides it, or takes the whole
+// product off the storefront. Nothing is painted over.
 
 export interface LivingBeings {
   /** Short Russian descriptions: «лицо человека», «морда кота на принте». Empty — no faces. */
@@ -88,6 +90,41 @@ export async function flagImage(ref: ImageRef, found: string[]) {
     found.join(", "),
     new Date().toISOString()
   );
+  await warnOwner(ref, found.join(", "));
+}
+
+/** The rule, in the words the owner reads in every moderation notification. */
+const RULE = "На витрине нельзя показывать лица людей и морды животных — живых, на принтах и рисунках, у игрушек, манекенов и кукол.";
+
+const subjectOf = async (ref: { kind: ImageKind; storeId: string; productId?: string | null }) => {
+  const db = await getDb();
+  if (ref.kind === "LOGO") {
+    const store = await db.get<{ name: string }>("SELECT name FROM stores WHERE id = ?", ref.storeId);
+    return { name: `Логотип магазина «${store?.name ?? ""}»`, link: `/dashboard/stores/${ref.storeId}/settings`, topic: `moderation:logo:${ref.storeId}` };
+  }
+  const product = ref.productId ? await db.get<{ title: string }>("SELECT title FROM products WHERE id = ?", ref.productId) : undefined;
+  return {
+    name: `Товар «${product?.title ?? "без названия"}»`,
+    link: ref.productId ? `/dashboard/stores/${ref.storeId}/products/${ref.productId}/edit` : `/dashboard/stores/${ref.storeId}`,
+    topic: `moderation:${ref.productId ?? ref.storeId}`
+  };
+};
+
+/** «Подозрение на нарушение правил площадки»: what, which rule, what happens next. Never fails the upload. */
+async function warnOwner(ref: ImageRef, findings: string) {
+  try {
+    const subject = await subjectOf(ref);
+    const what = ref.kind === "LOGO" ? "Логотип" : "Фото";
+    await notifyStoreOwner(ref.storeId, {
+      source: "SYSTEM",
+      title: "Подозрение на нарушение правил площадки",
+      body: `${subject.name}: на ${ref.kind === "LOGO" ? "логотипе" : "фото"} ${findings}. ${RULE} ${what} пока видно покупателям. Администратор проверит его: если нарушение подтвердится, ${ref.kind === "LOGO" ? "логотип скроют" : "фото или весь товар скроют с витрины"}. Чтобы этого избежать, замените ${ref.kind === "LOGO" ? "логотип" : "фото"}.`,
+      link: subject.link,
+      topic: subject.topic
+    });
+  } catch (error) {
+    console.error(`Moderation notice failed for ${ref.url}:`, error);
+  }
 }
 
 /**
@@ -107,17 +144,17 @@ export async function checkImage(ref: ImageRef, image: Buffer) {
   }
 }
 
-/** SQL condition: the image at `column` may be shown to buyers (not waiting for moderation, not rejected). */
+/** SQL condition: the image at `column` may be shown to buyers — everything but what the moderator hid. */
 export function visibleToBuyers(column: string) {
-  return `NOT EXISTS (SELECT 1 FROM image_checks c WHERE c.url = ${column} AND c.status IN ('PENDING', 'REJECTED'))`;
+  return `NOT EXISTS (SELECT 1 FROM image_checks c WHERE c.url = ${column} AND c.status = 'REJECTED')`;
 }
 
-/** The store's logo for buyers: hidden while it waits for moderation or after a rejection. */
+/** The store's logo for buyers: gone only when the moderator hid it. */
 export async function publicLogo(logoUrl: string | null) {
   if (!logoUrl) return null;
   const db = await getDb();
   const check = await db.get<{ status: ModerationStatus }>("SELECT status FROM image_checks WHERE url = ?", logoUrl);
-  return check && check.status !== "APPROVED" ? null : logoUrl;
+  return check?.status === "REJECTED" ? null : logoUrl;
 }
 
 /** Moderation of the given images, for the owner's own view: url → status and what was found. */
@@ -151,6 +188,8 @@ export interface ImageCheck {
   storeSlug: string;
   productId: string | null;
   productTitle: string | null;
+  /** The admin took the whole product off the storefront. */
+  productBlocked: number;
 }
 
 /** Images for the moderation page, newest first; only those still in use. */
@@ -158,7 +197,7 @@ export async function listChecks(status: ModerationStatus, limit = 200) {
   const db = await getDb();
   return db.all<ImageCheck>(
     `SELECT c.id, c.url, c.kind, c.status, c.findings, c.createdAt, c.reviewedAt, s.id as storeId, s.name as storeName, s.slug as storeSlug,
-            p.id as productId, p.title as productTitle
+            p.id as productId, p.title as productTitle, CASE WHEN p.blockedAt IS NULL THEN 0 ELSE 1 END as productBlocked
      FROM image_checks c
      JOIN stores s ON s.id = c.storeId
      LEFT JOIN products p ON p.id = c.productId
@@ -179,11 +218,91 @@ export async function countPending() {
   return row?.count ?? 0;
 }
 
-/** «Показывать» or «Скрыть»: the moderator's decision. */
-export async function review(id: string, status: "APPROVED" | "REJECTED", reviewerId: string) {
+/** Products the admin took off the storefront, newest first — to put them back after the owner fixed the photos. */
+export async function listBlockedProducts(limit = 200) {
   const db = await getDb();
-  const check = await db.get<{ id: string; storeId: string }>("SELECT id, storeId FROM image_checks WHERE id = ?", id);
+  return db.all<{ id: string; title: string; blockedAt: string; blockedReason: string | null; storeId: string; storeName: string; storeSlug: string; imageUrl: string | null }>(
+    `SELECT p.id, p.title, p.blockedAt, p.blockedReason, s.id as storeId, s.name as storeName, s.slug as storeSlug,
+            (SELECT i.url FROM product_images i WHERE i.productId = p.id ORDER BY i.sortOrder, i.createdAt LIMIT 1) as imageUrl
+     FROM products p JOIN stores s ON s.id = p.storeId
+     WHERE p.blockedAt IS NOT NULL ORDER BY p.blockedAt DESC LIMIT ?`,
+    limit
+  );
+}
+
+/** «Вернуть на витрину»: the product shows again (if the owner keeps it visible); the owner is told. */
+export async function unblockProduct(productId: string) {
+  const db = await getDb();
+  const product = await db.get<{ id: string; storeId: string; title: string }>("SELECT id, storeId, title FROM products WHERE id = ? AND blockedAt IS NOT NULL", productId);
+  if (!product) throw new HttpError(404, "Снятый товар не найден");
+  await db.run("UPDATE products SET blockedAt = NULL, blockedReason = NULL WHERE id = ?", productId);
+  try {
+    await notifyStoreOwner(product.storeId, {
+      source: "SYSTEM",
+      title: "Товар снова на витрине",
+      body: `Товар «${product.title}»: администратор вернул его на витрину, покупатели снова его видят.`,
+      link: `/dashboard/stores/${product.storeId}/products/${product.id}/edit`,
+      topic: `moderation:${product.id}`
+    });
+  } catch (error) {
+    console.error(`Unblock notice failed for ${productId}:`, error);
+  }
+  return product;
+}
+
+export type ReviewDecision = "APPROVED" | "REJECTED" | "PRODUCT_BLOCKED";
+
+/**
+ * The moderator's decision: «Показывать» (APPROVED; a product taken off for
+ * this photo comes back), «Скрыть фото» (REJECTED) or «Снять товар» (the photo
+ * is hidden and the whole product leaves the storefront). The owner gets a
+ * notification either way.
+ */
+export async function review(id: string, decision: ReviewDecision, reviewerId: string) {
+  const db = await getDb();
+  const check = await db.get<{ id: string; storeId: string; kind: ImageKind; productId: string | null; findings: string; url: string }>(
+    "SELECT id, storeId, kind, productId, findings, url FROM image_checks WHERE id = ?",
+    id
+  );
   if (!check) throw new HttpError(404, "Фото на проверке не найдено");
-  await db.run("UPDATE image_checks SET status = ?, reviewedBy = ?, reviewedAt = ? WHERE id = ?", status, reviewerId, new Date().toISOString(), id);
+  if (decision === "PRODUCT_BLOCKED" && !check.productId) throw new HttpError(400, "Снять с витрины можно только товар");
+  const now = new Date().toISOString();
+  await db.run("UPDATE image_checks SET status = ?, reviewedBy = ?, reviewedAt = ? WHERE id = ?", decision === "APPROVED" ? "APPROVED" : "REJECTED", reviewerId, now, id);
+
+  const product = check.productId ? await db.get<{ blockedAt: string | null }>("SELECT blockedAt FROM products WHERE id = ?", check.productId) : undefined;
+  if (decision === "PRODUCT_BLOCKED") {
+    await db.run(
+      "UPDATE products SET blockedAt = ?, blockedReason = ? WHERE id = ?",
+      now,
+      `На фото ${check.findings || "лицо"}. ${RULE}`,
+      check.productId
+    );
+  }
+  const returned = decision === "APPROVED" && Boolean(product?.blockedAt);
+  if (returned) await db.run("UPDATE products SET blockedAt = NULL, blockedReason = NULL WHERE id = ?", check.productId);
+
+  try {
+    const subject = await subjectOf(check);
+    const notices: Record<ReviewDecision, { title: string; body: string }> = {
+      APPROVED: {
+        title: "Проверка пройдена",
+        body: `${subject.name}: администратор проверил ${check.kind === "LOGO" ? "логотип" : "фото"} — нарушений нет.${returned ? " Товар снова на витрине." : ""}`
+      },
+      REJECTED: {
+        title: check.kind === "LOGO" ? "Логотип скрыт администратором" : "Фото скрыто администратором",
+        body:
+          check.kind === "LOGO"
+            ? `${subject.name}: на нём ${check.findings}. ${RULE} Покупатели видят магазин без логотипа. Загрузите другой логотип.`
+            : `${subject.name}: на фото ${check.findings}. ${RULE} Покупатели видят товар без этого фото. Удалите его или замените другим.`
+      },
+      PRODUCT_BLOCKED: {
+        title: "Товар снят с витрины",
+        body: `${subject.name} снят с витрины администратором: на фото ${check.findings}. ${RULE} Покупатели его не видят. Замените фото и напишите администратору, чтобы вернуть товар.`
+      }
+    };
+    await notifyStoreOwner(check.storeId, { source: "SYSTEM", ...notices[decision], link: subject.link, topic: subject.topic });
+  } catch (error) {
+    console.error(`Moderation decision notice failed for ${check.url}:`, error);
+  }
   return check;
 }

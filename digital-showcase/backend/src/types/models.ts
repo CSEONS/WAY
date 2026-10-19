@@ -55,6 +55,9 @@ export interface Product {
   category: string | null;
   status: ProductStatus;
   isVisible: number;
+  /** Taken off the storefront by the admin (photo moderation); null — not blocked. */
+  blockedAt?: string | null;
+  blockedReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

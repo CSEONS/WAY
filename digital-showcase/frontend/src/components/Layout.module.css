@@ -73,8 +73,18 @@
   outline-offset: 2px;
 }
 
-/* On phones «Помощь» is just the icon: the header has room for three items. */
+/* «Кабинет» and «Аккаунт»: an icon next to the word; on phones just the icon. */
+.navIconLink {
+  gap: var(--space-1);
+}
+
+/* On phones «Кабинет», «Помощь» and «Аккаунт» are just icons and the items sit
+   closer: with the bell and «Выйти» the header still fits a 360px screen. */
 @media (max-width: 480px) {
+  .navLink {
+    padding: 0 var(--space-2);
+  }
+
   .navLabel {
     position: absolute;
     width: 1px;

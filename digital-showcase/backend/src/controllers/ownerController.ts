@@ -202,10 +202,12 @@ export const createProductDraft = asyncHandler(async (req, res) => {
 
   const { voice, images } = uploadedAiDraftFiles(req);
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
-  if (!prompt.trim() && !voice) throw new HttpError(400, "Добавьте текстовое или голосовое описание товара");
+  const imageUrls = stringList(req.body.imageUrls);
+  // Photos alone are enough: «Заполнить карточку с ИИ» sends nothing else.
+  if (!prompt.trim() && !voice && !images.length && !imageUrls.length) throw new HttpError(400, "Добавьте фото товара или опишите его голосом или текстом");
   await aiUsageService.assertWithinLimit(store, "DRAFT");
 
-  const { result, usage } = await aiUsageService.measureTokens(() => createProductAiDraft({ prompt, voice, images, imageUrls: stringList(req.body.imageUrls) }));
+  const { result, usage } = await aiUsageService.measureTokens(() => createProductAiDraft({ prompt, voice, images, imageUrls }));
   await aiUsageService.recordUsage(store.id, "DRAFT", 1, usage);
   res.json(result);
 });

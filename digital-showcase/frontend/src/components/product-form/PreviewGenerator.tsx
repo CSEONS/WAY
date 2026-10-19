@@ -147,9 +147,8 @@ export function PreviewGenerator({ drawing, images, coverId, product, onUse, onC
             </div>
           )}
           {chosen.livingBeings.length > 0 && (
-            <Notice tone="warning" title="На превью есть живые существа">
-              {chosen.livingBeings.join(", ")}. С этой обложкой товар после сохранения уйдёт на проверку администратору, и до его решения покупатели её не
-              увидят. Можно нарисовать ещё раз.
+            <Notice tone="warning" title="Подозрение на нарушение правил площадки">
+              Товар будет отправлен на проверку администратору. Если выявится нарушение правил, товар будет отозван.
             </Notice>
           )}
           <p className={styles.hint}>Нравится — нажмите «Сделать обложкой». Нет — поменяйте настройки ниже и нарисуйте ещё.</p>

@@ -1,7 +1,7 @@
 import { HelpCircleIcon, Logout01Icon, ShieldUserIcon } from "@hugeicons/core-free-icons";
 import { lazy, Suspense, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Button, Icon } from "../ui";
+import { Button, ConfirmModal, Icon } from "../ui";
 import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
 import type { User } from "../types/models";
 import { stopImpersonation } from "../utils/impersonation";
@@ -20,13 +20,14 @@ export function Layout({ user }: { user: User | null }) {
   const isInAccount = location.pathname === "/account";
   const storeSlug = location.pathname.match(/^\/m\/([^/]+)/)?.[1];
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   function logout() {
+    // An admin in an owner's account just goes back to the admin panel: nothing to confirm.
     if (user?.impersonatedBy) {
       stopImpersonation();
       return;
     }
-    // The session ends on that page, not here: a screen with unsaved work may ask first and stay.
-    navigate("/logout");
+    setIsLogoutConfirmOpen(true);
   }
 
   return (
@@ -82,6 +83,21 @@ export function Layout({ user }: { user: User | null }) {
             Вернуться в админку
           </Button>
         </div>
+      )}
+      {isLogoutConfirmOpen && (
+        <ConfirmModal
+          title="Выйти из аккаунта?"
+          description="Чтобы вернуться, нужно будет снова ввести логин и пароль."
+          confirmLabel="Выйти"
+          cancelLabel="Остаться"
+          danger
+          onCancel={() => setIsLogoutConfirmOpen(false)}
+          onConfirm={() => {
+            setIsLogoutConfirmOpen(false);
+            // The session ends on that page, not here: a screen with unsaved work may ask first and stay.
+            navigate("/logout");
+          }}
+        />
       )}
       {isHelpOpen && (
         <Suspense fallback={null}>

@@ -266,7 +266,10 @@ async function createExternalProductAiDraft(input: ProductAiDraftInput) {
   const transcript = input.voice ? await transcribeVoice(input.voice) : "";
   const imageUrls = await collectImageInputs(input.images ?? [], input.imageUrls ?? []);
   const descriptionParts = [input.prompt?.trim(), transcript ? `Голосовое описание: ${transcript}` : ""].filter(Boolean);
-  const text = descriptionParts.length ? descriptionParts.join("\n\n") : "Описание товара не задано. Используй изображения, если они приложены.";
+  const text = descriptionParts.length
+    ? descriptionParts.join("\n\n")
+    : // «Заполнить карточку с ИИ»: only photos. Everything visible comes from them; price and sizes aren't guessed.
+      "Описания от владельца нет: заполни карточку только по фотографиям. Определи по ним название, описание для покупателя (ткань, фасон, детали — что видно), категорию и цвета. Размеры указывай, только если они видны на бирке, иначе sizes=[]. Цену не придумывай: price=null.";
 
   const answer = await completeJson({
     instructions: productDraftInstructions,

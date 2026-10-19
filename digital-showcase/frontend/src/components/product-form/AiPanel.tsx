@@ -1,9 +1,9 @@
 import { AiMagicIcon, Mic01Icon, TextFontIcon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
-import { api } from "../../api/client";
 import { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
 import { Button, Card, Field, Notice, SegmentedControl, Textarea } from "../../ui";
 import { VoiceQuestions, VoiceStatus, voiceButtonLabel } from "../VoiceRecorder";
+import { requestAiDraft } from "./aiDraft";
 import type { ProductDraft, ProductFormImage } from "./types";
 import styles from "./ProductForm.module.css";
 
@@ -19,13 +19,14 @@ interface AiPanelProps {
   prompt: string;
   onPromptChange: (prompt: string) => void;
   images: ProductFormImage[];
+  coverId: string | null;
   /** POST endpoint of the store the product belongs to. */
   aiDraftPath: string;
   onDraft: (draft: ProductDraft) => void;
 }
 
 /** Describe the product in text or by voice; the AI fills the form below. */
-export function AiPanel({ prompt, onPromptChange, images, aiDraftPath, onDraft }: AiPanelProps) {
+export function AiPanel({ prompt, onPromptChange, images, coverId, aiDraftPath, onDraft }: AiPanelProps) {
   // Talking is easier than typing on a phone, so voice comes first.
   const [inputMode, setInputMode] = useState<"text" | "voice">("voice");
   const [error, setError] = useState("");
@@ -37,19 +38,15 @@ export function AiPanel({ prompt, onPromptChange, images, aiDraftPath, onDraft }
     setError("");
     setIsLoading(true);
     try {
-      const formData = new FormData();
-      if (prompt.trim()) formData.append("prompt", prompt.trim());
-      for (const image of images) {
-        if (image.file) formData.append("images", image.file);
-        else if (image.url) formData.append("imageUrls", image.url);
-      }
-      if (inputMode === "voice") {
-        if (!recorder.blob) throw new Error("Сначала запишите голосовое сообщение");
-        formData.append("voice", recorder.blob, "product-voice.webm");
-      }
-
-      const { data } = await api.post<ProductDraft>(aiDraftPath, formData);
-      onDraft(data);
+      if (inputMode === "voice" && !recorder.blob) throw new Error("Сначала запишите голосовое сообщение");
+      onDraft(
+        await requestAiDraft(aiDraftPath, {
+          images,
+          coverId,
+          prompt: inputMode === "text" ? prompt : "",
+          voice: inputMode === "voice" ? recorder.blob : null
+        })
+      );
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message ?? "Не удалось заполнить форму");
     } finally {

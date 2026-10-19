@@ -4,6 +4,7 @@ import type { Product, ProductStatus } from "../../types/models";
 import { PRICE_ERROR, isValidPrice, parsePrice } from "../../utils/price";
 import { Button, Card, CardHeader, Chip, ChipGroup, ConfirmModal, Field, Input, Notice, SegmentedControl, Textarea, useToast } from "../../ui";
 import { AiBadge } from "./AiBadge";
+import { requestAiDraft } from "./aiDraft";
 import { AiPanel } from "./AiPanel";
 import { ASK_SELLER, hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
@@ -75,6 +76,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   const [simple, setSimple] = useState<SimpleDetailsValue>(savedDraft?.simple ?? initialSimple ?? emptySimpleDetails);
   const [isSimplifyConfirmOpen, setIsSimplifyConfirmOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isFillingFromPhotos, setIsFillingFromPhotos] = useState(false);
+  const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false);
   const previewDrawing = usePreviewDrawing(aiPreviewPath ?? null, isPreviewOpen);
   const hasSubmittedRef = useRef(false);
   const imageManager = useImageManager(initial);
@@ -146,7 +149,12 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     builder.applyDraftVariants(draft.variants);
     const draftSimple = simpleFromDraft(draft);
     if (draftSimple) {
-      setSimple(draftSimple);
+      // What the AI couldn't tell (the price and sizes are rarely on a photo) keeps the owner's value.
+      setSimple((current) => ({
+        price: draftSimple.price || current.price,
+        sizes: draftSimple.sizes.length ? draftSimple.sizes : current.sizes,
+        colors: draftSimple.colors.length ? draftSimple.colors : current.colors
+      }));
       setMode("simple");
     } else {
       setMode("advanced");
@@ -161,7 +169,36 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     if (draftSimple?.colors.length) filled.add("colors");
     setAiFilled(filled);
     setAiDraftApplied(true);
-    toast.show("ИИ заполнил форму. Проверьте поля с пометкой «ИИ».", { tone: "success" });
+    const noPrice = !draftSimple?.price && !simple.price.trim();
+    toast.show(`ИИ заполнил форму. Проверьте поля с пометкой «ИИ»${noPrice ? " и укажите цену" : ""}.`, { tone: "success", duration: 6000 });
+  }
+
+  // Something the owner typed would be replaced: ask first.
+  const hasOwnerDetails = Boolean(
+    form.title.trim() ||
+      form.description.trim() ||
+      form.category.trim() ||
+      simple.sizes.length ||
+      simple.colors.length ||
+      (mode === "advanced" && variants.some((variant) => variant.colorName.trim() || variant.size.trim()))
+  );
+
+  function askToFillFromPhotos() {
+    if (hasOwnerDetails) setIsReplaceConfirmOpen(true);
+    else void fillFromPhotos();
+  }
+
+  /** «Заполнить карточку с ИИ»: photos are all the AI gets. */
+  async function fillFromPhotos() {
+    setIsReplaceConfirmOpen(false);
+    setIsFillingFromPhotos(true);
+    try {
+      applyDraft(await requestAiDraft(aiDraftPath, { images: imageManager.images, coverId: imageManager.previewImageId }));
+    } catch (err: any) {
+      toast.show(err.response?.data?.message ?? "Не удалось заполнить карточку. Проверьте интернет и попробуйте ещё раз.", { tone: "danger", duration: 6000 });
+    } finally {
+      setIsFillingFromPhotos(false);
+    }
   }
 
   function advancedPayload() {
@@ -251,8 +288,9 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       )}
 
       {aiMode && !aiDraftApplied && (
-        <Notice tone="accent" icon={AiMagicIcon} title="Три шага">
-          1. Сфотографируйте товар. 2. Расскажите о нём голосом или текстом. 3. Проверьте, что заполнил ИИ, и опубликуйте.
+        <Notice tone="accent" icon={AiMagicIcon} title="Хватит фото">
+          Добавьте фото товара и нажмите «Заполнить карточку с ИИ» — ИИ заполнит всё, что видно на фото. Цену и размеры можно надиктовать или написать ниже и нажать
+          «Заполнить форму».
         </Notice>
       )}
 
@@ -271,6 +309,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
 
       <ImageManager
         manager={imageManager}
+        onFillWithAi={aiFormEnabled ? askToFillFromPhotos : undefined}
+        isFilling={isFillingFromPhotos}
         onCreatePreview={aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
         previewLabel={
           previewDrawing.isDrawing
@@ -285,7 +325,14 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       />
 
       {aiMode && !aiDraftApplied && (
-        <AiPanel prompt={aiPrompt} onPromptChange={setAiPrompt} images={imageManager.images} aiDraftPath={aiDraftPath} onDraft={applyDraft} />
+        <AiPanel
+          prompt={aiPrompt}
+          onPromptChange={setAiPrompt}
+          images={imageManager.images}
+          coverId={imageManager.previewImageId}
+          aiDraftPath={aiDraftPath}
+          onDraft={applyDraft}
+        />
       )}
 
       {(!aiMode || aiDraftApplied) && (
@@ -369,6 +416,15 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           }}
           onUse={imageManager.addCover}
           onClose={() => setIsPreviewOpen(false)}
+        />
+      )}
+      {isReplaceConfirmOpen && (
+        <ConfirmModal
+          title="Заполнить карточку заново?"
+          description="ИИ заменит название, описание, категорию, цвета и размеры тем, что увидит на фото. Цена останется вашей, если ИИ её не найдёт."
+          confirmLabel="Заполнить с ИИ"
+          onCancel={() => setIsReplaceConfirmOpen(false)}
+          onConfirm={fillFromPhotos}
         />
       )}
       {isSimplifyConfirmOpen && (

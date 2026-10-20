@@ -1,7 +1,7 @@
 import { DashboardSquare01Icon, HelpCircleIcon, Logout01Icon, ShieldUserIcon, UserCircleIcon } from "@hugeicons/core-free-icons";
 import { lazy, Suspense, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Button, ConfirmModal, Icon } from "../ui";
+import { Button, ConfirmModal, Icon, IconButton, cx, type IconSvgElement } from "../ui";
 import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
 import { NotificationBell } from "./notifications/NotificationBell";
 import type { User } from "../types/models";
@@ -11,14 +11,20 @@ import styles from "./Layout.module.css";
 // Only owners open it: a separate chunk, buyers don't download it.
 const HelpModal = lazy(() => import("./help/HelpModal").then((m) => ({ default: m.HelpModal })));
 
+/** A header link that is just an icon; the page it leads to is highlighted while you're there. */
+function NavIcon({ to, icon, label }: { to: string; icon: IconSvgElement; label: string }) {
+  return (
+    <NavLink to={to} className={({ isActive }) => cx(styles.navIcon, isActive && styles.navIconActive)} aria-label={label} title={label}>
+      <Icon icon={icon} size="sm" />
+    </NavLink>
+  );
+}
+
 export function Layout({ user }: { user: User | null }) {
   const navigate = useNavigate();
   const location = useLocation();
   const hidePublicStoreNav = !user && location.pathname.startsWith("/m/");
   const isLoginPage = location.pathname === "/login";
-  const isInDashboard = location.pathname.startsWith("/dashboard");
-  const isInAdmin = location.pathname.startsWith("/admin");
-  const isInAccount = location.pathname === "/account";
   const storeSlug = location.pathname.match(/^\/m\/([^/]+)/)?.[1];
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
@@ -39,34 +45,25 @@ export function Layout({ user }: { user: User | null }) {
         </Link>
         {!hidePublicStoreNav && (
           <nav className={styles.nav} aria-label="Основная навигация">
-            {user?.role === "ADMIN" && !isInAdmin && (
-              <NavLink to="/admin" className={styles.navLink}>
-                Админка
-              </NavLink>
-            )}
-            {user?.role === "OWNER" && !isInDashboard && (
-              <NavLink to="/dashboard" className={`${styles.navLink} ${styles.navIconLink}`}>
-                <Icon icon={DashboardSquare01Icon} size="sm" />
-                <span className={styles.navLabel}>Кабинет</span>
-              </NavLink>
-            )}
+            {/* Icons only, always all of them; the page you're on is highlighted. Names are in the tooltips. */}
+            {user?.role === "ADMIN" && <NavIcon to="/admin" icon={ShieldUserIcon} label="Админка" />}
+            {user?.role === "OWNER" && <NavIcon to="/dashboard" icon={DashboardSquare01Icon} label="Кабинет" />}
             {user?.role === "OWNER" && <NotificationBell />}
             {user?.role === "OWNER" && (
-              <button type="button" className={`${styles.navLink} ${styles.navButton}`} onClick={() => setIsHelpOpen(true)} aria-label="Помощь">
+              <button
+                type="button"
+                className={cx(styles.navIcon, isHelpOpen && styles.navIconActive)}
+                onClick={() => setIsHelpOpen(true)}
+                aria-label="Помощь"
+                aria-expanded={isHelpOpen}
+                title="Помощь"
+              >
                 <Icon icon={HelpCircleIcon} size="sm" />
-                <span className={styles.navLabel}>Помощь</span>
               </button>
             )}
-            {user && !isInAccount && (
-              <NavLink to="/account" className={`${styles.navLink} ${styles.navIconLink}`}>
-                <Icon icon={UserCircleIcon} size="sm" />
-                <span className={styles.navLabel}>Аккаунт</span>
-              </NavLink>
-            )}
+            {user && <NavIcon to="/account" icon={UserCircleIcon} label="Аккаунт" />}
             {user ? (
-              <Button variant="danger" size="sm" icon={Logout01Icon} onClick={logout}>
-                Выйти
-              </Button>
+              <IconButton variant="danger" size="sm" icon={Logout01Icon} label="Выйти" onClick={logout} />
             ) : (
               !isLoginPage && (
                 <NavLink to="/login" className={styles.navLink}>

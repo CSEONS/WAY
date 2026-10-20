@@ -63,8 +63,9 @@ export function NotificationBell() {
     <>
       <button
         type="button"
-        className={styles.bell}
+        className={cx(styles.bell, isOpen && styles.bellOpen)}
         aria-label={count ? `Уведомления: новых ${count}` : "Уведомления"}
+        aria-expanded={isOpen}
         title="Уведомления"
         onClick={open}
       >

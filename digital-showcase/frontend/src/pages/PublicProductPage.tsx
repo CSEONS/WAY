@@ -198,157 +198,160 @@ export function PublicProductPage() {
 
   return (
     <Page className={styles.page}>
-      <div className={styles.back}>
+      <div>
         <BackLink to={`/m/${storeSlug}`}>{store.name}</BackLink>
       </div>
-      <div className={styles.gallery}>
-        {selectedImage ? (
-          <>
-            <button type="button" className={styles.galleryMain} aria-label="Открыть фото на весь экран" onClick={() => setIsViewerOpen(true)}>
-              <ProductPhoto key={selectedImage.id} src={selectedImage.url} sizes={MAIN_PHOTO_SIZES} alt={product.title} loading="eager" />
-            </button>
-            {product.images.length > 1 && (
-              <div className={styles.thumbs}>
-                {product.images.map((image) => (
-                  <button
-                    type="button"
-                    key={image.id}
-                    className={cx(styles.thumb, image.id === selectedImage.id && styles.thumbActive)}
-                    aria-label="Показать фото"
-                    aria-pressed={image.id === selectedImage.id}
-                    onClick={() => setSelectedImageId(image.id)}
-                  >
-                    <ProductPhoto src={image.url} sizes="96px" />
-                  </button>
+      {/* Its own grid: the sticky info card stops here, before the footer. */}
+      <div className={styles.layout}>
+        <div className={styles.gallery}>
+          {selectedImage ? (
+            <>
+              <button type="button" className={styles.galleryMain} aria-label="Открыть фото на весь экран" onClick={() => setIsViewerOpen(true)}>
+                <ProductPhoto key={selectedImage.id} src={selectedImage.url} sizes={MAIN_PHOTO_SIZES} alt={product.title} loading="eager" />
+              </button>
+              {product.images.length > 1 && (
+                <div className={styles.thumbs}>
+                  {product.images.map((image) => (
+                    <button
+                      type="button"
+                      key={image.id}
+                      className={cx(styles.thumb, image.id === selectedImage.id && styles.thumbActive)}
+                      aria-label="Показать фото"
+                      aria-pressed={image.id === selectedImage.id}
+                      onClick={() => setSelectedImageId(image.id)}
+                    >
+                      <ProductPhoto src={image.url} sizes="96px" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className={styles.galleryEmpty}>
+              <Icon icon={Image01Icon} size="lg" strokeWidth={1.6} />
+            </div>
+          )}
+        </div>
+        <Card as="article" padding="lg" className={styles.info}>
+          <div className={styles.titleRow}>
+            <div className={styles.titleText}>
+              {isNewProduct(product.createdAt) && product.status !== "NOT_AVAILABLE" && (
+                <Badge tone="accent" className={styles.newBadge}>
+                  Новинка
+                </Badge>
+              )}
+              <h1 className={styles.title}>{product.title}</h1>
+            </div>
+            <div className={styles.titleActions}>
+              <FavoriteButton active={isFavorite} onToggle={() => favorites.toggle(product.id)} />
+              <ShareButton url={productUrl} title={product.title} variant="neutral" className={styles.share} />
+            </div>
+          </div>
+          <p className={styles.price}>{product.priceText ? `Цена: ${displayedPriceText}` : displayedPriceText}</p>
+          {product.description && <p className={styles.description}>{product.description}</p>}
+          {variants.length ? (
+            <div className={styles.variants}>
+              <div className={styles.variantGroup}>
+                <SectionLabel>Цвет</SectionLabel>
+                <ChipGroup label="Цвет">
+                  {colorOptions.map((color) => (
+                    <ColorSwatch
+                      key={color.colorName}
+                      color={color.colorHex}
+                      label={color.colorName}
+                      size="lg"
+                      selected={color.colorName === selectedColor}
+                      disabled={Boolean(selectedSize) && !availableColorNames.has(color.colorName)}
+                      onClick={() => chooseColor(color.colorName)}
+                    />
+                  ))}
+                </ChipGroup>
+              </div>
+              <div className={styles.variantGroup}>
+                <SectionLabel>Размер</SectionLabel>
+                <ChipGroup label="Размер">
+                  {sizeOptions.map((size) => (
+                    <Chip
+                      key={size}
+                      selected={size === selectedSize}
+                      disabled={Boolean(selectedColor) && !availableSizes.has(size)}
+                      onClick={() => chooseSize(size)}
+                    >
+                      {size}
+                    </Chip>
+                  ))}
+                </ChipGroup>
+              </div>
+              <Button variant="ghost" size="sm" className={styles.reset} onClick={resetVariantSelection} disabled={!firstChoice}>
+                Сбросить выбор
+              </Button>
+            </div>
+          ) : (
+            (product.sizes.length > 0 || product.colors.length > 0) && (
+              <div className={styles.staticAttrs}>
+                {sortSizes(product.sizes.map((s) => s.value)).map((size) => (
+                  <Badge key={size}>{size}</Badge>
+                ))}
+                {product.colors.map((c) => (
+                  <Badge key={c.id}>{c.name}</Badge>
                 ))}
               </div>
+            )
+          )}
+          <p className={cx(styles.availability, availability.tone)}>
+            <Icon icon={availability.icon} size="sm" />
+            <strong>Наличие:</strong> {availability.label}
+          </p>
+          {data.viewerIsOwner ? (
+            <div className={styles.ownerShare}>
+              {product.blockedAt ? (
+                <Notice tone="danger" title="Снят с витрины администратором">
+                  {product.blockedReason ? `${product.blockedReason} ` : ""}Покупатели не видят этот товар. Замените фото и напишите администратору, чтобы вернуть его.
+                </Notice>
+              ) : product.isVisible ? (
+                <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
+                  Поделиться в соцсетях
+                </Button>
+              ) : (
+                <Notice tone="warning" title="Скрыт с витрины">
+                  Покупатели не видят этот товар. Вам он открывается, потому что вы владелец.
+                </Notice>
+              )}
+              <div className={styles.ownerActions}>
+                <ButtonLink variant="secondary" icon={Edit02Icon} to={`/dashboard/stores/${store.id}/products/${product.id}/edit`}>
+                  Редактировать
+                </ButtonLink>
+                <Button variant="secondary" icon={MoreHorizontalIcon} onClick={() => setOwnerWindow("actions")}>
+                  Ещё действия
+                </Button>
+              </div>
+              <small>Это ваш товар. Покупатели видят здесь «Связаться»: WhatsApp, Telegram, звонок и другие ваши контакты.</small>
+            </div>
+          ) : hasContacts(store) ? (
+            <ContactButton block store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} />
+          ) : (
+            <Notice tone="neutral">Магазин не указал контакты — загляните к ним лично{store.address ? ` по адресу: ${store.address}` : ""}.</Notice>
+          )}
+          <div className={styles.store}>
+            <Link to={`/m/${storeSlug}`} className={styles.storeName}>
+              <Icon icon={Store01Icon} size="sm" />
+              {store.name}
+            </Link>
+            {store.address && (
+              <a href={mapsUrl(store.address)} target="_blank" rel="noreferrer" className={styles.storeFact}>
+                <Icon icon={Location01Icon} size="sm" />
+                {store.address}
+              </a>
             )}
-          </>
-        ) : (
-          <div className={styles.galleryEmpty}>
-            <Icon icon={Image01Icon} size="lg" strokeWidth={1.6} />
+            {store.workingHours && (
+              <span className={styles.storeFact}>
+                <Icon icon={Clock01Icon} size="sm" />
+                {store.workingHours}
+              </span>
+            )}
           </div>
-        )}
+        </Card>
       </div>
-      <Card as="article" padding="lg" className={styles.info}>
-        <div className={styles.titleRow}>
-          <div className={styles.titleText}>
-            {isNewProduct(product.createdAt) && product.status !== "NOT_AVAILABLE" && (
-              <Badge tone="accent" className={styles.newBadge}>
-                Новинка
-              </Badge>
-            )}
-            <h1 className={styles.title}>{product.title}</h1>
-          </div>
-          <div className={styles.titleActions}>
-            <FavoriteButton active={isFavorite} onToggle={() => favorites.toggle(product.id)} />
-            <ShareButton url={productUrl} title={product.title} variant="neutral" className={styles.share} />
-          </div>
-        </div>
-        <p className={styles.price}>{product.priceText ? `Цена: ${displayedPriceText}` : displayedPriceText}</p>
-        {product.description && <p className={styles.description}>{product.description}</p>}
-        {variants.length ? (
-          <div className={styles.variants}>
-            <div className={styles.variantGroup}>
-              <SectionLabel>Цвет</SectionLabel>
-              <ChipGroup label="Цвет">
-                {colorOptions.map((color) => (
-                  <ColorSwatch
-                    key={color.colorName}
-                    color={color.colorHex}
-                    label={color.colorName}
-                    size="lg"
-                    selected={color.colorName === selectedColor}
-                    disabled={Boolean(selectedSize) && !availableColorNames.has(color.colorName)}
-                    onClick={() => chooseColor(color.colorName)}
-                  />
-                ))}
-              </ChipGroup>
-            </div>
-            <div className={styles.variantGroup}>
-              <SectionLabel>Размер</SectionLabel>
-              <ChipGroup label="Размер">
-                {sizeOptions.map((size) => (
-                  <Chip
-                    key={size}
-                    selected={size === selectedSize}
-                    disabled={Boolean(selectedColor) && !availableSizes.has(size)}
-                    onClick={() => chooseSize(size)}
-                  >
-                    {size}
-                  </Chip>
-                ))}
-              </ChipGroup>
-            </div>
-            <Button variant="ghost" size="sm" className={styles.reset} onClick={resetVariantSelection} disabled={!firstChoice}>
-              Сбросить выбор
-            </Button>
-          </div>
-        ) : (
-          (product.sizes.length > 0 || product.colors.length > 0) && (
-            <div className={styles.staticAttrs}>
-              {sortSizes(product.sizes.map((s) => s.value)).map((size) => (
-                <Badge key={size}>{size}</Badge>
-              ))}
-              {product.colors.map((c) => (
-                <Badge key={c.id}>{c.name}</Badge>
-              ))}
-            </div>
-          )
-        )}
-        <p className={cx(styles.availability, availability.tone)}>
-          <Icon icon={availability.icon} size="sm" />
-          <strong>Наличие:</strong> {availability.label}
-        </p>
-        {data.viewerIsOwner ? (
-          <div className={styles.ownerShare}>
-            {product.blockedAt ? (
-              <Notice tone="danger" title="Снят с витрины администратором">
-                {product.blockedReason ? `${product.blockedReason} ` : ""}Покупатели не видят этот товар. Замените фото и напишите администратору, чтобы вернуть его.
-              </Notice>
-            ) : product.isVisible ? (
-              <Button variant="primary" size="lg" block icon={Share08Icon} onClick={() => setIsShareOpen(true)}>
-                Поделиться в соцсетях
-              </Button>
-            ) : (
-              <Notice tone="warning" title="Скрыт с витрины">
-                Покупатели не видят этот товар. Вам он открывается, потому что вы владелец.
-              </Notice>
-            )}
-            <div className={styles.ownerActions}>
-              <ButtonLink variant="secondary" icon={Edit02Icon} to={`/dashboard/stores/${store.id}/products/${product.id}/edit`}>
-                Редактировать
-              </ButtonLink>
-              <Button variant="secondary" icon={MoreHorizontalIcon} onClick={() => setOwnerWindow("actions")}>
-                Ещё действия
-              </Button>
-            </div>
-            <small>Это ваш товар. Покупатели видят здесь «Связаться»: WhatsApp, Telegram, звонок и другие ваши контакты.</small>
-          </div>
-        ) : hasContacts(store) ? (
-          <ContactButton block store={store} storeSlug={storeSlug} productId={product.id} message={askMessage} />
-        ) : (
-          <Notice tone="neutral">Магазин не указал контакты — загляните к ним лично{store.address ? ` по адресу: ${store.address}` : ""}.</Notice>
-        )}
-        <div className={styles.store}>
-          <Link to={`/m/${storeSlug}`} className={styles.storeName}>
-            <Icon icon={Store01Icon} size="sm" />
-            {store.name}
-          </Link>
-          {store.address && (
-            <a href={mapsUrl(store.address)} target="_blank" rel="noreferrer" className={styles.storeFact}>
-              <Icon icon={Location01Icon} size="sm" />
-              {store.address}
-            </a>
-          )}
-          {store.workingHours && (
-            <span className={styles.storeFact}>
-              <Icon icon={Clock01Icon} size="sm" />
-              {store.workingHours}
-            </span>
-          )}
-        </div>
-      </Card>
       {isViewerOpen && selectedImage && (
         <PhotoViewer
           images={product.images.map((image) => image.url)}

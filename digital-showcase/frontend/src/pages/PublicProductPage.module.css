@@ -2,12 +2,16 @@
   gap: var(--space-5);
 }
 
-.back {
-  grid-column: 1 / -1;
+/* Gallery and info side by side. A grid of their own, not the page's: the
+   sticky info card is held inside it and can't slide over the footer. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
 }
 
 @media (min-width: 720px) {
-  .page {
+  .layout {
     grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.75fr);
     align-items: start;
   }

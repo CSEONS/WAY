@@ -1,3 +1,4 @@
+import type { Request } from "express";
 import { optionalUser } from "../middleware/authMiddleware.js";
 import { asyncHandler, HttpError } from "../utils/http.js";
 import * as storeService from "../services/storeService.js";
@@ -21,9 +22,15 @@ async function publicStore(slug: string) {
   return { ...store, logoUrl: await publicLogo(store.logoUrl) };
 }
 
+/** The store's owner or an admin is looking, not a buyer: their visits don't go into the statistics. */
+function isStaff(req: Request, ownerId: string) {
+  const viewer = optionalUser(req);
+  return viewer?.role === "ADMIN" || (viewer?.role === "OWNER" && viewer.userId === ownerId);
+}
+
 export const getStore = asyncHandler(async (req, res) => {
   const store = await publicStore(String(req.params.slug));
-  await analyticsService.recordStoreView(store.id);
+  if (!isStaff(req, store.ownerId)) await analyticsService.recordStoreView(store.id);
   res.json(store);
 });
 
@@ -87,6 +94,6 @@ export const getProduct = asyncHandler(async (req, res) => {
   const productId = String(req.params.productId);
   const product = (await productService.getProduct(productId, store.id, true)) ?? (viewerIsOwner ? await productService.getProduct(productId, store.id) : null);
   if (!product) throw new HttpError(404, "Товар не найден");
-  if (!viewerIsOwner) await analyticsService.recordProductView(store.id, product.id);
+  if (!isStaff(req, store.ownerId)) await analyticsService.recordProductView(store.id, product.id);
   res.json({ store, product, viewerIsOwner });
 });

@@ -37,6 +37,8 @@ export interface Store {
   /** Owner's app only: «Превью с ИИ» can be drawn (the server can; the plan or a package allows). */
   aiPreviewEnabled?: boolean;
   subscriptionEndsAt: string | null;
+  /** The admin stopped serving it after it stopped paying («Отклонить»); null — served. */
+  servingEndedAt?: string | null;
   /** AI cards per month; null — the server default. */
   aiMonthlyLimit?: number | null;
   /** AI previews and cards bought in packages and not spent yet. */
@@ -250,11 +252,13 @@ export interface SupportContacts {
 export interface OwnerSubscription {
   subscription: SubscriptionInfo;
   /** The store's plan; null if it has none. */
-  plan: { name: string; price: number | null; aiEnabled: boolean; aiMonthlyLimit: number | null } | null;
+  plan: { name: string; price: number | null; aiEnabled: boolean; aiMonthlyLimit: number | null; reportsAnytime: boolean } | null;
   graceDays: number;
   ai: AiStatus;
   payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "receipt" | "packageName" | "createdAt">[];
+  /** Empty unless the plan has «Итоги в любой день»: the others get month results in a notification. */
   reports: MonthReport[];
+  reportsAnytime: boolean;
   support: SupportContacts;
   /** Packages the owner can ask for. */
   packages: PublicPackage[];
@@ -276,6 +280,7 @@ export interface OverviewStore {
   planId: string | null;
   planName: string | null;
   subscriptionEndsAt: string | null;
+  servingEndedAt: string | null;
   subscription: SubscriptionInfo;
   productCount: number;
   visibleProductCount: number;
@@ -288,6 +293,8 @@ export interface AdminOverview {
   stores: OverviewStore[];
   expiring: OverviewStore[];
   overdue: OverviewStore[];
+  /** «Не обслуживается»: declined after not paying; their data still has to be deleted in time. */
+  declined: OverviewStore[];
   inactive: OverviewStore[];
   revenue: { byMonth: MonthRevenue[]; thisMonth: number };
   ai: AiSpend;
@@ -328,6 +335,8 @@ export interface AdminPlan extends Plan {
   id: string;
   aiEnabled: number;
   aiMonthlyLimit: number | null;
+  /** «Полная версия»: month results in the owner's app any day. */
+  reportsAnytime: number;
   highlighted: number;
   /** Shown on the landing; a hidden plan still works for its stores. */
   isPublic: number;

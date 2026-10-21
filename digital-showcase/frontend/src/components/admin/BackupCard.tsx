@@ -1,4 +1,4 @@
-import { DatabaseRestoreIcon } from "@hugeicons/core-free-icons";
+import { DatabaseRestoreIcon, Download01Icon } from "@hugeicons/core-free-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { Badge, Button, Card, CardHeader, Notice, ProgressBar, useToast } from "../../ui";
@@ -60,6 +60,7 @@ export function BackupCard() {
   const toast = useToast();
   const [data, setData] = useState<BackupsResponse>();
   const [isStarting, setIsStarting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const poll = useRef<number | undefined>(undefined);
   const wasRunning = useRef(false);
 
@@ -97,6 +98,28 @@ export function BackupCard() {
     }
   }
 
+  /** A fresh copy of the database straight to this computer (the photos aren't in it). */
+  async function download() {
+    setIsDownloading(true);
+    try {
+      const response = await api.get<Blob>("/admin/backups/download", { responseType: "blob" });
+      const name = /filename="([^"]+)"/.exec(String(response.headers["content-disposition"] ?? ""))?.[1] ?? "database.sqlite.gz";
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      toast.show("Копия базы сохранена в загрузки", { tone: "success" });
+    } catch {
+      toast.show("Не удалось скачать копию базы", { tone: "danger" });
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
   if (!data) return null;
   const { settings, runs, progress } = data;
   const lastOk = runs.find((run) => run.status === "OK");
@@ -110,9 +133,14 @@ export function BackupCard() {
         title="Резервные копии"
         description={`Каждый день в ${String(settings.hour).padStart(2, "0")}:00: база и новые фото`}
         actions={
-          <Button variant="secondary" size="sm" icon={DatabaseRestoreIcon} loading={isStarting || latest?.status === "RUNNING"} onClick={startNow}>
-            Сделать копию сейчас
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" icon={DatabaseRestoreIcon} loading={isStarting || latest?.status === "RUNNING"} onClick={startNow}>
+              Сделать копию сейчас
+            </Button>
+            <Button variant="outline" size="sm" icon={Download01Icon} loading={isDownloading} onClick={download} title="Свежая копия базы: магазины, товары, владельцы, оплаты. Фото в неё не входят">
+              Скачать на компьютер
+            </Button>
+          </>
         }
       />
       {latest?.status === "RUNNING" && (

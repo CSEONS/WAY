@@ -257,6 +257,8 @@ export function AdminStoresPage() {
                   <div className={styles.rowMeta}>
                     {store.isActive ? (
                       <Badge tone={subscriptionBadge(store.subscription).tone}>{subscriptionBadge(store.subscription).label}</Badge>
+                    ) : store.servingEndedAt ? (
+                      <Badge tone="danger">Не обслуживается</Badge>
                     ) : (
                       <Badge tone="neutral">В архиве</Badge>
                     )}

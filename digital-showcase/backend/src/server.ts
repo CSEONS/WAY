@@ -11,6 +11,7 @@ import { closeDb, initDatabase } from "./database/db.js";
 import { reportProblem } from "./services/alertService.js";
 import { startBackupSchedule } from "./services/backupService.js";
 import { ensureThumbnails } from "./services/imageService.js";
+import { startMonthlyReports } from "./services/monthlyReportService.js";
 import { loadSettings } from "./services/settingsService.js";
 
 const port = Number(process.env.PORT ?? 4000);
@@ -30,6 +31,8 @@ ensureThumbnails()
   .catch((error) => console.error("Thumbnail backfill failed", error));
 
 await startBackupSchedule();
+// Last month's results go to the owners as notifications.
+startMonthlyReports();
 
 process.on("unhandledRejection", (error) => void reportProblem("Необработанная ошибка на сервере", error));
 process.on("uncaughtException", (error) => {

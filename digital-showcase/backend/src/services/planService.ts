@@ -19,6 +19,8 @@ export interface Plan {
   aiEnabled: number;
   /** AI cards a month on this plan; null when there's no AI. A store can have its own. */
   aiMonthlyLimit: number | null;
+  /** «Полная версия»: month results in the owner's app any day. Without it they arrive in a notification at the month's end. */
+  reportsAnytime: number;
   /** The plan most people should pick: accented on the landing. At most one. */
   highlighted: number;
   /** Shown on the landing. A hidden plan still works for the stores on it. */
@@ -28,7 +30,8 @@ export interface Plan {
   updatedAt: string;
 }
 
-export type PlanInput = Pick<Plan, "name" | "price" | "description" | "features" | "aiEnabled" | "aiMonthlyLimit" | "highlighted" | "isPublic">;
+export type PlanInput = Pick<Plan, "name" | "price" | "description" | "features" | "aiEnabled" | "aiMonthlyLimit" | "highlighted" | "isPublic"> &
+  Partial<Pick<Plan, "reportsAnytime">>;
 
 type PlanRow = Omit<Plan, "features"> & { features: string };
 
@@ -114,7 +117,7 @@ export async function savePlan(id: string | null, input: PlanInput) {
     const current = await getPlan(planId);
     if (!current) throw new HttpError(404, "Тариф не найден");
     await db.run(
-      `UPDATE plans SET name = ?, price = ?, description = ?, features = ?, aiEnabled = ?, aiMonthlyLimit = ?, highlighted = ?, isPublic = ?, updatedAt = ? WHERE id = ?`,
+      `UPDATE plans SET name = ?, price = ?, description = ?, features = ?, aiEnabled = ?, aiMonthlyLimit = ?, highlighted = ?, isPublic = ?, reportsAnytime = ?, updatedAt = ? WHERE id = ?`,
       input.name,
       input.price,
       input.description,
@@ -123,6 +126,7 @@ export async function savePlan(id: string | null, input: PlanInput) {
       aiMonthlyLimit,
       input.highlighted,
       input.isPublic,
+      input.reportsAnytime ? 1 : 0,
       now,
       planId
     );
@@ -130,8 +134,8 @@ export async function savePlan(id: string | null, input: PlanInput) {
     planId = crypto.randomUUID();
     const last = await db.get<{ sortOrder: number | null }>("SELECT MAX(sortOrder) as sortOrder FROM plans");
     await db.run(
-      `INSERT INTO plans (id, name, price, description, features, aiEnabled, aiMonthlyLimit, highlighted, isPublic, sortOrder, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO plans (id, name, price, description, features, aiEnabled, aiMonthlyLimit, highlighted, isPublic, reportsAnytime, sortOrder, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       planId,
       input.name,
       input.price,
@@ -141,6 +145,7 @@ export async function savePlan(id: string | null, input: PlanInput) {
       aiMonthlyLimit,
       input.highlighted,
       input.isPublic,
+      input.reportsAnytime ? 1 : 0,
       (last?.sortOrder ?? -1) + 1,
       now,
       now

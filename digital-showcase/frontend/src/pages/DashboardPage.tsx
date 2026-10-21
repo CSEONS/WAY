@@ -5,12 +5,14 @@ import {
   CheckListIcon,
   CheckmarkCircle02Icon,
   Copy01Icon,
+  DashboardSquare01Icon,
   Delete02Icon,
   Exchange01Icon,
   EyeIcon,
   Home01Icon,
   InformationCircleIcon,
   Link04Icon,
+  LinkSquare02Icon,
   Message01Icon,
   Package01Icon,
   PackageRemoveIcon,
@@ -20,6 +22,7 @@ import {
   Settings01Icon,
   ShoppingBag01Icon,
   Store01Icon,
+  UserCircleIcon,
   ViewIcon,
   ViewOffSlashIcon
 } from "@hugeicons/core-free-icons";
@@ -51,6 +54,7 @@ import {
   Input,
   LoadingState,
   Menu,
+  Modal,
   Notice,
   Page,
   PageHeader,
@@ -65,7 +69,7 @@ import styles from "./DashboardPage.module.css";
 
 type StoreAnalytics = { productCount: number; storeViews: number; productViews: number; contactClicks: number };
 type ListFilter = "all" | "visible" | "hidden" | "unavailable";
-type SectionView = "products" | "stats";
+type SectionView = "products" | "stats" | "sections";
 /** «Выбрать»: what can be done with several products at once (POST …/products/bulk). */
 type BulkAction = "show" | "hide" | "available" | "unavailable" | "delete";
 
@@ -93,6 +97,30 @@ const bulkDone: Record<BulkAction, string> = {
 };
 
 const emptyAnalytics: StoreAnalytics = { productCount: 0, storeViews: 0, productViews: 0, contactClicks: 0 };
+
+/** «Как считается статистика»: what makes each number grow. Mirrors the server (analytics events). */
+const statsRules: { icon: typeof EyeIcon; title: string; text: string }[] = [
+  {
+    icon: EyeIcon,
+    title: "Просмотры витрины",
+    text: "+1, когда человек открыл витрину: перешёл по ссылке из WhatsApp или соцсетей, навёл камеру на QR-код или открыл её из закладок. Каждое открытие считается отдельно, даже если это тот же человек."
+  },
+  {
+    icon: Analytics01Icon,
+    title: "Просмотры товаров",
+    text: "+1, когда покупатель открыл карточку товара: нажал на товар на витрине или перешёл по ссылке на сам товар."
+  },
+  {
+    icon: Message01Icon,
+    title: "Написали или позвонили",
+    text: "+1, когда покупатель нажал «WhatsApp», «Telegram», «Instagram», «ВКонтакте» или «Позвонить» на витрине или в карточке товара. Считается нажатие — отправил ли он сообщение, мы не знаем."
+  },
+  {
+    icon: Package01Icon,
+    title: "Товары",
+    text: "«Всего», «На витрине», «Скрыто» и «Нет в наличии» — сколько товаров сейчас, а не за какое-то время."
+  }
+];
 
 const filterMatchers: Record<ListFilter, (product: Product) => boolean> = {
   all: () => true,
@@ -124,23 +152,37 @@ function StoreAvatar({ store }: { store: Store }) {
 
 function PublicLink({ store, url }: { store: Store; url: string }) {
   const copy = useCopyToClipboard();
+  const [isCopied, setIsCopied] = useState(false);
+  const address = url.replace(/^https?:\/\//, "");
+  const base = address.slice(0, address.length - store.slug.length);
+
+  async function copyLink() {
+    if (!(await copy(url, "Ссылка скопирована"))) return;
+    markStoreShared(store.id);
+    setIsCopied(true);
+    window.setTimeout(() => setIsCopied(false), 2000);
+  }
+
   return (
     <div className={styles.linkValue}>
-      <a className={styles.link} href={`/m/${store.slug}`}>
-        {url.replace(/^https?:\/\//, "")}
-      </a>
-      <div className={styles.linkActions}>
-        <Button
-          variant="neutral"
-          size="sm"
-          icon={Copy01Icon}
-          onClick={async () => {
-            if (await copy(url, "Ссылка скопирована")) markStoreShared(store.id);
-          }}
-        >
-          Копировать
+      <div className={styles.linkField}>
+        <a className={styles.link} href={`/m/${store.slug}`} title="Открыть витрину, как её видят покупатели">
+          <span className={styles.linkIcon}>
+            <Icon icon={Link04Icon} size="sm" />
+          </span>
+          {/* On a narrow screen the start gives way first: the store's own part stays readable. */}
+          <span className={styles.linkAddress}>
+            <span className={styles.linkBase}>{base}</span>
+            <strong>{store.slug}</strong>
+          </span>
+          <Icon icon={LinkSquare02Icon} size="sm" className={styles.linkOpen} />
+        </a>
+        <Button variant="primary" size="sm" icon={isCopied ? CheckmarkCircle02Icon : Copy01Icon} onClick={copyLink} className={styles.copyButton}>
+          {isCopied ? "Скопировано" : "Копировать"}
         </Button>
-        <QrShareButton url={url} label="QR" onOpen={() => markStoreShared(store.id)} />
+      </div>
+      <div className={styles.linkActions}>
+        <QrShareButton url={url} label="QR-код" onOpen={() => markStoreShared(store.id)} />
         <ButtonLink variant="outline" size="sm" icon={PrinterIcon} to={`/dashboard/stores/${store.id}/poster`}>
           Плакат
         </ButtonLink>
@@ -198,6 +240,9 @@ export function DashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState("new");
   const [view, setView] = useState<SectionView>("products");
+  const [isStatsHelpOpen, setIsStatsHelpOpen] = useState(false);
+  // «Назад» from «Аккаунт» comes back to «Разделы».
+  const requestedView = (routerLocation.state as { view?: SectionView } | null)?.view;
   // «Выбрать»: ticked products and whether a bulk action is running.
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -248,6 +293,10 @@ export function DashboardPage() {
     }),
     [products]
   );
+
+  useEffect(() => {
+    if (requestedView) setView(requestedView);
+  }, [requestedView, storeId]);
 
   // Another search or filter: what was ticked may be out of sight, so the choice starts over.
   useEffect(() => setSelectedIds(new Set()), [search, listFilter, categoryFilter, storeId]);
@@ -387,12 +436,20 @@ export function DashboardPage() {
 
   if (!storeId) {
     if (stores.length === 1 && !(routerLocation.state as { showAll?: boolean } | null)?.showAll) {
-      return <Navigate to={`/dashboard/stores/${stores[0].id}`} replace />;
+      return <Navigate to={`/dashboard/stores/${stores[0].id}`} state={routerLocation.state} replace />;
     }
 
     return (
       <Page>
-        <PageHeader title="Кабинет владельца" description="Выберите магазин, чтобы добавлять товары и менять реквизиты." />
+        <PageHeader
+          title="Кабинет владельца"
+          description="Выберите магазин, чтобы добавлять товары и менять реквизиты."
+          actions={
+            <ButtonLink variant="secondary" icon={UserCircleIcon} to="/account">
+              Аккаунт
+            </ButtonLink>
+          }
+        />
         {stores.length ? (
           <div className={styles.storeGrid}>
             {stores.map((store) => (
@@ -496,7 +553,7 @@ export function DashboardPage() {
             <Icon icon={Calendar03Icon} size="sm" />
             {subscriptionBadge(subscription).label}
             <span className={styles.subscriptionMore}>
-              Подписка и итоги месяца
+              Подписка и оплата
               <Icon icon={ArrowRight01Icon} size="xs" />
             </span>
           </Link>
@@ -536,7 +593,8 @@ export function DashboardPage() {
           }}
           options={[
             { value: "products", label: `Товары · ${products.length}`, icon: Package01Icon },
-            { value: "stats", label: "Статистика", icon: Analytics01Icon }
+            { value: "stats", label: "Статистика", icon: Analytics01Icon },
+            { value: "sections", label: "Разделы", icon: DashboardSquare01Icon }
           ]}
           className={styles.viewSwitch}
         />
@@ -552,10 +610,34 @@ export function DashboardPage() {
               <Stat icon={Analytics01Icon} label="Просмотры товаров" value={analytics.productViews} />
               <Stat icon={Message01Icon} label="Написали или позвонили" value={analytics.contactClicks} />
             </div>
-            <Link to={`/dashboard/stores/${selectedStore.id}/subscription`} className={styles.statsMore}>
-              Итоги по месяцам — в «Подписка и итоги»
-              <Icon icon={ArrowRight01Icon} size="xs" />
-            </Link>
+            <div className={styles.statsFoot}>
+              <Button variant="secondary" size="sm" icon={InformationCircleIcon} onClick={() => setIsStatsHelpOpen(true)}>
+                Как считается статистика
+              </Button>
+              <p className={styles.statsNote}>Цифры — за всё время. Итоги каждого месяца приходят в уведомления в начале следующего.</p>
+            </div>
+          </Card>
+        )}
+
+        {view === "sections" && (
+          <Card as="section" padding="lg">
+            <nav className={styles.tiles} aria-label="Разделы кабинета">
+              {[
+                { to: `/dashboard/stores/${selectedStore.id}/settings`, label: "Реквизиты магазина", icon: Settings01Icon },
+                { to: `/dashboard/stores/${selectedStore.id}/subscription`, label: "Подписка и оплата", icon: Calendar03Icon },
+                { to: `/dashboard/stores/${selectedStore.id}/poster`, label: "Плакат с QR-кодом", icon: PrinterIcon },
+                { to: "/account", label: "Аккаунт: логин и пароль", icon: UserCircleIcon },
+                ...(stores.length > 1 ? [{ to: "/dashboard", label: "Другой магазин", icon: Exchange01Icon, state: { showAll: true } }] : [])
+              ].map((section) => (
+                <Link key={section.to} to={section.to} state={"state" in section ? section.state : undefined} className={styles.tile}>
+                  <span className={styles.tileLabel}>
+                    <Icon icon={section.icon} size="md" />
+                    {section.label}
+                  </span>
+                  <Icon icon={ArrowRight01Icon} size="sm" />
+                </Link>
+              ))}
+            </nav>
           </Card>
         )}
 
@@ -714,6 +796,36 @@ export function DashboardPage() {
           onCancel={() => setProductToDelete(null)}
           onConfirm={deleteProduct}
         />
+      )}
+      {isStatsHelpOpen && (
+        <Modal
+          title="Как считается статистика"
+          description="Что должно произойти, чтобы цифра выросла"
+          icon={Analytics01Icon}
+          onClose={() => setIsStatsHelpOpen(false)}
+          footer={
+            <Button variant="primary" onClick={() => setIsStatsHelpOpen(false)}>
+              Понятно
+            </Button>
+          }
+        >
+          <ul className={styles.statsRules}>
+            {statsRules.map((rule) => (
+              <li key={rule.title} className={styles.statsRule}>
+                <span className={styles.statsRuleIcon}>
+                  <Icon icon={rule.icon} size="sm" />
+                </span>
+                <span>
+                  <strong>{rule.title}</strong>
+                  <span className={styles.statsRuleText}>{rule.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.statsNote}>
+            Ваши собственные заходы на витрину не считаются, если вы вошли в кабинет на этом телефоне или компьютере.
+          </p>
+        </Modal>
       )}
       {productToReprice && (
         <PriceModal product={productToReprice} storeId={selectedStore.id} onClose={() => setProductToReprice(null)} onSaved={replaceProduct} />

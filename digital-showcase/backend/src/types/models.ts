@@ -41,6 +41,8 @@ export interface Store {
   /** AI previews and AI cards bought in packages and not spent yet; they don't burn at the month's end. */
   extraPreviews: number;
   extraFills: number;
+  /** The admin declined to serve it after it stopped paying («Отклонить»); null — served. */
+  servingEndedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

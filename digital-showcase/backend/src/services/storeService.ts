@@ -97,7 +97,7 @@ export async function updateStore(id: string, input: Partial<Store>) {
   const db = await getDb();
   await db.run(
     `UPDATE stores SET ownerId = ?, name = ?, slug = ?, description = ?, address = ?, phone = ?, whatsapp = ?, telegram = ?, instagram = ?, vk = ?,
-     logoUrl = ?, workingHours = ?, isActive = ?, planId = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, aiMonthlyLimit = ?, updatedAt = ? WHERE id = ?`,
+     logoUrl = ?, workingHours = ?, isActive = ?, planId = ?, aiFormEnabled = ?, subscriptionEndsAt = ?, aiMonthlyLimit = ?, servingEndedAt = ?, updatedAt = ? WHERE id = ?`,
     input.ownerId ?? current.ownerId,
     input.name ?? current.name,
     slug,
@@ -115,6 +115,8 @@ export async function updateStore(id: string, input: Partial<Store>) {
     plan ? plan.aiEnabled : current.aiFormEnabled,
     field(input, "subscriptionEndsAt", current.subscriptionEndsAt),
     field(input, "aiMonthlyLimit", current.aiMonthlyLimit),
+    // Switched back on (by the admin or a payment): served again.
+    input.isActive === 1 ? null : field(input, "servingEndedAt", current.servingEndedAt ?? null),
     new Date().toISOString(),
     id
   );

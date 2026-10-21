@@ -568,6 +568,16 @@ export const migrations: Migration[] = [
       addColumn(db, "products", "blockedAt", "TEXT");
       addColumn(db, "products", "blockedReason", "TEXT");
     }
+  },
+  {
+    version: 17,
+    name: "month results on the full plan, stores no longer served",
+    up(db) {
+      // «Итоги в любой день»: the owner sees month results whenever; others get them in a notification at the month's end.
+      addColumn(db, "plans", "reportsAnytime", "INTEGER NOT NULL DEFAULT 0");
+      // «Отклонить» on an overdue store: the admin stopped serving it (the storefront is off too).
+      addColumn(db, "stores", "servingEndedAt", "TEXT");
+    }
   }
 ];
 

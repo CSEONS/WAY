@@ -22,6 +22,7 @@ import * as aiUsageService from "../services/aiUsageService.js";
 import * as auditService from "../services/auditService.js";
 import * as authService from "../services/authService.js";
 import * as backupService from "../services/backupService.js";
+import * as notificationService from "../services/notificationService.js";
 import * as onboardingService from "../services/onboardingService.js";
 import * as overviewService from "../services/overviewService.js";
 import * as packageService from "../services/packageService.js";
@@ -239,6 +240,25 @@ export const disableStore = asyncHandler(async (req, res) => {
   res.json(store);
 });
 
+/**
+ * «Отклонить» on an overdue store: the admin no longer serves it. The
+ * storefront goes off and the owner is told why; a payment or «Восстановить»
+ * brings it back.
+ */
+export const declineStore = asyncHandler(async (req, res) => {
+  const store = await storeService.updateStore(String(req.params.id), { isActive: 0, servingEndedAt: new Date().toISOString() });
+  if (!store) throw new HttpError(404, "Магазин не найден");
+  await notificationService.notifyStoreOwner(store.id, {
+    source: "SYSTEM",
+    title: "Магазин больше не обслуживается",
+    body: `Подписка магазина «${store.name}» не продлена, и обслуживание прекращено: витрина выключена, покупатели её не видят. Чтобы возобновить работу, напишите администратору и оплатите подписку.`,
+    link: `/dashboard/stores/${store.id}/subscription`,
+    topic: `serving:${store.id}`
+  });
+  await auditService.logAction(req.user!.userId, "STORE_DECLINED", { type: "store", id: store.id, name: store.name });
+  res.json(store);
+});
+
 export const enableStore = asyncHandler(async (req, res) => {
   const store = await storeService.updateStore(String(req.params.id), { isActive: 1 });
   if (!store) throw new HttpError(404, "Магазин не найден");
@@ -246,6 +266,16 @@ export const enableStore = asyncHandler(async (req, res) => {
 });
 
 
+
+/** «Скачать на компьютер»: a fresh copy of the database as a .sqlite.gz file. Recorded in the journal. */
+export const downloadBackup = asyncHandler(async (req, res) => {
+  const { name, data } = await backupService.databaseCopy();
+  await auditService.logAction(req.user!.userId, "BACKUP_DOWNLOADED", undefined, name);
+  res.setHeader("Content-Type", "application/gzip");
+  res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+  res.setHeader("Cache-Control", "no-store");
+  res.send(data);
+});
 
 /** Backup status for the admin panel: settings (no secrets) and the latest runs. */
 export const listBackups = asyncHandler(async (_req, res) => {

@@ -23,6 +23,8 @@ const actions: Record<string, { label: string; tone: Tone }> = {
   PRODUCT_BLOCKED: { label: "Товар снят с витрины", tone: "danger" },
   PRODUCT_UNBLOCKED: { label: "Товар возвращён на витрину", tone: "success" },
   NOTIFICATION_SENT: { label: "Отправлено уведомление", tone: "accent" },
+  STORE_DECLINED: { label: "Магазин больше не обслуживается", tone: "danger" },
+  BACKUP_DOWNLOADED: { label: "База скачана на компьютер", tone: "warning" },
   PLAN_SAVED: { label: "Сохранён тариф", tone: "accent" },
   PLAN_DELETED: { label: "Удалён тариф", tone: "warning" },
   PACKAGE_SAVED: { label: "Сохранён пакет", tone: "accent" },

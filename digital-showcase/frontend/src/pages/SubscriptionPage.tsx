@@ -82,7 +82,7 @@ export function SubscriptionPage() {
   if (state === "error") {
     return (
       <Page width="narrow">
-        <PageHeader title="Подписка и итоги" back={back} />
+        <PageHeader title="Подписка и оплата" back={back} />
         <ErrorState onRetry={load} />
       </Page>
     );
@@ -90,7 +90,7 @@ export function SubscriptionPage() {
   if (!store || !data) {
     return (
       <Page width="narrow">
-        <PageHeader title="Подписка и итоги" back={back} />
+        <PageHeader title="Подписка и оплата" back={back} />
         <LoadingState />
       </Page>
     );
@@ -111,7 +111,7 @@ export function SubscriptionPage() {
 
   return (
     <Page width="narrow">
-      <PageHeader title="Подписка и итоги" description={store.name} back={back} />
+      <PageHeader title="Подписка и оплата" description={store.name} back={back} />
 
       {notice && (
         <Notice tone={notice.tone} title={notice.title}>
@@ -244,6 +244,12 @@ export function SubscriptionPage() {
         </Card>
       )}
 
+      {!data.reportsAnytime ? (
+        <Notice tone="accent" title="Итоги месяца — в уведомлениях">
+          В начале каждого месяца в колокольчик приходят итоги прошлого: сколько раз открыли витрину и товары, сколько человек написали или позвонили.
+          Смотреть итоги в любой день можно в полной версии — спросите администратора.
+        </Notice>
+      ) : (
       <Card as="section" padding="lg" className={styles.card}>
         <CardHeader title="Итоги по месяцам" description="Сколько людей смотрели витрину и связались с вами" />
         <div className={styles.reports}>
@@ -272,6 +278,7 @@ export function SubscriptionPage() {
           ))}
         </div>
       </Card>
+      )}
 
       <Card as="section" padding="lg" className={styles.card}>
         <CardHeader title="История оплат" />

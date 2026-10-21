@@ -276,7 +276,8 @@ export const planSchema = z
     aiEnabled: flag,
     aiMonthlyLimit: aiLimit.transform((value) => value ?? null),
     highlighted: flag,
-    isPublic: flag
+    isPublic: flag,
+    reportsAnytime: flag.default(0)
   })
   .refine((plan) => !plan.aiEnabled || plan.aiMonthlyLimit != null, { message: "укажите, сколько карточек с ИИ в месяц", path: ["aiMonthlyLimit"] });
 

@@ -46,6 +46,7 @@ interface Form {
   features: FeatureRow[];
   aiEnabled: boolean;
   aiMonthlyLimit: string;
+  reportsAnytime: boolean;
   isPublic: boolean;
   highlighted: boolean;
 }
@@ -85,6 +86,7 @@ export function AdminPlanEditPage() {
         features: [row("")],
         aiEnabled: false,
         aiMonthlyLimit: String(DEFAULT_AI_LIMIT),
+        reportsAnytime: false,
         isPublic: true,
         highlighted: false
       });
@@ -109,6 +111,7 @@ export function AdminPlanEditPage() {
           features: found.features.map(row),
           aiEnabled: Boolean(found.aiEnabled),
           aiMonthlyLimit: String(found.aiMonthlyLimit ?? DEFAULT_AI_LIMIT),
+          reportsAnytime: Boolean(found.reportsAnytime),
           isPublic: Boolean(found.isPublic),
           highlighted: Boolean(found.highlighted)
         });
@@ -172,6 +175,7 @@ export function AdminPlanEditPage() {
       features: preview.features,
       aiEnabled: form.aiEnabled,
       aiMonthlyLimit: form.aiEnabled ? form.aiMonthlyLimit : null,
+      reportsAnytime: form.reportsAnytime,
       isPublic: form.isPublic,
       highlighted: form.highlighted
     };
@@ -267,6 +271,12 @@ export function AdminPlanEditPage() {
                 </div>
               </Field>
             )}
+            <Switch
+              checked={form.reportsAnytime}
+              onChange={(reportsAnytime) => change({ reportsAnytime })}
+              label="Итоги месяца в любой день (полная версия)"
+              description="Владелец смотрит итоги в «Подписке» когда захочет. Без этого итоги приходят ему уведомлением в начале следующего месяца"
+            />
             {plan && plan.storeCount > 0 && plan.aiEnabled !== Number(form.aiEnabled) && (
               <Notice tone="warning">
                 {form.aiEnabled ? "ИИ включится" : "ИИ выключится"} сразу у {plan.storeCount} {plural(plan.storeCount, ["магазина", "магазинов", "магазинов"])} на этом тарифе.

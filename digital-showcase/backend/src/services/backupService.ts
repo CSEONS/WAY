@@ -232,6 +232,22 @@ async function doBackup(): Promise<BackupRun> {
   return run;
 }
 
+/**
+ * A consistent copy of the live database, gzipped, for «Скачать на компьютер»:
+ * the same online backup as the nightly copy, checked by opening it. It is
+ * not saved on the server. The photos aren't in it (they live in UPLOAD_DIR).
+ */
+export async function databaseCopy() {
+  const temp = path.join(os.tmpdir(), `showcase-download-${crypto.randomUUID()}.sqlite`);
+  try {
+    await rawDb().backup(temp);
+    verifyDatabaseFile(temp);
+    return { name: `database-${stamp()}.sqlite.gz`, data: await gzip(await fs.promises.readFile(temp)) };
+  } finally {
+    fs.rmSync(temp, { force: true });
+  }
+}
+
 export async function listBackupRuns(limit = 10) {
   const db = await getDb();
   return db.all<BackupRun>("SELECT * FROM backup_runs ORDER BY startedAt DESC LIMIT ?", limit);

@@ -70,26 +70,113 @@
 }
 
 .linkValue {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
   gap: var(--space-2);
   min-width: 0;
+  max-width: 640px;
+}
+
+/* The address and «Копировать» in one field: the store's main thing to share. */
+.linkField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-1);
+  background: var(--color-surface-muted);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.linkField:hover {
+  border-color: var(--color-border-strong);
 }
 
 .link {
-  flex: 1 1 180px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
-  overflow: hidden;
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
   color: var(--color-ink-muted);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--color-ink);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.linkIcon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+.linkAddress {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.linkBase,
+.linkAddress strong {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.link:hover {
+.linkBase {
+  flex: 0 10 auto;
+}
+
+.linkAddress strong {
+  flex: none;
+  max-width: 75%;
+  color: var(--color-ink);
+  font-weight: var(--font-weight-semibold);
+}
+
+.linkOpen {
+  flex: none;
+  color: var(--color-ink-subtle);
+}
+
+.link:hover .linkOpen {
   color: var(--color-accent);
+}
+
+/* Phone: the address gets the whole width, «Копировать» goes under it. */
+.linkField {
+  flex-wrap: wrap;
+}
+
+.copyButton {
+  flex: 1 1 100%;
+}
+
+@media (min-width: 520px) {
+  .linkField {
+    flex-wrap: nowrap;
+  }
+
+  .copyButton {
+    flex: none;
+  }
 }
 
 .linkActions {
@@ -208,31 +295,118 @@
 /* «Товары | Статистика»: full width on a phone, by its labels from a tablet up. */
 .viewSwitch {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   justify-self: stretch;
 }
 
 .viewSwitch > * {
   justify-content: center;
+  padding-inline: var(--space-2);
+  white-space: nowrap;
+}
+
+/* Three tabs on a phone: words only, so «Товары · 8» stays on one line. */
+.viewSwitch svg {
+  display: none;
+}
+
+@media (min-width: 520px) {
+  .viewSwitch svg {
+    display: block;
+  }
 }
 
 .more {
   gap: var(--space-4);
 }
 
-.statsMore {
-  display: inline-flex;
+.statsFoot {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-self: start;
-  gap: var(--space-1);
-  color: var(--color-accent-strong);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
+  gap: var(--space-2) var(--space-3);
 }
 
-.statsMore:hover {
-  text-decoration: underline;
+.statsNote {
+  flex: 1 1 220px;
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-base);
+}
+
+.statsRules {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.statsRule {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--color-ink);
+  font-size: var(--font-size-sm);
+}
+
+.statsRuleIcon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+.statsRuleText {
+  display: block;
+  margin-top: var(--space-0-5);
+  color: var(--color-ink-muted);
+  line-height: var(--line-height-base);
+}
+
+/* «Разделы»: the same tiles as the admin's. */
+.tiles {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--control-lg);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.tile:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+.tileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (min-width: 720px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Search, then the filter chips, then sorting and the category side by side. */

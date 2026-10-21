@@ -86,7 +86,7 @@ function supportContacts() {
 /** The store's plan for «Подписка и итоги»: name, price, AI. */
 function planSummary(store: Store) {
   const plan = planOf(store);
-  return plan && { name: plan.name, price: plan.price, aiEnabled: Boolean(plan.aiEnabled), aiMonthlyLimit: plan.aiMonthlyLimit };
+  return plan && { name: plan.name, price: plan.price, aiEnabled: Boolean(plan.aiEnabled), aiMonthlyLimit: plan.aiMonthlyLimit, reportsAnytime: Boolean(plan.reportsAnytime) };
 }
 
 /** «Помощь» in the owner's app: who to write or call. */
@@ -97,16 +97,20 @@ export const getSupport = asyncHandler(async (_req, res) => {
 /** «Подписка и итоги»: paid date, tariff, AI left this month, payments and month results. */
 export const getSubscription = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
+  // Month results any day — on the full plan only; the others get them in a notification at the month's end.
+  const reportsAnytime = Boolean(planOf(store)?.reportsAnytime);
   const [ai, payments, reports, packages, orders] = await Promise.all([
     aiUsageService.aiStatus(store),
     paymentService.listPayments({ storeId: store.id, limit: 24 }),
-    Promise.all(
-      reportService
-        .recentMonths(3)
-        // No reports for months before the store was connected.
-        .filter((month) => month >= paymentService.monthKey(new Date(store.createdAt)))
-        .map((month) => reportService.storeMonthReport(store.id, month))
-    ),
+    reportsAnytime
+      ? Promise.all(
+          reportService
+            .recentMonths(3)
+            // No reports for months before the store was connected.
+            .filter((month) => month >= paymentService.monthKey(new Date(store.createdAt)))
+            .map((month) => reportService.storeMonthReport(store.id, month))
+        )
+      : Promise.resolve([]),
     packageService.publicPackages(),
     packageService.listOrders(store.id)
   ]);
@@ -142,6 +146,7 @@ export const getSubscription = asyncHandler(async (req, res) => {
       doneAt
     })),
     reports,
+    reportsAnytime,
     support: supportContacts()
   });
 });

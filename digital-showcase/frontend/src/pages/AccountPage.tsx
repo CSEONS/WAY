@@ -36,7 +36,11 @@ export function AccountPage({ user }: { user: User | null }) {
       <PageHeader
         title="Аккаунт"
         description={[user?.name, user?.phone, user?.email].filter(Boolean).join(" · ")}
-        back={{ to: user?.role === "ADMIN" ? "/admin" : "/dashboard", label: "Назад" }}
+        back={
+          user?.role === "ADMIN"
+            ? { to: "/admin?tab=sections", label: "К разделам" }
+            : { to: "/dashboard", label: "К разделам", state: { view: "sections" } }
+        }
       />
       <Card as="section" padding="lg">
         <CardHeader title="Сменить пароль" description="Для входа можно использовать почту или телефон в любом виде: 8 928…, +7 928…" />

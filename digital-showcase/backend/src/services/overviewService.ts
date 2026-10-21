@@ -62,6 +62,7 @@ export async function adminOverview(now = new Date()) {
         planId: store.planId,
         planName: planOf(store)?.name ?? null,
         subscriptionEndsAt: store.subscriptionEndsAt,
+        servingEndedAt: store.servingEndedAt ?? null,
         subscription: subscriptionInfo(store, now.getTime()),
         productCount: productRow?.total ?? 0,
         visibleProductCount: productRow?.visible ?? 0,
@@ -76,6 +77,8 @@ export async function adminOverview(now = new Date()) {
     stores: rows,
     expiring: rows.filter((row) => row.subscription.state === "expiring"),
     overdue: rows.filter((row) => row.subscription.state === "grace" || row.subscription.state === "expired"),
+    // «Отклонено»: no longer served — out of «Просрочено», but their data still has to be deleted in time.
+    declined: rows.filter((row) => row.servingEndedAt),
     inactive: inactiveOwners(rows, inactiveSince, now.getTime() - NEW_OWNER_DAYS * DAY_MS),
     revenue: { byMonth: revenue, thisMonth: revenue[revenue.length - 1]?.total ?? 0 },
     ai: { cards: aiUsage.reduce((sum, row) => sum + row.units, 0), ...aiSpend },

@@ -24,7 +24,9 @@ import {
   StoreRemove01Icon,
   Tag01Icon,
   TaskDone01Icon,
-  UserAccountIcon
+  UserAccountIcon,
+  UserBlock01Icon,
+  UserCircleIcon
 } from "@hugeicons/core-free-icons";
 import { type ReactNode, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -46,6 +48,7 @@ import {
   ButtonLink,
   Card,
   CardHeader,
+  ConfirmModal,
   ErrorState,
   Icon,
   LoadingState,
@@ -72,7 +75,8 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/contacts", label: "Контакты", icon: ContactBookIcon },
   { to: "/admin/videos", label: "Видеоинструкции", icon: PlayCircleIcon },
   { to: "/admin/legal", label: "Реквизиты", icon: LegalDocument01Icon },
-  { to: "/admin/settings", label: "Настройки ИИ", icon: Settings02Icon }
+  { to: "/admin/settings", label: "Настройки ИИ", icon: Settings02Icon },
+  { to: "/account", label: "Аккаунт: логин и пароль", icon: UserCircleIcon }
 ];
 
 /**
@@ -108,6 +112,7 @@ export function AdminPage() {
   const [overview, setOverview] = useState<AdminOverview>();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
+  const [toDecline, setToDecline] = useState<OverviewStore | null>(null);
   const [sellTarget, setSellTarget] = useState<SellTarget | null>(null);
   const toast = useToast();
   // The privacy policy promises to delete a store's data this long after the paid date (admin panel → «Реквизиты»).
@@ -124,6 +129,18 @@ export function AdminPage() {
   }
 
   useEffect(load, []);
+
+  /** «Отклонить» an overdue store: no longer served, the owner gets a notification. */
+  async function decline(store: OverviewStore) {
+    try {
+      await api.post(`/admin/stores/${store.id}/decline`);
+      toast.show(`«${store.name}» больше не обслуживается`, { tone: "success" });
+      setToDecline(null);
+      load();
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не получилось", { tone: "danger" });
+    }
+  }
 
   /** «Отклонить» a request or «Выполнено» for a paid service. */
   async function closeOrder(order: OpenPackageOrder, action: "decline" | "done") {
@@ -179,7 +196,8 @@ export function AdminPage() {
   const working = overview.stores.filter((store) => ["active", "expiring", "unlimited"].includes(store.subscription.state));
   const awaitingPayment = overview.overdue.filter((store) => store.subscription.state === "grace");
   const deleteAfter = Date.now() - keepDataDays * 24 * 60 * 60 * 1000;
-  const dataToDelete = overview.overdue.filter((store) => store.subscription.endsAt && Date.parse(store.subscription.endsAt) < deleteAfter);
+  // Declined stores are out of «Просрочено», but the privacy policy's deadline for their data still holds.
+  const dataToDelete = [...overview.overdue, ...overview.declined].filter((store) => store.subscription.endsAt && Date.parse(store.subscription.endsAt) < deleteAfter);
   const pastDue = overview.overdue.filter((store) => store.subscription.state === "expired");
   const pastDueToCall = pastDue.filter((store) => !dataToDelete.includes(store));
   const urgentCount =
@@ -202,7 +220,14 @@ export function AdminPage() {
           <CardHeader title="Нужно сделать сейчас" description="Оплаты, заявки и всё, что не может ждать" />
           {overview.backupProblem && <BackupAlert problem={overview.backupProblem} onOpen={() => openTab("system")} />}
           <AttentionGroup title="Ждут оплаты — витрина ещё видна покупателям" tone="warning" icon={HourglassIcon} stores={awaitingPayment} onPay={setPayTarget} />
-          <AttentionGroup title="Просрочено — витрина закрыта" tone="danger" icon={StoreRemove01Icon} stores={pastDueToCall} onPay={setPayTarget} />
+          <AttentionGroup
+            title="Просрочено — витрина закрыта"
+            tone="danger"
+            icon={StoreRemove01Icon}
+            stores={pastDueToCall}
+            onPay={setPayTarget}
+            onDecline={setToDecline}
+          />
           <LeadGroup leads={overview.latestLeads} total={overview.newLeads} />
           <PackageGroup
             title="Просят пакет — примите оплату"
@@ -341,6 +366,17 @@ export function AdminPage() {
         />
       )}
 
+      {toDecline && (
+        <ConfirmModal
+          danger
+          title={`Больше не обслуживать «${toDecline.name}»?`}
+          description="Витрина выключится, магазин уйдёт из «Просрочено» с пометкой «Не обслуживается», владелец получит уведомление, что обслуживание прекращено. Если он вернётся и оплатит — примите оплату, и магазин снова заработает."
+          confirmLabel="Отклонить"
+          onCancel={() => setToDecline(null)}
+          onConfirm={() => decline(toDecline)}
+        />
+      )}
+
       {payTarget && (
         <AcceptPaymentModal
           store={payTarget}
@@ -376,6 +412,7 @@ function AttentionGroup({
   icon,
   stores,
   onPay,
+  onDecline,
   detail
 }: {
   title: string;
@@ -383,6 +420,8 @@ function AttentionGroup({
   icon?: IconSvgElement;
   stores: OverviewStore[];
   onPay?: (store: OverviewStore) => void;
+  /** «Отклонить»: the store is no longer served. */
+  onDecline?: (store: OverviewStore) => void;
   detail?: (store: OverviewStore) => string;
 }) {
   if (!stores.length) return null;
@@ -403,6 +442,11 @@ function AttentionGroup({
               {onPay && (
                 <Button variant="secondary" size="sm" icon={Money03Icon} onClick={() => onPay(store)}>
                   Продлить
+                </Button>
+              )}
+              {onDecline && (
+                <Button variant="ghost" size="sm" icon={UserBlock01Icon} onClick={() => onDecline(store)}>
+                  Отклонить
                 </Button>
               )}
             </div>
@@ -527,7 +571,7 @@ function StoreRow({ store, onPay, onSell }: { store: OverviewStore; onPay: () =>
         </small>
       </div>
       <div className={styles.storeFacts}>
-        <Badge tone={badge.tone}>{badge.label}</Badge>
+        {store.servingEndedAt ? <Badge tone="danger">Не обслуживается</Badge> : <Badge tone={badge.tone}>{badge.label}</Badge>}
         {store.planName && <Badge tone={store.aiFormEnabled ? "accent" : "neutral"}>{store.planName}</Badge>}
         <span>
           <Icon icon={Package01Icon} size="xs" />

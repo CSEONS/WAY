@@ -1,4 +1,4 @@
-import { DashboardSquare01Icon, HelpCircleIcon, Logout01Icon, ShieldUserIcon, UserCircleIcon } from "@hugeicons/core-free-icons";
+import { DashboardSquare01Icon, HelpCircleIcon, Logout01Icon, ShieldUserIcon } from "@hugeicons/core-free-icons";
 import { lazy, Suspense, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Button, ConfirmModal, Icon, IconButton, cx, type IconSvgElement } from "../ui";
@@ -45,7 +45,8 @@ export function Layout({ user }: { user: User | null }) {
         </Link>
         {!hidePublicStoreNav && (
           <nav className={styles.nav} aria-label="Основная навигация">
-            {/* Icons only, always all of them; the page you're on is highlighted. Names are in the tooltips. */}
+            {/* Icons only, always all of them; the page you're on is highlighted. Names are in the tooltips.
+                «Аккаунт» (login and password) is in «Разделы»: the admin's and the owner's. */}
             {user?.role === "ADMIN" && <NavIcon to="/admin" icon={ShieldUserIcon} label="Админка" />}
             {user?.role === "OWNER" && <NavIcon to="/dashboard" icon={DashboardSquare01Icon} label="Кабинет" />}
             {user?.role === "OWNER" && <NotificationBell />}
@@ -61,7 +62,6 @@ export function Layout({ user }: { user: User | null }) {
                 <Icon icon={HelpCircleIcon} size="sm" />
               </button>
             )}
-            {user && <NavIcon to="/account" icon={UserCircleIcon} label="Аккаунт" />}
             {user ? (
               <IconButton variant="danger" size="sm" icon={Logout01Icon} label="Выйти" onClick={logout} />
             ) : (

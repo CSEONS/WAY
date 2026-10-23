@@ -78,8 +78,10 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isFillingFromPhotos, setIsFillingFromPhotos] = useState(false);
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false);
+  const [isNoPhotosConfirmOpen, setIsNoPhotosConfirmOpen] = useState(false);
   const previewDrawing = usePreviewDrawing(aiPreviewPath ?? null, isPreviewOpen);
   const hasSubmittedRef = useRef(false);
+  const photosRef = useRef<HTMLDivElement>(null);
   const imageManager = useImageManager(initial);
   const builder = useVariantBuilder(initial, savedDraft, draftKey);
   const { variants } = builder;
@@ -226,6 +228,10 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     };
   }
 
+  // A product needs at least one photo; without one the owner is asked and may still save it.
+  // An existing product that never had photos isn't asked about on every edit.
+  const needsPhotosConfirm = imageManager.images.length === 0 && (!initial || initial.images.length > 0);
+
   function submit(event: FormEvent) {
     event.preventDefault();
     if (hasSubmittedRef.current) return;
@@ -233,6 +239,21 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       toast.show(`Цена: ${PRICE_ERROR.toLowerCase()}`, { tone: "danger" });
       return;
     }
+    if (needsPhotosConfirm) {
+      setIsNoPhotosConfirmOpen(true);
+      return;
+    }
+    save();
+  }
+
+  function addPhotosFirst() {
+    setIsNoPhotosConfirmOpen(false);
+    photosRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function save() {
+    if (hasSubmittedRef.current) return;
+    setIsNoPhotosConfirmOpen(false);
     hasSubmittedRef.current = true;
 
     onSubmit(
@@ -307,22 +328,24 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
         </Notice>
       )}
 
-      <ImageManager
-        manager={imageManager}
-        onFillWithAi={aiFormEnabled ? askToFillFromPhotos : undefined}
-        isFilling={isFillingFromPhotos}
-        onCreatePreview={aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
-        previewLabel={
-          previewDrawing.isDrawing
-            ? `Рисуем превью… ${previewDrawing.seconds} с`
-            : previewDrawing.hasUnseen
-              ? "Превью готово — посмотреть"
-              : previewDrawing.results.length
-                ? "Посмотреть превью"
-                : undefined
-        }
-        previewReady={previewDrawing.hasUnseen}
-      />
+      <div ref={photosRef}>
+        <ImageManager
+          manager={imageManager}
+          onFillWithAi={aiFormEnabled ? askToFillFromPhotos : undefined}
+          isFilling={isFillingFromPhotos}
+          onCreatePreview={aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
+          previewLabel={
+            previewDrawing.isDrawing
+              ? `Рисуем превью… ${previewDrawing.seconds} с`
+              : previewDrawing.hasUnseen
+                ? "Превью готово — посмотреть"
+                : previewDrawing.results.length
+                  ? "Посмотреть превью"
+                  : undefined
+          }
+          previewReady={previewDrawing.hasUnseen}
+        />
+      </div>
 
       {aiMode && !aiDraftApplied && (
         <AiPanel
@@ -425,6 +448,18 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           confirmLabel="Заполнить с ИИ"
           onCancel={() => setIsReplaceConfirmOpen(false)}
           onConfirm={fillFromPhotos}
+        />
+      )}
+      {isNoPhotosConfirmOpen && (
+        <ConfirmModal
+          title={initial ? "Сохранить товар без фото?" : "Создать товар без фото?"}
+          description={`${initial ? "Вы убрали все фото." : "Вы не добавили ни одного фото."} ${
+            isVisible ? "На витрине вместо фото будет пустая карточка" : "Если потом показать товар на витрине, вместо фото будет пустая карточка"
+          }, а без фото покупатели почти не открывают товар. Фото можно добавить и позже, в «Редактировать».`}
+          confirmLabel={initial ? "Сохранить без фото" : "Создать без фото"}
+          cancelLabel="Добавить фото"
+          onCancel={addPhotosFirst}
+          onConfirm={save}
         />
       )}
       {isSimplifyConfirmOpen && (

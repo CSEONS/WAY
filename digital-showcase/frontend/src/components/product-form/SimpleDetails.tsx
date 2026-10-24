@@ -1,5 +1,5 @@
 import { Add01Icon, GridViewIcon } from "@hugeicons/core-free-icons";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
 import { Button, Card, CardHeader, Chip, ChipGroup, ColorSwatch, Field, Input, Modal, SectionLabel, SegmentedControl } from "../../ui";
 import { AiBadge } from "./AiBadge";
 import { sortSizes } from "../../utils/format";
@@ -16,13 +16,15 @@ interface SimpleDetailsProps {
   onChange: (field: SimpleField, update: (current: SimpleDetailsValue) => SimpleDetailsValue) => void;
   /** Fields the AI just filled: marked until the owner edits them. */
   aiFilled: Set<string>;
+  /** «Вручную + ИИ»: «Заполнить с ИИ» next to «Цвета». */
+  colorsAction?: ReactNode;
   onSwitchToAdvanced: () => void;
 }
 
 const isNumericSize = (size: string) => /^\d+$/.test(size);
 
 /** «Цена, размеры и цвета»: one price, tap sizes and colors — no combinations table. */
-export function SimpleDetails({ value, onChange, aiFilled, onSwitchToAdvanced }: SimpleDetailsProps) {
+export function SimpleDetails({ value, onChange, aiFilled, colorsAction, onSwitchToAdvanced }: SimpleDetailsProps) {
   const [sizeKind, setSizeKind] = useState<"letters" | "numbers">(() => (value.sizes.some(isNumericSize) ? "numbers" : "letters"));
   const [modal, setModal] = useState<"size" | "color" | null>(null);
   const [customSize, setCustomSize] = useState("");
@@ -121,9 +123,12 @@ export function SimpleDetails({ value, onChange, aiFilled, onSwitchToAdvanced }:
       </div>
 
       <div className={styles.builderBlock}>
-        <SectionLabel>
-          Цвета <AiBadge show={aiFilled.has("colors")} />
-        </SectionLabel>
+        <div className={styles.blockHead}>
+          <SectionLabel>
+            Цвета <AiBadge show={aiFilled.has("colors")} />
+          </SectionLabel>
+          {colorsAction}
+        </div>
         <ChipGroup label="Цвета">
           {colorChips.map((color) => (
             <Chip key={color.name} selected={value.colors.some((item) => item.name === color.name)} onClick={() => toggleColor(color)}>

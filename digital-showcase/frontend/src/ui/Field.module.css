@@ -14,6 +14,14 @@
   line-height: var(--line-height-snug);
 }
 
+.labelRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+}
+
 .required {
   color: var(--color-danger);
 }

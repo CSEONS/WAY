@@ -50,34 +50,42 @@
   flex: 1 1 160px;
 }
 
-/* «Заполнить карточку с ИИ» under the photos */
+/* «Вручную» · «Вручную + ИИ» · «Авто» and what the chosen one does */
 
-.fillWithAi {
+.fillModes {
   display: grid;
   gap: var(--space-2);
 }
 
-.fillHint {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-snug);
+.fillModeSwitch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-self: stretch;
 }
 
-/* AI panel */
+.fillModeSwitch > * {
+  justify-content: center;
+  padding-inline: var(--space-2);
+  white-space: nowrap;
+}
 
+/* A phone: words only, so «Вручную + ИИ» fits on one line. */
+.fillModeSwitch svg {
+  display: none;
+}
+
+@media (min-width: 520px) {
+  .fillModeSwitch svg {
+    display: block;
+  }
+}
+
+/* «Авто»: price and sizes by voice or text */
+
+.autoHint,
 .voice {
   display: grid;
   gap: var(--space-3);
-}
-
-.aiActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.aiFill {
-  flex: 1 1 200px;
 }
 
 /* Images */

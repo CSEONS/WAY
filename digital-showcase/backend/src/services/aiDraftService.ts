@@ -19,8 +19,18 @@ interface AiDraftFile {
   size: number;
 }
 
+/** «Вручную + ИИ»: the owner asks the AI for one field only. */
+export const DRAFT_FIELDS = ["title", "description", "category", "colors"] as const;
+export type DraftField = (typeof DRAFT_FIELDS)[number];
+
+/** What the owner already typed: the AI builds the asked field on it. */
+export type KnownProductFields = Partial<Record<"title" | "description" | "category", string>>;
+
 export interface ProductAiDraftInput {
   prompt?: string;
+  /** Only this field is wanted; the others come back empty and the form ignores them. */
+  field?: DraftField;
+  known?: KnownProductFields;
   voice?: AiDraftFile;
   images?: AiDraftFile[];
   imageUrls?: string[];
@@ -100,6 +110,16 @@ const productDraftInstructions = `
 Не выдумывай точную цену, если ее нет в тексте или голосе. Используй null и priceText "Уточнить у продавца".
 AI не принимает финальных решений: возвращай только редактируемое предложение.
 `;
+
+const fieldTasks: Record<DraftField, string> = {
+  title: "Придумай только название (title): 2–5 слов, как на ценнике, например «Льняное платье миди».",
+  description:
+    "Напиши только описание для покупателя (description): 2–4 коротких предложения — ткань, фасон, посадка, детали, то, что видно. Без цены и размеров, без восклицаний.",
+  category: "Определи только категорию (category): одно-два слова во множественном числе, например «Платья», «Брюки», «Верхняя одежда», «Обувь».",
+  colors: "Определи только цвета товара (colors): те, что видны на самой вещи, а не на фоне. Названия по-русски, hex — примерный."
+};
+
+const knownLabels: Record<keyof KnownProductFields, string> = { title: "Название", description: "Описание", category: "Категория" };
 
 const bulkDraftInstructions = `
 Ты каталогизатор одежды.
@@ -193,7 +213,8 @@ imageIndexes — это ВСЕ фотографии одного физичес�
 export async function createProductAiDraft(input: string | ProductAiDraftInput): Promise<ProductAiDraft> {
   const draftInput = typeof input === "string" ? { prompt: input } : input;
   const prompt = draftInput.prompt?.trim() ?? "";
-  const hasRichInput = Boolean(draftInput.voice || draftInput.images?.length || draftInput.imageUrls?.length);
+  // One field is always asked of the model: the local fallback has nothing to say about it.
+  const hasRichInput = Boolean(draftInput.voice || draftInput.images?.length || draftInput.imageUrls?.length || draftInput.field);
 
   if (isAiConfigured()) {
     try {
@@ -263,12 +284,16 @@ export function normalizeBulkProductDrafts(rawText: string, imageCount: number, 
 }
 
 async function createExternalProductAiDraft(input: ProductAiDraftInput) {
-  const transcript = input.voice ? await transcribeVoice(input.voice) : "";
   const imageUrls = await collectImageInputs(input.images ?? [], input.imageUrls ?? []);
+  if (input.field) {
+    const answer = await completeJson({ instructions: productDraftInstructions, text: fieldRequestText(input.field, input.known ?? {}, imageUrls.length), images: imageUrls });
+    return normalizeAiDraft(answer, "");
+  }
+  const transcript = input.voice ? await transcribeVoice(input.voice) : "";
   const descriptionParts = [input.prompt?.trim(), transcript ? `Голосовое описание: ${transcript}` : ""].filter(Boolean);
   const text = descriptionParts.length
     ? descriptionParts.join("\n\n")
-    : // «Заполнить карточку с ИИ»: only photos. Everything visible comes from them; price and sizes aren't guessed.
+    : // «Авто» → «Сгенерировать карточку»: only photos. Everything visible comes from them; price and sizes aren't guessed.
       "Описания от владельца нет: заполни карточку только по фотографиям. Определи по ним название, описание для покупателя (ткань, фасон, детали — что видно), категорию и цвета. Размеры указывай, только если они видны на бирке, иначе sizes=[]. Цену не придумывай: price=null.";
 
   const answer = await completeJson({
@@ -277,6 +302,22 @@ async function createExternalProductAiDraft(input: ProductAiDraftInput) {
     images: imageUrls
   });
   return normalizeAiDraft(answer, [input.prompt, transcript].filter(Boolean).join("\n"));
+}
+
+/** «Вручную + ИИ»: one field from the photos and what the owner already typed. */
+function fieldRequestText(field: DraftField, known: KnownProductFields, photoCount: number) {
+  const typed = (Object.keys(knownLabels) as (keyof KnownProductFields)[])
+    .filter((key) => key !== field && known[key]?.trim())
+    .map((key) => `${knownLabels[key]}: ${known[key]!.trim()}`);
+  return [
+    "Владелец заполняет карточку товара одежды сам и просит помочь с одним полем.",
+    fieldTasks[field],
+    "Остальные поля схемы верни пустыми: null или []. Цену не придумывай: price=null.",
+    photoCount ? "Опирайся на фотографии товара." : "Фото нет: опирайся на то, что владелец уже написал.",
+    typed.length ? `Уже заполнено владельцем:\n${typed.join("\n")}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function transcribeVoice(file: AiDraftFile) {

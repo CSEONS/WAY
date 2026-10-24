@@ -1,11 +1,12 @@
-import { AiMagicIcon, Edit02Icon, InformationCircleIcon, LockKeyIcon } from "@hugeicons/core-free-icons";
+import { AiEditingIcon, AiMagicIcon, Edit02Icon, InformationCircleIcon, LockKeyIcon } from "@hugeicons/core-free-icons";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Product, ProductStatus } from "../../types/models";
 import { PRICE_ERROR, isValidPrice, parsePrice } from "../../utils/price";
 import { Button, Card, CardHeader, Chip, ChipGroup, ConfirmModal, Field, Input, Notice, SegmentedControl, Textarea, useToast } from "../../ui";
 import { AiBadge } from "./AiBadge";
-import { requestAiDraft } from "./aiDraft";
-import { AiPanel } from "./AiPanel";
+import { AiFieldButton } from "./AiFieldButton";
+import { type AiDraftField, requestAiDraft } from "./aiDraft";
+import { type AutoHint, AutoPanel } from "./AutoPanel";
 import { ASK_SELLER, hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
 import { PreviewGenerator } from "./PreviewGenerator";
@@ -42,6 +43,50 @@ interface ProductFormProps {
 
 type AiField = "title" | "description" | "category" | "price" | "sizes" | "colors";
 
+/** How the card gets filled. The AI ones are there only when the store has AI. */
+type FillMode = "manual" | "assisted" | "auto";
+
+const fillModes: { value: FillMode; label: string; icon: typeof Edit02Icon; hint: string }[] = [
+  { value: "manual", label: "Вручную", icon: Edit02Icon, hint: "Все поля заполняете сами." },
+  {
+    value: "assisted",
+    label: "Вручную + ИИ",
+    icon: AiEditingIcon,
+    hint: "Заполняете сами, а название, описание, категорию или цвета можно доверить ИИ — кнопка «Заполнить с ИИ» у поля."
+  },
+  {
+    value: "auto",
+    label: "Авто",
+    icon: AiMagicIcon,
+    hint: "Загрузите фото и нажмите «Сгенерировать карточку» — ИИ заполнит всё сам. Останется проверить и указать цену."
+  }
+];
+
+/** For the toast when the AI came back empty: «ИИ не смог определить …». */
+const fieldNames: Record<AiDraftField, string> = { title: "название", description: "описание", category: "категорию", colors: "цвета" };
+/** For the screen reader: «Заполнить с ИИ: Категория». */
+const fieldTitles: Record<AiDraftField, string> = { title: "Название", description: "Описание", category: "Категория", colors: "Цвета" };
+
+const FILL_MODE_KEY = "product-form-fill-mode";
+const emptyHint: AutoHint = { prompt: "", voice: null };
+
+function savedFillMode(): FillMode {
+  try {
+    const saved = localStorage.getItem(FILL_MODE_KEY);
+    return saved === "assisted" || saved === "auto" ? saved : "manual";
+  } catch {
+    return "manual";
+  }
+}
+
+function rememberFillMode(mode: FillMode) {
+  try {
+    localStorage.setItem(FILL_MODE_KEY, mode);
+  } catch {
+    // Private mode: the next product just starts by hand.
+  }
+}
+
 // Ctrl/Cmd+A inside a field selects only that field's text, not the page.
 function selectFieldText(event: KeyboardEvent<HTMLFormElement>) {
   if (!(event.ctrlKey || event.metaKey) || (event.key.toLowerCase() !== "a" && event.code !== "KeyA")) return;
@@ -66,17 +111,21 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       isVisible: initial?.isVisible ?? 1
     }
   );
-  // A new product starts with the manual form; the AI is one tap away on the switch above it.
-  const [aiMode, setAiMode] = useState(false);
+  // A new product opens in the way the owner filled the last one; an existing one — by hand.
+  const [preferredFillMode, setPreferredFillMode] = useState<FillMode>(() => (initial ? "manual" : savedFillMode()));
+  const fillMode: FillMode = aiFormEnabled ? preferredFillMode : "manual";
   const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
-  const [aiDraftApplied, setAiDraftApplied] = useState(false);
+  // «Авто»: the card was generated (or restored), so the fields are shown instead of the panel.
+  const [isAutoDone, setIsAutoDone] = useState(Boolean(savedDraft));
+  const [isGenerating, setIsGenerating] = useState(false);
+  const pendingHint = useRef<AutoHint>(emptyHint);
+  const [fillingField, setFillingField] = useState<AiDraftField | null>(null);
   const [aiFilled, setAiFilled] = useState<Set<AiField>>(new Set());
   const [isDraftNoticeVisible, setIsDraftNoticeVisible] = useState(Boolean(savedDraft));
   const [mode, setMode] = useState<DetailsMode>(savedDraft?.mode ?? (initialSimple ? "simple" : "advanced"));
   const [simple, setSimple] = useState<SimpleDetailsValue>(savedDraft?.simple ?? initialSimple ?? emptySimpleDetails);
   const [isSimplifyConfirmOpen, setIsSimplifyConfirmOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isFillingFromPhotos, setIsFillingFromPhotos] = useState(false);
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false);
   const [isNoPhotosConfirmOpen, setIsNoPhotosConfirmOpen] = useState(false);
   const previewDrawing = usePreviewDrawing(aiPreviewPath ?? null, isPreviewOpen);
@@ -170,7 +219,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     if (draftSimple?.sizes.length) filled.add("sizes");
     if (draftSimple?.colors.length) filled.add("colors");
     setAiFilled(filled);
-    setAiDraftApplied(true);
+    setIsAutoDone(true);
     const noPrice = !draftSimple?.price && !simple.price.trim();
     toast.show(`ИИ заполнил форму. Проверьте поля с пометкой «ИИ»${noPrice ? " и укажите цену" : ""}.`, { tone: "success", duration: 6000 });
   }
@@ -185,23 +234,78 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       (mode === "advanced" && variants.some((variant) => variant.colorName.trim() || variant.size.trim()))
   );
 
-  function askToFillFromPhotos() {
-    if (hasOwnerDetails) setIsReplaceConfirmOpen(true);
-    else void fillFromPhotos();
+  function changeFillMode(next: FillMode) {
+    setPreferredFillMode(next);
+    if (!initial) rememberFillMode(next);
+    // In «Авто» a filled card stays on screen; an empty one shows the panel.
+    if (next === "auto") setIsAutoDone(isAutoDone || hasOwnerDetails);
   }
 
-  /** «Заполнить карточку с ИИ»: photos are all the AI gets. */
-  async function fillFromPhotos() {
+  /** «Авто» → «Сгенерировать карточку». */
+  function askToGenerate(hint: AutoHint) {
+    pendingHint.current = hint;
+    if (hasOwnerDetails) setIsReplaceConfirmOpen(true);
+    else void generateCard();
+  }
+
+  async function generateCard() {
     setIsReplaceConfirmOpen(false);
-    setIsFillingFromPhotos(true);
+    setIsGenerating(true);
     try {
-      applyDraft(await requestAiDraft(aiDraftPath, { images: imageManager.images, coverId: imageManager.previewImageId }));
+      const { prompt, voice } = pendingHint.current;
+      applyDraft(await requestAiDraft(aiDraftPath, { images: imageManager.images, coverId: imageManager.previewImageId, prompt, voice }));
     } catch (err: any) {
-      toast.show(err.response?.data?.message ?? "Не удалось заполнить карточку. Проверьте интернет и попробуйте ещё раз.", { tone: "danger", duration: 6000 });
+      toast.show(err.response?.data?.message ?? "Не удалось сгенерировать карточку. Проверьте интернет и попробуйте ещё раз.", { tone: "danger", duration: 6000 });
     } finally {
-      setIsFillingFromPhotos(false);
+      setIsGenerating(false);
+      pendingHint.current = emptyHint;
     }
   }
+
+  /** «Вручную + ИИ»: one field from the photos and what the owner already typed. */
+  async function fillField(field: AiDraftField) {
+    const known = { title: form.title, description: form.description, category: form.category };
+    const hasOtherText = (Object.keys(known) as (keyof typeof known)[]).some((key) => key !== field && known[key].trim());
+    if (!imageManager.images.length && !hasOtherText) {
+      toast.show("Сначала добавьте фото товара — по нему ИИ заполнит поле");
+      return;
+    }
+    setFillingField(field);
+    try {
+      const draft = await requestAiDraft(aiDraftPath, { images: imageManager.images, coverId: imageManager.previewImageId, field, known });
+      if (!applyField(field, draft)) toast.show(`ИИ не смог определить ${fieldNames[field]}. Попробуйте другое фото или заполните сами.`);
+    } catch (err: any) {
+      toast.show(err.response?.data?.message ?? "Не удалось заполнить поле. Проверьте интернет и попробуйте ещё раз.", { tone: "danger", duration: 6000 });
+    } finally {
+      setFillingField(null);
+    }
+  }
+
+  /** Takes only the asked field from the AI's answer. False — it came back empty. */
+  function applyField(field: AiDraftField, draft: ProductDraft) {
+    if (field === "colors") {
+      const colors = simpleFromDraft({ ...draft, variants: [] })?.colors ?? [];
+      if (!colors.length) return false;
+      setSimple((current) => ({ ...current, colors }));
+    } else {
+      const value = draft[field]?.trim();
+      if (!value) return false;
+      setForm((current) => ({ ...current, [field]: value }));
+    }
+    setAiFilled((current) => new Set(current).add(field));
+    return true;
+  }
+
+  const aiAction = (field: AiDraftField) =>
+    fillMode === "assisted" ? (
+      <AiFieldButton
+        fieldName={fieldTitles[field]}
+        filled={aiFilled.has(field)}
+        loading={fillingField === field}
+        disabled={fillingField !== null && fillingField !== field}
+        onClick={() => void fillField(field)}
+      />
+    ) : undefined;
 
   function advancedPayload() {
     const normalizedVariants = variants
@@ -271,6 +375,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   }
 
   const isVisible = Boolean(form.isVisible);
+  // «Авто» shows the fields once the card is generated; the other modes — always.
+  const showFields = fillMode !== "auto" || isAutoDone;
   const submitLabel = initial ? "Сохранить изменения" : isVisible ? "Опубликовать" : "Сохранить черновик";
 
   return (
@@ -290,49 +396,38 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       )}
 
       {aiFormEnabled ? (
-        <SegmentedControl
-          label="Способ заполнения"
-          value={aiMode ? "ai" : "manual"}
-          onChange={(value) => {
-            setAiMode(value === "ai");
-            if (value === "ai") setAiDraftApplied(false);
-          }}
-          options={[
-            { value: "manual", label: "Вручную", icon: Edit02Icon },
-            { value: "ai", label: "ИИ заполнение", icon: AiMagicIcon }
-          ]}
-        />
+        <div className={styles.fillModes}>
+          <SegmentedControl
+            label="Способ заполнения"
+            value={fillMode}
+            onChange={changeFillMode}
+            options={fillModes.map(({ value, label, icon }) => ({ value, label, icon }))}
+            className={styles.fillModeSwitch}
+          />
+          <p className={styles.hint}>{fillModes.find((item) => item.value === fillMode)?.hint}</p>
+        </div>
       ) : (
         <Notice icon={LockKeyIcon} title="ИИ недоступен">
           Администратор ещё не подключил заполнение с помощью ИИ для этого магазина.
         </Notice>
       )}
 
-      {aiMode && !aiDraftApplied && (
-        <Notice tone="accent" icon={AiMagicIcon} title="Хватит фото">
-          Добавьте фото товара и нажмите «Заполнить карточку с ИИ» — ИИ заполнит всё, что видно на фото. Цену и размеры можно надиктовать или написать ниже и нажать
-          «Заполнить форму».
-        </Notice>
-      )}
-
-      {aiMode && aiDraftApplied && (
+      {showFields && fillMode === "auto" && (
         <Notice
-          tone="success"
+          tone={aiFilled.size ? "success" : "accent"}
           action={
-            <Button variant="ghost" size="sm" onClick={() => setAiDraftApplied(false)}>
-              Изменить запрос
+            <Button variant="ghost" size="sm" icon={AiMagicIcon} onClick={() => setIsAutoDone(false)}>
+              {aiFilled.size ? "Сгенерировать заново" : "Сгенерировать"}
             </Button>
           }
         >
-          ИИ заполнил форму — проверьте поля с пометкой «ИИ».
+          {aiFilled.size ? "ИИ заполнил карточку — проверьте поля с пометкой «ИИ»." : "Карточка уже заполнена. ИИ может заполнить её заново по фото."}
         </Notice>
       )}
 
       <div ref={photosRef}>
         <ImageManager
           manager={imageManager}
-          onFillWithAi={aiFormEnabled ? askToFillFromPhotos : undefined}
-          isFilling={isFillingFromPhotos}
           onCreatePreview={aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
           previewLabel={
             previewDrawing.isDrawing
@@ -347,18 +442,18 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
         />
       </div>
 
-      {aiMode && !aiDraftApplied && (
-        <AiPanel
+      {!showFields && (
+        <AutoPanel
+          hasPhotos={imageManager.images.length > 0}
           prompt={aiPrompt}
           onPromptChange={setAiPrompt}
-          images={imageManager.images}
-          coverId={imageManager.previewImageId}
-          aiDraftPath={aiDraftPath}
-          onDraft={applyDraft}
+          isGenerating={isGenerating}
+          onGenerate={askToGenerate}
+          onBack={hasOwnerDetails ? () => setIsAutoDone(true) : undefined}
         />
       )}
 
-      {(!aiMode || aiDraftApplied) && (
+      {showFields && (
         <>
           <Card as="section" className={styles.section}>
             <CardHeader title="Описание" />
@@ -369,6 +464,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
                 </>
               }
               required
+              action={aiAction("title")}
             >
               <Input value={form.title} onChange={(e) => updateForm({ title: e.target.value })} placeholder="Например, льняное платье" required />
             </Field>
@@ -378,6 +474,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
                   Описание <AiBadge show={aiFilled.has("description")} />
                 </>
               }
+              action={aiAction("description")}
             >
               <Textarea value={form.description} onChange={(e) => updateForm({ description: e.target.value })} placeholder="Ткань, посадка, уход" />
             </Field>
@@ -387,6 +484,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
                   Категория <AiBadge show={aiFilled.has("category")} />
                 </>
               }
+              action={aiAction("category")}
             >
               <Input value={form.category} onChange={(e) => updateForm({ category: e.target.value })} placeholder="Выберите ниже или впишите свою" />
             </Field>
@@ -400,7 +498,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           </Card>
 
           {mode === "simple" ? (
-            <SimpleDetails value={simple} onChange={updateSimple} aiFilled={aiFilled} onSwitchToAdvanced={switchToAdvanced} />
+            <SimpleDetails value={simple} onChange={updateSimple} aiFilled={aiFilled} colorsAction={aiAction("colors")} onSwitchToAdvanced={switchToAdvanced} />
           ) : (
             <VariantBuilder
               builder={builder}
@@ -445,9 +543,9 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
         <ConfirmModal
           title="Заполнить карточку заново?"
           description="ИИ заменит название, описание, категорию, цвета и размеры тем, что увидит на фото. Цена останется вашей, если ИИ её не найдёт."
-          confirmLabel="Заполнить с ИИ"
+          confirmLabel="Сгенерировать"
           onCancel={() => setIsReplaceConfirmOpen(false)}
-          onConfirm={fillFromPhotos}
+          onConfirm={generateCard}
         />
       )}
       {isNoPhotosConfirmOpen && (

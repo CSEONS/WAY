@@ -30,26 +30,38 @@ export interface FieldProps {
   /** Validation message. Replaces the hint and marks the control invalid. */
   error?: ReactNode;
   required?: boolean;
+  /** A small button on the label's line, e.g. «Заполнить с ИИ». Kept outside <label>, so it isn't read as the field's name. */
+  action?: ReactNode;
   className?: string;
   children: ReactNode;
 }
 
-export function Field({ label, hint, error, required, className, children }: FieldProps) {
+export function Field({ label, hint, error, required, action, className, children }: FieldProps) {
   const id = useId();
   const messageId = `${id}-message`;
   const message = error || hint;
+  const labelElement = (
+    <label className={styles.label} htmlFor={id}>
+      {label}
+      {required && (
+        <span className={styles.required} aria-hidden="true">
+          *
+        </span>
+      )}
+    </label>
+  );
 
   return (
     <FieldContext.Provider value={{ id, describedBy: message ? messageId : undefined, invalid: Boolean(error) }}>
       <div className={cx(styles.field, className)}>
-        <label className={styles.label} htmlFor={id}>
-          {label}
-          {required && (
-            <span className={styles.required} aria-hidden="true">
-              *
-            </span>
-          )}
-        </label>
+        {action ? (
+          <div className={styles.labelRow}>
+            {labelElement}
+            {action}
+          </div>
+        ) : (
+          labelElement
+        )}
         {children}
         {error ? (
           <span id={messageId} className={styles.error}>

@@ -47,4 +47,18 @@ test("черновик только по фото: в ИИ уходят фото
   assert.match(content[1].image_url?.url ?? "", /^data:image\/webp;base64,/);
 });
 
+test("одно поле («Вручную + ИИ»): в ИИ уходит задача только на это поле и то, что владелец уже написал", async () => {
+  const draft = await createProductAiDraft({ field: "description", known: { title: "Пуховик синий", description: "старое", category: "  " } });
+
+  assert.equal(draft.description, "Тёплый стёганый пуховик");
+  const content = lastBody!.messages[1].content;
+  const text = typeof content === "string" ? content : ((content as { type: string; text?: string }[])[0].text ?? "");
+  assert.match(text, /просит помочь с одним полем/);
+  assert.match(text, /только описание для покупателя/);
+  assert.match(text, /Фото нет: опирайся на то, что владелец уже написал/);
+  assert.match(text, /Название: Пуховик синий/);
+  assert.doesNotMatch(text, /Описание: старое/, "the field being redone isn't sent back as a hint");
+  assert.doesNotMatch(text, /Категория:/, "empty fields aren't sent");
+});
+
 test.after(() => server.close());

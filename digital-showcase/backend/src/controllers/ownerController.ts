@@ -1,6 +1,6 @@
 import type { Request } from "express";
 import type { Store } from "../types/models.js";
-import { createBulkProductAiDraft, createProductAiDraft } from "../services/aiDraftService.js";
+import { DRAFT_FIELDS, type DraftField, type KnownProductFields, createBulkProductAiDraft, createProductAiDraft } from "../services/aiDraftService.js";
 import * as aiUsageService from "../services/aiUsageService.js";
 import { previewSettings } from "../services/aiProvider.js";
 import { planOf } from "../services/planService.js";
@@ -62,6 +62,24 @@ function parseJsonList(value: unknown) {
   } catch {
     return [];
   }
+}
+
+/** «Вручную + ИИ»: which field the owner asked for and what they already typed (a JSON form field). */
+function draftFieldRequest(body: Record<string, unknown>) {
+  const field = DRAFT_FIELDS.find((name) => name === body.field) as DraftField | undefined;
+  if (!field) return { field: undefined, known: {} };
+  let parsed: unknown = {};
+  try {
+    parsed = typeof body.known === "string" ? JSON.parse(body.known) : {};
+  } catch {
+    parsed = {};
+  }
+  const known: KnownProductFields = {};
+  for (const key of ["title", "description", "category"] as const) {
+    const value = (parsed as Record<string, unknown> | null)?.[key];
+    if (typeof value === "string" && value.trim()) known[key] = value.trim().slice(0, 1000);
+  }
+  return { field, known };
 }
 
 function stringList(value: unknown) {
@@ -208,11 +226,20 @@ export const createProductDraft = asyncHandler(async (req, res) => {
   const { voice, images } = uploadedAiDraftFiles(req);
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
   const imageUrls = stringList(req.body.imageUrls);
-  // Photos alone are enough: «Заполнить карточку с ИИ» sends nothing else.
-  if (!prompt.trim() && !voice && !images.length && !imageUrls.length) throw new HttpError(400, "Добавьте фото товара или опишите его голосом или текстом");
+  const { field, known } = draftFieldRequest(req.body);
+  const hasPhotos = images.length > 0 || imageUrls.length > 0;
+  if (field) {
+    // One field: from the photos or from what the owner already typed in the other fields.
+    if (!hasPhotos && !Object.keys(known).some((key) => key !== field)) throw new HttpError(400, "Добавьте фото товара — по нему ИИ заполнит поле");
+  } else if (!prompt.trim() && !voice && !hasPhotos) {
+    // Photos alone are enough: «Сгенерировать карточку» sends nothing else.
+    throw new HttpError(400, "Добавьте фото товара или опишите его голосом или текстом");
+  }
   await aiUsageService.assertWithinLimit(store, "DRAFT");
 
-  const { result, usage } = await aiUsageService.measureTokens(() => createProductAiDraft({ prompt, voice, images, imageUrls }));
+  const { result, usage } = await aiUsageService.measureTokens(() =>
+    createProductAiDraft(field ? { field, known, images, imageUrls } : { prompt, voice, images, imageUrls })
+  );
   await aiUsageService.recordUsage(store.id, "DRAFT", 1, usage);
   res.json(result);
 });

@@ -54,16 +54,11 @@ export type ImageManagerState = ReturnType<typeof useImageManager>;
  */
 export function ImageManager({
   manager,
-  onFillWithAi,
-  isFilling = false,
   onCreatePreview,
   previewLabel = "Сделать превью с ИИ",
   previewReady = false
 }: {
   manager: ImageManagerState;
-  /** The store has AI: «Заполнить карточку с ИИ» fills the form from the photos alone. */
-  onFillWithAi?: () => void;
-  isFilling?: boolean;
   onCreatePreview?: () => void;
   previewLabel?: string;
   previewReady?: boolean;
@@ -141,14 +136,6 @@ export function ImageManager({
               . На витрине нельзя показывать лица людей и морды животных. Фото с пометкой «Проверка» покупатели пока видят: администратор проверит их и, если
               нарушение подтвердится, скроет фото или весь товар. «Скрыто» — администратор уже скрыл фото. Лучше заменить такие фото другими.
             </Notice>
-          )}
-          {onFillWithAi && (
-            <div className={styles.fillWithAi}>
-              <Button variant="primary" icon={AiMagicIcon} block loading={isFilling} onClick={onFillWithAi}>
-                {isFilling ? "ИИ заполняет карточку…" : "Заполнить карточку с ИИ"}
-              </Button>
-              <span className={styles.fillHint}>Название, описание, категорию и цвета ИИ определит по фото. Цену и размеры проверьте сами.</span>
-            </div>
           )}
           {onCreatePreview && (
             <Button variant={previewReady ? "primary" : "secondary"} icon={AiMagicIcon} block onClick={onCreatePreview}>

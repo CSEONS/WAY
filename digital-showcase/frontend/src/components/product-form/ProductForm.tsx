@@ -448,8 +448,9 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       <div ref={photosRef}>
         <ImageManager
           manager={imageManager}
+          // «Вручную» has no AI at all — unless the store has no AI cards and so no modes: then only previews (bought as a package) are AI.
           // In «Авто» the AI draws the preview with the card: the button appears with the card, for a variant of the owner's own.
-          onCreatePreview={aiPreviewPath && showFields ? () => setIsPreviewOpen(true) : undefined}
+          onCreatePreview={aiPreviewPath && showFields && (fillMode !== "manual" || !aiFormEnabled) ? () => setIsPreviewOpen(true) : undefined}
           previewLabel={
             previewDrawing.isDrawing
               ? `Рисуем превью… ${previewDrawing.seconds} с`

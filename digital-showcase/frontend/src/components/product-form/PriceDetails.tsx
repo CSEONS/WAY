@@ -1,9 +1,9 @@
-import { Add01Icon, Cancel01Icon, ColorPickerIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Cancel01Icon, ColorPickerIcon, Undo02Icon } from "@hugeicons/core-free-icons";
 import { FormEvent, useState, type ReactNode } from "react";
-import { Button, Card, CardHeader, Chip, ChipGroup, ColorSwatch, Field, IconButton, Input, Modal, SectionLabel, SegmentedControl, Switch } from "../../ui";
+import { Button, Card, CardHeader, Chip, ChipGroup, ColorSwatch, Field, IconButton, Input, Modal, SectionLabel, SegmentedControl, cx } from "../../ui";
 import { AiBadge } from "./AiBadge";
 import { sortSizes } from "../../utils/format";
-import { PRICE_ERROR, isValidPrice } from "../../utils/price";
+import { PRICE_ERROR, isValidPrice, parsePrice } from "../../utils/price";
 import { combinationsLabel, normalizeHex, normalizeSize } from "./helpers";
 import {
   LETTER_SIZES,
@@ -51,16 +51,51 @@ async function pickColorFromScreen() {
   }
 }
 
-/** What a combination is called in the price list: its size, or its color when no sizes are ticked. */
-function combinationLabel({ color, size }: Combination) {
-  return size ?? color?.name ?? "";
+/** «Бордовый / M»; just the size or the color when only one of them is ticked. */
+function combinationName({ color, size }: Combination) {
+  return [color?.name, size].filter(Boolean).join(" / ");
+}
+
+/** «2890» → «2 890»; anything that isn't a price stays as typed. */
+function formatAmount(value: string) {
+  const amount = parsePrice(value);
+  return amount != null && !Number.isNaN(amount) ? amount.toLocaleString("ru-RU") : value;
 }
 
 /**
- * «Цена, размеры и цвета»: tap sizes and colors, set the price. The switch on
- * top turns on «Разные цены»: then every color × size gets a line with its
- * own price (empty — the usual one), and a combination that isn't sold can be
- * taken out and put back. Both ways look and work the same; switching loses nothing.
+ * A combination's price as a pill, typed into in place: its own price filled
+ * with the accent, the usual one pale (shown as the placeholder).
+ */
+function PricePill({ value, usual, label, onChange }: { value: string; usual: string; label: string; onChange: (value: string) => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const isOwn = Boolean(value.trim());
+  const text = isEditing ? value : formatAmount(value);
+  const placeholder = usual.trim() ? formatAmount(usual) : "Уточнить";
+  return (
+    <label className={cx(styles.pricePill, isOwn && styles.pricePillOwn, !isValidPrice(value) && styles.pricePillInvalid)}>
+      <input
+        className={styles.pricePillInput}
+        inputMode="decimal"
+        value={text}
+        placeholder={placeholder}
+        aria-label={`Цена: ${label}`}
+        // As wide as what's in it.
+        style={{ width: `${Math.max(2, (text || placeholder).length) + 0.5}ch` }}
+        onFocus={() => setIsEditing(true)}
+        onBlur={() => setIsEditing(false)}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {(isOwn || usual.trim()) && <span aria-hidden="true">₽</span>}
+    </label>
+  );
+}
+
+/**
+ * «Цена, размеры и цвета»: tap sizes and colors, set the price. «Одна цена /
+ * Разные цены» on top: with different prices every color × size is a line
+ * «Бордовый / M» with its price pill (empty — the usual price), and a
+ * combination that isn't sold can be taken out and put back. Both ways look
+ * and work the same; switching loses nothing.
  */
 export function PriceDetails({ value, onChange, mode, onModeChange, variantPrices, onVariantPricesChange, aiFilled, colorsAction, coverUrl }: PriceDetailsProps) {
   const [sizeKind, setSizeKind] = useState<"letters" | "numbers">(() => (value.sizes.some(isNumericSize) ? "numbers" : "letters"));
@@ -76,11 +111,6 @@ export function PriceDetails({ value, onChange, mode, onModeChange, variantPrice
   const all = combinations(value);
   const missing = new Set(variantPrices.missing);
   const sold = all.filter((combination) => !missing.has(combination.key));
-  // Sizes under each color; with only sizes or only colors ticked — one plain list.
-  const groups =
-    value.colors.length && value.sizes.length
-      ? value.colors.map((color) => ({ color, items: all.filter((combination) => combination.color?.name === color.name) }))
-      : [{ color: null, items: all }];
 
   function toggleSize(size: string) {
     onChange("sizes", (current) => ({
@@ -133,14 +163,24 @@ export function PriceDetails({ value, onChange, mode, onModeChange, variantPrice
   return (
     <Card as="section" className={styles.section}>
       <CardHeader title="Цена, размеры и цвета" />
-      <Switch
-        checked={isDifferent}
-        onChange={(checked) => onModeChange(checked ? "advanced" : "simple")}
-        label="Разные цены для размеров и цветов"
-        description={
-          isDifferent ? "Покупатель выберет цвет и размер и увидит их цену" : "Включите, если, например, XXL дороже остальных. Сейчас цена одна, покупатели просто видят размеры и цвета"
-        }
-      />
+      <div className={styles.builderBlock}>
+        <SegmentedControl
+          label="Как указать цену"
+          size="sm"
+          className={styles.priceMode}
+          value={mode}
+          onChange={onModeChange}
+          options={[
+            { value: "simple", label: "Одна цена" },
+            { value: "advanced", label: "Разные цены" }
+          ]}
+        />
+        <p className={styles.hint}>
+          {isDifferent
+            ? "У каждого сочетания цвета и размера — своя цена: покупатель выберет его и увидит её"
+            : "Одна цена для всех размеров и цветов: покупатели видят их, но не выбирают. Если, например, XXL дороже — выберите «Разные цены»"}
+        </p>
+      </div>
 
       <Field
         label={
@@ -218,59 +258,38 @@ export function PriceDetails({ value, onChange, mode, onModeChange, variantPrice
           </div>
           {all.length ? (
             <>
-              <p className={styles.hint}>Поставьте цену там, где она не обычная. Крестик — такого сочетания нет в продаже.</p>
-              {groups.map(({ color, items }) => {
-                const notSold = items.filter((combination) => missing.has(combination.key));
-                return (
-                  <div className={styles.priceGroup} key={color?.name ?? "all"}>
-                    {color && (
-                      <span className={styles.priceGroupHead}>
-                        <ColorSwatch color={color.hex} size="sm" />
-                        {color.name}
+              <p className={styles.hint}>Нажмите на цену, чтобы поменять: бледная — обычная, синяя — своя. Крестик — такого сочетания нет в продаже.</p>
+              <ul className={styles.combos}>
+                {all.map((combination) => {
+                  const name = combinationName(combination);
+                  const isSold = !missing.has(combination.key);
+                  return (
+                    <li className={cx(styles.combo, !combination.color && styles.comboNoColor, !isSold && styles.comboOff)} key={combination.key}>
+                      {combination.color && <ColorSwatch color={combination.color.hex} size="md" />}
+                      <span className={styles.comboName}>
+                        {combination.color ? <strong>{combination.color.name}</strong> : <strong>{combination.size}</strong>}
+                        {combination.color && combination.size && <span className={styles.comboSize}> / {combination.size}</span>}
                       </span>
-                    )}
-                    {items
-                      .filter((combination) => !missing.has(combination.key))
-                      .map((combination) => {
-                        const label = combinationLabel(combination);
-                        const price = variantPrices.prices[combination.key] ?? "";
-                        return (
-                          <div className={styles.priceRow} key={combination.key}>
-                            <span className={styles.priceLabel}>
-                              {!combination.size && combination.color && <ColorSwatch color={combination.color.hex} size="sm" />}
-                              {label}
-                            </span>
-                            <Input
-                              inputMode="decimal"
-                              className={styles.priceInput}
-                              value={price}
-                              invalid={!isValidPrice(price)}
-                              placeholder={value.price.trim() || "Уточнить"}
-                              aria-label={`Цена: ${color ? `${color.name}, ` : ""}${label}`}
-                              onChange={(event) => setCombinationPrice(combination.key, event.target.value)}
-                            />
-                            <IconButton
-                              icon={Cancel01Icon}
-                              label={`Нет в продаже: ${color ? `${color.name}, ` : ""}${label}`}
-                              variant="ghost"
-                              onClick={() => setSold(combination.key, false)}
-                            />
-                          </div>
-                        );
-                      })}
-                    {notSold.length > 0 && (
-                      <div className={styles.notSold}>
-                        <span className={styles.hint}>Нет в продаже:</span>
-                        {notSold.map((combination) => (
-                          <Chip key={combination.key} dashed icon={Add01Icon} onClick={() => setSold(combination.key, true)}>
-                            {combinationLabel(combination)}
-                          </Chip>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {isSold ? (
+                        <PricePill
+                          value={variantPrices.prices[combination.key] ?? ""}
+                          usual={value.price}
+                          label={name}
+                          onChange={(price) => setCombinationPrice(combination.key, price)}
+                        />
+                      ) : (
+                        <span className={styles.comboOffNote}>нет в продаже</span>
+                      )}
+                      <IconButton
+                        icon={isSold ? Cancel01Icon : Undo02Icon}
+                        label={isSold ? `Нет в продаже: ${name}` : `Вернуть в продажу: ${name}`}
+                        size="sm"
+                        onClick={() => setSold(combination.key, !isSold)}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
             </>
           ) : (
             <p className={styles.hint}>Отметьте размеры или цвета выше — у каждого сочетания можно будет поставить свою цену.</p>

@@ -269,52 +269,107 @@
   font-size: var(--font-size-xs);
 }
 
-/* «Разные цены»: a block per color, a line per size — label, price, «нет в продаже». */
-.priceGroup {
+/* «Одна цена / Разные цены»: as wide as its two words, like «XS–XXL / 40–56». */
+.priceMode {
+  justify-self: start;
+}
+
+/* «Разные цены»: «Бордовый / M» and its price pill, a line each. */
+.combos {
   display: grid;
-  gap: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.priceGroupHead {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) 0;
-  color: var(--color-ink);
-  font-weight: var(--font-weight-semibold);
-}
-
-.priceRow {
+.combo {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, 160px) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) 0;
 }
 
-.priceLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+.combo:last-child {
+  border-bottom: 0;
+}
+
+/* Only sizes ticked: no swatch, the name takes its place. */
+.comboNoColor {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.comboName {
   overflow: hidden;
   color: var(--color-ink);
+  font-size: var(--font-size-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.priceInput {
-  min-height: var(--control-md);
+.comboName strong {
+  font-weight: var(--font-weight-semibold);
 }
 
-.notSold {
-  display: flex;
-  flex-wrap: wrap;
+.comboSize {
+  color: var(--color-ink-muted);
+}
+
+.comboOff .comboName,
+.comboOff > :first-child {
+  opacity: 0.45;
+}
+
+.comboOffNote {
+  color: var(--color-ink-subtle);
+  font-size: var(--font-size-sm);
+}
+
+/* The price: the combination's own one filled, the usual one pale; typed into in place. */
+.pricePill {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding-top: var(--space-1);
+  gap: 0.25ch;
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  color: var(--color-ink-muted);
+  background: var(--color-accent-soft);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+}
+
+.pricePill:focus-within {
+  box-shadow: var(--focus-ring);
+}
+
+.pricePillOwn {
+  color: var(--color-accent-ink);
+  background: var(--color-accent);
+}
+
+.pricePillInvalid {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.pricePillInput {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-align: right;
+  outline: none;
+}
+
+.pricePillInput::placeholder {
+  color: inherit;
+  opacity: 1;
 }
 
 /* Color dialog */

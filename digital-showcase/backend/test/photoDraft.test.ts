@@ -39,6 +39,8 @@ test("черновик только по фото: в ИИ уходят фото
   assert.equal(draft.category, "Верхняя одежда");
   assert.equal(draft.price, null);
   assert.equal(draft.priceText, "Уточнить у продавца");
+  assert.deepEqual(draft.colors, [{ name: "синий", hex: "#1b2f6b" }]);
+  assert.ok(draft.variants.every((variant) => variant.colorHex === "#1b2f6b"), "variants built from colors keep the AI's code");
 
   const content = lastBody!.messages[1].content as { type: string; text?: string; image_url?: { url: string } }[];
   assert.match(content[0].text ?? "", /заполни карточку только по фотографиям/);

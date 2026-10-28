@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ProductStatus } from "../types/models.js";
+import { colorHexForName, colorNamesIn, parseColorHex, resolveColorHex } from "../utils/colorHex.js";
 import { HttpError } from "../utils/http.js";
 import { completeJson, isAiConfigured, transcribe } from "./aiProvider.js";
 import { optimizeImageForAi } from "./imageService.js";
@@ -55,42 +56,6 @@ export interface BulkProductAiDraft extends ProductAiDraft {
   imageIndexes: number[];
 }
 
-const colorHexByName: Record<string, string> = {
-  белый: "#ffffff",
-  белая: "#ffffff",
-  белое: "#ffffff",
-  черный: "#000000",
-  черная: "#000000",
-  черное: "#000000",
-  синий: "#2779a7",
-  синяя: "#2779a7",
-  синее: "#2779a7",
-  голубой: "#49c5b6",
-  красный: "#d92d20",
-  красная: "#d92d20",
-  зеленый: "#12b76a",
-  зеленая: "#12b76a",
-  желтый: "#ecd06f",
-  желтая: "#ecd06f",
-  серый: "#667085",
-  серая: "#667085",
-  бежевый: "#d6bb98",
-  розовый: "#ee46bc"
-};
-
-const colorAliases: Record<string, string> = {
-  белая: "белый",
-  белое: "белый",
-  черная: "черный",
-  черное: "черный",
-  синяя: "синий",
-  синее: "синий",
-  красная: "красный",
-  зеленая: "зеленый",
-  желтая: "желтый",
-  серая: "серый"
-};
-
 const productDraftInstructions = `
 Ты помогаешь владельцу небольшого магазина одежды заполнить форму товара.
 Верни только JSON без markdown и пояснений. В ответе обязательно должен быть JSON.
@@ -104,9 +69,10 @@ const productDraftInstructions = `
   "status": "AVAILABLE" | "NOT_AVAILABLE" | "CHECK_IN_STORE",
   "isVisible": 1 или 0,
   "sizes": ["S", "M"],
-  "colors": [{"name":"синий","hex":"#2779a7"}],
-  "variants": [{"colorName":"синий","colorHex":"#2779a7","size":"M","price":4500}]
+  "colors": [{"name":"тёмно-синий","hex":"#1f2a44"}],
+  "variants": [{"colorName":"тёмно-синий","colorHex":"#1f2a44","size":"M","price":4500}]
 }
+hex и colorHex — всегда код цвета в формате #RRGGBB, подобранный по фото (или по названию, если фото нет), например "#1f2a44". Никогда не пиши в hex название цвета.
 Не выдумывай точную цену, если ее нет в тексте или голосе. Используй null и priceText "Уточнить у продавца".
 AI не принимает финальных решений: возвращай только редактируемое предложение.
 `;
@@ -116,7 +82,7 @@ const fieldTasks: Record<DraftField, string> = {
   description:
     "Напиши только описание для покупателя (description): 2–4 коротких предложения — ткань, фасон, посадка, детали, то, что видно. Без цены и размеров, без восклицаний.",
   category: "Определи только категорию (category): одно-два слова во множественном числе, например «Платья», «Брюки», «Верхняя одежда», «Обувь».",
-  colors: "Определи только цвета товара (colors): те, что видны на самой вещи, а не на фоне. Названия по-русски, hex — примерный."
+  colors: "Определи только цвета товара (colors): те, что видны на самой вещи, а не на фоне. Названия по-русски, у каждого — hex: код #RRGGBB, как цвет выглядит на фото, а не название."
 };
 
 const knownLabels: Record<keyof KnownProductFields, string> = { title: "Название", description: "Описание", category: "Категория" };
@@ -384,9 +350,9 @@ function normalizeAiDraft(rawText: string, fallbackPrompt: string): ProductAiDra
   const price = numberOrNull(parsed.price);
   const colors = normalizeColors(parsed.colors);
   const sizes = normalizeStrings(parsed.sizes);
-  let variants = normalizeDraftVariants(parsed.variants);
+  let variants = normalizeDraftVariants(parsed.variants, colors);
   if (!variants.length && (colors.length || sizes.length)) {
-    variants = buildVariants("", colors.map((color) => color.name), sizes, price);
+    variants = buildVariants("", colors, sizes, price);
   }
 
   return {
@@ -426,22 +392,24 @@ function normalizeColors(value: unknown): { name: string; hex: string | null }[]
   for (const item of value) {
     if (typeof item === "string") {
       const name = item.trim();
-      if (name) colors.push({ name, hex: colorHexByName[name.toLowerCase()] ?? null });
+      if (name) colors.push({ name, hex: colorHexForName(name) });
       continue;
     }
 
     if (item && typeof item === "object") {
       const color = item as { name?: unknown; hex?: unknown };
       const name = String(color.name ?? "").trim();
-      if (name) colors.push({ name, hex: typeof color.hex === "string" && color.hex.trim() ? color.hex.trim() : colorHexByName[name.toLowerCase()] ?? null });
+      if (name) colors.push({ name, hex: resolveColorHex(color.hex, name) });
     }
   }
 
   return colors;
 }
 
-function normalizeDraftVariants(value: unknown): DraftVariant[] {
+/** A variant without its own code takes the one its color got in `colors`. */
+function normalizeDraftVariants(value: unknown, colors: { name: string; hex: string | null }[]): DraftVariant[] {
   if (!Array.isArray(value)) return [];
+  const hexByName = new Map(colors.map((color) => [color.name.toLowerCase(), color.hex]));
   const variants: DraftVariant[] = [];
 
   for (const item of value) {
@@ -452,7 +420,7 @@ function normalizeDraftVariants(value: unknown): DraftVariant[] {
     if (!colorName || !size) continue;
     variants.push({
       colorName,
-      colorHex: stringOrNull(variant.colorHex) ?? colorHexByName[colorName.toLowerCase()] ?? null,
+      colorHex: parseColorHex(variant.colorHex) ?? hexByName.get(colorName.toLowerCase()) ?? resolveColorHex(variant.colorHex, colorName),
       size,
       price: numberOrNull(variant.price)
     });
@@ -479,7 +447,7 @@ function createLocalProductAiDraft(prompt: string): ProductAiDraft {
   const normalized = prompt.replace(/\s+/g, " ").trim();
   const lower = normalized.toLowerCase();
   const price = findFirstPrice(lower);
-  const colors = findColors(lower);
+  const colors = colorNamesIn(lower).map((name) => ({ name, hex: colorHexForName(name) }));
   const sizes = findSizes(normalized);
   const variants = buildVariants(lower, colors, sizes, price);
 
@@ -492,7 +460,7 @@ function createLocalProductAiDraft(prompt: string): ProductAiDraft {
     status: "AVAILABLE",
     isVisible: 1,
     sizes,
-    colors: colors.map((name) => ({ name, hex: colorHexByName[name] ?? null })),
+    colors,
     variants
   };
 }
@@ -517,14 +485,6 @@ function findFirstPrice(prompt: string) {
   return Number(match[1].replace(/\s/g, ""));
 }
 
-function findColors(prompt: string) {
-  const colors = new Set<string>();
-  for (const rawName of Object.keys(colorHexByName)) {
-    if (new RegExp(`\\b${rawName}\\b`, "i").test(prompt)) colors.add(colorAliases[rawName] ?? rawName);
-  }
-  return [...colors];
-}
-
 function findSizes(prompt: string) {
   const sizes = new Set<string>();
   const letterSizeMatches = prompt.match(/\b(?:XS|S|M|L|XL|XXL|XXXL)\b/gi) ?? [];
@@ -535,15 +495,15 @@ function findSizes(prompt: string) {
   return [...sizes];
 }
 
-function buildVariants(prompt: string, colors: string[], sizes: string[], fallbackPrice: number | null) {
-  const safeColors = colors.length ? colors : ["Уточнить"];
+function buildVariants(prompt: string, colors: { name: string; hex: string | null }[], sizes: string[], fallbackPrice: number | null) {
+  const safeColors = colors.length ? colors : [{ name: "Уточнить", hex: null }];
   const safeSizes = sizes.length ? sizes : ["Уточнить"];
-  return safeColors.flatMap((colorName) =>
+  return safeColors.flatMap((color) =>
     safeSizes.map((size) => ({
-      colorName,
-      colorHex: colorHexByName[colorName] ?? null,
+      colorName: color.name,
+      colorHex: color.hex,
       size,
-      price: findNearbyPrice(prompt, colorName, size) ?? fallbackPrice
+      price: findNearbyPrice(prompt, color.name, size) ?? fallbackPrice
     }))
   );
 }

@@ -210,7 +210,7 @@ export function useVariantBuilder(initial: Product | undefined, savedDraft: Save
     const nextVariants = draftVariants.map((variant) => ({
       id: createId(),
       colorName: variant.colorName,
-      colorHex: variant.colorHex ?? "#2779a7",
+      colorHex: normalizeHex(variant.colorHex),
       size: variant.size,
       price: variant.price?.toString() ?? ""
     }));

@@ -10,6 +10,7 @@ import { AutoPanel } from "./AutoPanel";
 import { ASK_SELLER, hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
 import { PreviewGenerator } from "./PreviewGenerator";
+import { previewRequest, readPreviewOptions } from "./previewOptions";
 import { usePreviewDrawing } from "./usePreviewDrawing";
 import {
   CATEGORY_PRESETS,
@@ -222,8 +223,25 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     if (draftSimple?.colors.length) filled.add("colors");
     setAiFilled(filled);
     setIsAutoDone(true);
+    const isDrawingPreview = drawAutoPreview(draft);
     const noPrice = !draftSimple?.price && !simple.price.trim();
-    toast.show(`ИИ заполнил форму. Проверьте поля с пометкой «ИИ»${noPrice ? " и укажите цену" : ""}.`, { tone: "success", duration: 6000 });
+    toast.show(
+      `ИИ заполнил форму. Проверьте поля с пометкой «ИИ»${noPrice ? " и укажите цену" : ""}.${isDrawingPreview ? " Превью рисуется — через минуту оно само станет обложкой." : ""}`,
+      { tone: "success", duration: 6000 }
+    );
+  }
+
+  /**
+   * «Авто» also draws the preview: from the cover, in the look chosen last
+   * time, with what the AI just called the product. Once per form — a card
+   * generated again keeps its preview («Посмотреть превью» draws another).
+   */
+  function drawAutoPreview(draft: ProductDraft) {
+    const photo = imageManager.previewImage;
+    if (!aiPreviewPath || !photo || previewDrawing.isDrawing || previewDrawing.results.length) return false;
+    const product = { title: draft.title ?? form.title, category: draft.category ?? form.category, colors: (draft.colors ?? []).map((color) => color.name) };
+    void previewDrawing.draw(previewRequest(photo, readPreviewOptions(), product), photo.id);
+    return true;
   }
 
   // Something the owner typed would be replaced: ask first.
@@ -435,7 +453,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       </div>
 
       {!showFields && (
-        <AutoPanel hasPhotos={imageManager.images.length > 0} isGenerating={isGenerating} onGenerate={askToGenerate} />
+        <AutoPanel hasPhotos={imageManager.images.length > 0} withPreview={Boolean(aiPreviewPath)} isGenerating={isGenerating} onGenerate={askToGenerate} />
       )}
 
       {showFields && (

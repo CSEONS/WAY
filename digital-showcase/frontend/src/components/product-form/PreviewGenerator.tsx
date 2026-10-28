@@ -8,6 +8,7 @@ import {
   MAX_HEADLINE,
   SCENES,
   THEMES,
+  previewRequest,
   readPreviewOptions,
   savePreviewOptions,
   type PreviewFeature,
@@ -76,22 +77,7 @@ export function PreviewGenerator({ drawing, images, coverId, product, onClose }:
   function draw() {
     if (!photo) return;
     savePreviewOptions(options);
-    const formData = new FormData();
-    // A new photo goes as a file; a saved one — by its address.
-    if (photo.file) formData.append("image", photo.file);
-    else formData.append("imageUrl", photo.url);
-    formData.append(
-      "options",
-      JSON.stringify({
-        ...options,
-        headline: withText ? options.headline.trim() : "",
-        showColors: options.showColors && colors.length > 1,
-        title: product.title.trim(),
-        category: product.category.trim(),
-        colors
-      })
-    );
-    void drawing.draw(formData, photo.id);
+    void drawing.draw(previewRequest(photo, options, product), photo.id);
     // The request is on its way: the window folds away, the owner keeps filling in the product.
     // When the picture is ready, it becomes the cover and the form opens this window again to show it.
     toast.show("Рисуем превью — через минуту оно само станет обложкой. Можно заполнять товар дальше", { duration: 5000 });

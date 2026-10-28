@@ -59,6 +59,17 @@ test("заголовки безопасности на месте, Express не 
   assert.equal(response.headers.get("x-powered-by"), null);
 });
 
+test("фото отдаются с кэшем на год: браузер не спрашивает сервер о них снова", async () => {
+  fs.mkdirSync(process.env.UPLOAD_DIR!, { recursive: true });
+  fs.writeFileSync(path.join(process.env.UPLOAD_DIR!, "photo.webp"), "webp");
+  const photo = await fetch(`${base}/uploads/photo.webp`);
+  assert.equal(photo.status, 200);
+  assert.equal(photo.headers.get("cache-control"), "public, max-age=31536000, immutable");
+  const missing = await fetch(`${base}/uploads/missing.webp`);
+  assert.equal(missing.status, 404);
+  assert.equal(missing.headers.get("cache-control")?.includes("immutable") ?? false, false, "a missing photo isn't remembered");
+});
+
 test("владелец А не видит и не меняет магазин Б", async () => {
   const token = await login("+7 928 000-00-11", "password-a");
   assert.equal((await call("GET", `/api/owner/stores/${storeA.id}`, { token })).status, 200);

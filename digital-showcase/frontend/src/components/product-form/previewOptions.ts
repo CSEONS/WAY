@@ -1,6 +1,8 @@
 // «Превью с ИИ»: what the owner can choose. The keys match the server
 // (backend/src/services/previewImageService.ts), which turns them into the prompt.
 
+import type { ProductFormImage } from "./types";
+
 export type PreviewScene = "auto" | "studio" | "city" | "nature" | "interior" | "winter" | "beach" | "sport";
 export type PreviewTheme =
   | "auto"
@@ -99,6 +101,29 @@ export function savePreviewOptions({ headline: _headline, ...look }: PreviewOpti
   } catch {
     // Private mode: the choice just isn't remembered.
   }
+}
+
+/**
+ * What «Превью с ИИ» sends: the photo (a new one as a file, a saved one by its
+ * address), the options and what the product is — the window and «Авто» both.
+ */
+export function previewRequest(photo: ProductFormImage, options: PreviewOptions, product: { title: string; category: string; colors: string[] }) {
+  const colors = [...new Set(product.colors.map((color) => color.trim()).filter(Boolean))];
+  const formData = new FormData();
+  if (photo.file) formData.append("image", photo.file);
+  else formData.append("imageUrl", photo.url);
+  formData.append(
+    "options",
+    JSON.stringify({
+      ...options,
+      headline: options.text === "with_text" ? options.headline.trim() : "",
+      showColors: options.showColors && colors.length > 1,
+      title: product.title.trim(),
+      category: product.category.trim(),
+      colors
+    })
+  );
+  return formData;
 }
 
 /** The server answers with a data: URL; CSP forbids fetch(data:), so it's decoded by hand. */

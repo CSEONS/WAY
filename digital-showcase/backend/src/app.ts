@@ -33,7 +33,8 @@ app.use(
 );
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost", credentials: true, exposedHeaders: ["X-Total-Count"] }));
 app.use(express.json({ limit: "1mb" }));
-app.use("/uploads", express.static(process.env.UPLOAD_DIR ?? path.resolve("uploads")));
+// A photo is never changed under its name (a new one gets a new name): browsers keep it for a year without asking again.
+app.use("/uploads", express.static(process.env.UPLOAD_DIR ?? path.resolve("uploads"), { maxAge: "365d", immutable: true }));
 
 function limiter(windowMinutes: number, limit: number, message: string, options: { skipSuccessfulRequests?: boolean } = {}) {
   return rateLimit({

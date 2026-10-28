@@ -26,6 +26,12 @@
   user-select: none;
 }
 
+/* Seen or next in line: loaded and kept, just not shown. */
+.photoAside {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .top {
   position: absolute;
   top: var(--space-3);

@@ -4,22 +4,25 @@ import styles from "./ProductForm.module.css";
 
 interface AutoPanelProps {
   hasPhotos: boolean;
+  /** The store can have AI previews: the AI draws one with the card. */
+  withPreview: boolean;
   isGenerating: boolean;
   onGenerate: () => void;
 }
 
 /**
- * «Авто»: photos and one button — the AI fills the whole card. Price and sizes
- * aren't on the photos: the owner checks the card and adds them after.
+ * «Авто»: photos and one button — the AI fills the whole card and draws the
+ * preview. Price and sizes aren't on the photos: the owner checks the card and
+ * adds them after.
  */
-export function AutoPanel({ hasPhotos, isGenerating, onGenerate }: AutoPanelProps) {
+export function AutoPanel({ hasPhotos, withPreview, isGenerating, onGenerate }: AutoPanelProps) {
   return (
     <Card as="section" className={styles.section} aria-busy={isGenerating}>
       <CardHeader
         title="Сгенерировать карточку"
         description={
           hasPhotos
-            ? "ИИ заполнит название, описание, категорию и цвета по фото. Вам останется проверить карточку и указать цену."
+            ? `ИИ заполнит название, описание, категорию и цвета по фото${withPreview ? " и нарисует превью для обложки" : ""}. Вам останется проверить карточку и указать цену.`
             : "Добавьте фото товара выше — по нему ИИ заполнит всю карточку."
         }
       />

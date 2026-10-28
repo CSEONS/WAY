@@ -1,34 +1,31 @@
 import { AiEditingIcon, AiMagicIcon, Edit02Icon, InformationCircleIcon, LockKeyIcon } from "@hugeicons/core-free-icons";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Product, ProductStatus } from "../../types/models";
-import { PRICE_ERROR, isValidPrice, parsePrice } from "../../utils/price";
+import { PRICE_ERROR } from "../../utils/price";
 import { Button, Card, CardHeader, Chip, ChipGroup, ConfirmModal, Field, Input, Notice, SegmentedControl, Textarea, useToast } from "../../ui";
 import { AiBadge } from "./AiBadge";
 import { AiFieldButton } from "./AiFieldButton";
 import { type AiDraftField, requestAiDraft } from "./aiDraft";
 import { AutoPanel } from "./AutoPanel";
-import { ASK_SELLER, hasDraftContent, readSavedDraft } from "./helpers";
+import { hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
 import { PreviewGenerator } from "./PreviewGenerator";
 import { previewRequest, readPreviewOptions } from "./previewOptions";
 import { usePreviewDrawing } from "./usePreviewDrawing";
 import {
   CATEGORY_PRESETS,
-  emptySimpleDetails,
-  simpleFromDraft,
-  simpleFromProduct,
+  arePricesValid,
+  detailsFromDraft,
+  detailsFromProduct,
+  detailsFromSavedDraft,
   simplePayload,
-  simpleToVariantRows,
-  simplifyVariantRows,
-  variantsToSimple,
-  type SimpleDetails as SimpleDetailsValue
+  variantPayload,
+  type SimpleDetails as SimpleDetailsValue,
+  type VariantPrices
 } from "./simple";
-import { SimpleDetails, type SimpleField } from "./SimpleDetails";
+import { PriceDetails, type SimpleField } from "./PriceDetails";
 import { StatusCard } from "./StatusCard";
 import type { DetailsMode, ProductDraft, ProductFormState, ProductImageSelection, ProductPayload, SavedProductFormDraft } from "./types";
-import { useVariantBuilder } from "./useVariantBuilder";
-import { VariantBuilder } from "./VariantBuilder";
-import { VariantModal } from "./VariantModal";
 import styles from "./ProductForm.module.css";
 
 interface ProductFormProps {
@@ -101,7 +98,8 @@ function selectFieldText(event: KeyboardEvent<HTMLFormElement>) {
 export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled, draftKey, onSubmit }: ProductFormProps) {
   const toast = useToast();
   const savedDraft = useMemo(() => readSavedDraft(draftKey), [draftKey]);
-  const initialSimple = useMemo(() => simpleFromProduct(initial), [initial]);
+  // A draft left unsaved wins over the product as it is on the server.
+  const initialDetails = useMemo(() => detailsFromSavedDraft(savedDraft) ?? detailsFromProduct(initial), [savedDraft, initial]);
   const [form, setForm] = useState<ProductFormState>(
     savedDraft?.form ?? {
       title: initial?.title ?? "",
@@ -120,9 +118,10 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   const [fillingField, setFillingField] = useState<AiDraftField | null>(null);
   const [aiFilled, setAiFilled] = useState<Set<AiField>>(new Set());
   const [isDraftNoticeVisible, setIsDraftNoticeVisible] = useState(Boolean(savedDraft));
-  const [mode, setMode] = useState<DetailsMode>(savedDraft?.mode ?? (initialSimple ? "simple" : "advanced"));
-  const [simple, setSimple] = useState<SimpleDetailsValue>(savedDraft?.simple ?? initialSimple ?? emptySimpleDetails);
-  const [isSimplifyConfirmOpen, setIsSimplifyConfirmOpen] = useState(false);
+  const [mode, setMode] = useState<DetailsMode>(initialDetails.mode);
+  const [simple, setSimple] = useState<SimpleDetailsValue>(initialDetails.simple);
+  // Kept while the switch is off: turning «Разные цены» back on brings them back.
+  const [variantPrices, setVariantPrices] = useState<VariantPrices>(initialDetails.variantPrices);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false);
   const [isNoPhotosConfirmOpen, setIsNoPhotosConfirmOpen] = useState(false);
@@ -130,8 +129,6 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   const previewDrawing = usePreviewDrawing(aiPreviewPath ?? null, isPreviewOpen, imageManager.addCover);
   const hasSubmittedRef = useRef(false);
   const photosRef = useRef<HTMLDivElement>(null);
-  const builder = useVariantBuilder(initial, savedDraft, draftKey);
-  const { variants } = builder;
 
   // A finished preview is already the cover: the window opens to show it.
   useEffect(() => {
@@ -140,13 +137,13 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
 
   useEffect(() => {
     if (!draftKey) return;
-    const draft: SavedProductFormDraft = { form, variants, mode, simple };
+    const draft: SavedProductFormDraft = { form, mode, simple, variantPrices };
     if (!hasDraftContent(draft)) {
       localStorage.removeItem(draftKey);
       return;
     }
     localStorage.setItem(draftKey, JSON.stringify(draft));
-  }, [draftKey, form, variants, mode, simple]);
+  }, [draftKey, form, mode, simple, variantPrices]);
 
   function clearSavedDraft() {
     if (draftKey) localStorage.removeItem(draftKey);
@@ -172,25 +169,6 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     setSimple(update);
   }
 
-  function switchToAdvanced() {
-    builder.replaceRows(simpleToVariantRows(simple));
-    setMode("advanced");
-  }
-
-  function switchToSimple() {
-    if (variantsToSimple(variants)) {
-      applySimplification();
-      return;
-    }
-    setIsSimplifyConfirmOpen(true);
-  }
-
-  function applySimplification() {
-    setSimple(simplifyVariantRows(variants));
-    setMode("simple");
-    setIsSimplifyConfirmOpen(false);
-  }
-
   function applyDraft(draft: ProductDraft) {
     setForm((current) => ({
       ...current,
@@ -200,31 +178,27 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       status: draft.status ?? current.status,
       isVisible: draft.isVisible ?? current.isVisible
     }));
-    builder.applyDraftVariants(draft.variants);
-    const draftSimple = simpleFromDraft(draft);
-    if (draftSimple) {
-      // What the AI couldn't tell (the price and sizes are rarely on a photo) keeps the owner's value.
-      setSimple((current) => ({
-        price: draftSimple.price || current.price,
-        sizes: draftSimple.sizes.length ? draftSimple.sizes : current.sizes,
-        colors: draftSimple.colors.length ? draftSimple.colors : current.colors
-      }));
-      setMode("simple");
-    } else {
-      setMode("advanced");
-    }
+    const { simple: draftSimple, variantPrices: draftPrices, isOnePrice } = detailsFromDraft(draft);
+    // What the AI couldn't tell (the price and sizes are rarely on a photo) keeps the owner's value.
+    setSimple((current) => ({
+      price: draftSimple.price || current.price,
+      sizes: draftSimple.sizes.length ? draftSimple.sizes : current.sizes,
+      colors: draftSimple.colors.length ? draftSimple.colors : current.colors
+    }));
+    if (!isOnePrice) setVariantPrices(draftPrices);
+    setMode(isOnePrice ? "simple" : "advanced");
 
     const filled = new Set<AiField>();
     if (draft.title) filled.add("title");
     if (draft.description) filled.add("description");
     if (draft.category) filled.add("category");
-    if (draftSimple?.price) filled.add("price");
-    if (draftSimple?.sizes.length) filled.add("sizes");
-    if (draftSimple?.colors.length) filled.add("colors");
+    if (draftSimple.price) filled.add("price");
+    if (draftSimple.sizes.length) filled.add("sizes");
+    if (draftSimple.colors.length) filled.add("colors");
     setAiFilled(filled);
     setIsAutoDone(true);
     const isDrawingPreview = drawAutoPreview(draft);
-    const noPrice = !draftSimple?.price && !simple.price.trim();
+    const noPrice = !draftSimple.price && !simple.price.trim();
     toast.show(
       `ИИ заполнил форму. Проверьте поля с пометкой «ИИ»${noPrice ? " и укажите цену" : ""}.${isDrawingPreview ? " Превью рисуется — через минуту оно само станет обложкой." : ""}`,
       { tone: "success", duration: 6000 }
@@ -250,8 +224,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       form.description.trim() ||
       form.category.trim() ||
       simple.sizes.length ||
-      simple.colors.length ||
-      (mode === "advanced" && variants.some((variant) => variant.colorName.trim() || variant.size.trim()))
+      simple.colors.length
   );
 
   function changeFillMode(next: FillMode) {
@@ -301,7 +274,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   /** Takes only the asked field from the AI's answer. False — it came back empty. */
   function applyField(field: AiDraftField, draft: ProductDraft) {
     if (field === "colors") {
-      const colors = simpleFromDraft({ ...draft, variants: [] })?.colors ?? [];
+      const { colors } = detailsFromDraft({ ...draft, variants: [] }).simple;
       if (!colors.length) return false;
       setSimple((current) => ({ ...current, colors }));
     } else {
@@ -324,31 +297,6 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       />
     ) : undefined;
 
-  function advancedPayload() {
-    const normalizedVariants = variants
-      .map((variant) => ({
-        colorName: variant.colorName.trim(),
-        colorHex: variant.colorHex.trim() || null,
-        size: variant.size.trim(),
-        price: variant.price && variant.price !== ASK_SELLER ? parsePrice(variant.price) : null
-      }))
-      .filter((variant) => variant.colorName && variant.size);
-    const sizes = [...new Set(normalizedVariants.map((variant) => variant.size))];
-    const colorsByName = new Map<string, { name: string; hex: string | null }>();
-    for (const variant of normalizedVariants) {
-      if (!colorsByName.has(variant.colorName)) colorsByName.set(variant.colorName, { name: variant.colorName, hex: variant.colorHex });
-    }
-    const hasVariantPrices = normalizedVariants.some((variant) => variant.price != null);
-    return {
-      // With per-variant prices the cards show «from» the lowest one.
-      price: hasVariantPrices ? null : initial?.price ?? null,
-      priceText: initial?.priceText ?? null,
-      sizes,
-      colors: [...colorsByName.values()],
-      variants: normalizedVariants
-    };
-  }
-
   // A product needs at least one photo; without one the owner is asked and may still save it.
   // An existing product that never had photos isn't asked about on every edit.
   const needsPhotosConfirm = imageManager.images.length === 0 && (!initial || initial.images.length > 0);
@@ -356,7 +304,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   function submit(event: FormEvent) {
     event.preventDefault();
     if (hasSubmittedRef.current) return;
-    if (mode === "simple" && !isValidPrice(simple.price)) {
+    if (!arePricesValid(simple, mode === "advanced" ? variantPrices : null)) {
       toast.show(`Цена: ${PRICE_ERROR.toLowerCase()}`, { tone: "danger" });
       return;
     }
@@ -387,7 +335,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
         category: form.category || null,
         status: form.status as ProductStatus,
         isVisible: Number(form.isVisible),
-        ...(mode === "simple" ? simplePayload(simple) : advancedPayload())
+        ...(mode === "simple" ? simplePayload(simple) : variantPayload(simple, variantPrices))
       },
       { images: imageManager.images, previewImageId: imageManager.previewImageId, pendingPreview: picture ? { picture, replaces } : undefined }
     );
@@ -511,15 +459,17 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
             </ChipGroup>
           </Card>
 
-          {mode === "simple" ? (
-            <SimpleDetails value={simple} onChange={updateSimple} aiFilled={aiFilled} colorsAction={aiAction("colors")} onSwitchToAdvanced={switchToAdvanced} />
-          ) : (
-            <VariantBuilder
-              builder={builder}
-              onOpenModal={(type) => builder.openModal(type, imageManager.previewImageId ?? imageManager.images[0]?.id ?? null)}
-              onSwitchToSimple={switchToSimple}
-            />
-          )}
+          <PriceDetails
+            value={simple}
+            onChange={updateSimple}
+            mode={mode}
+            onModeChange={setMode}
+            variantPrices={variantPrices}
+            onVariantPricesChange={setVariantPrices}
+            aiFilled={aiFilled}
+            colorsAction={aiAction("colors")}
+            coverUrl={imageManager.previewImage?.url}
+          />
 
           <StatusCard
             isVisible={isVisible}
@@ -538,7 +488,6 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           </Button>
         </>
       )}
-      <VariantModal builder={builder} images={imageManager.images} />
       {isPreviewOpen && aiPreviewPath && (
         <PreviewGenerator
           drawing={previewDrawing}
@@ -547,7 +496,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           product={{
             title: form.title,
             category: form.category,
-            colors: mode === "simple" ? simple.colors.map((color) => color.name) : variants.map((variant) => variant.colorName).filter((name) => name !== ASK_SELLER)
+            colors: simple.colors.map((color) => color.name)
           }}
           onClose={() => setIsPreviewOpen(false)}
         />
@@ -571,15 +520,6 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           cancelLabel="Добавить фото"
           onCancel={addPhotosFirst}
           onConfirm={save}
-        />
-      )}
-      {isSimplifyConfirmOpen && (
-        <ConfirmModal
-          title="Одна цена для всех?"
-          description="Сейчас у размеров или цветов разные цены. Останется одна цена — первая из списка. Её можно будет поменять."
-          confirmLabel="Да, одна цена"
-          onCancel={() => setIsSimplifyConfirmOpen(false)}
-          onConfirm={applySimplification}
         />
       )}
     </form>

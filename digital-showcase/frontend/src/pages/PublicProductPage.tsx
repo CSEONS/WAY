@@ -287,14 +287,32 @@ export function PublicProductPage() {
               </Button>
             </div>
           ) : (
+            // One price for everything: the sizes and colors are there to see, there is nothing to pick.
             (product.sizes.length > 0 || product.colors.length > 0) && (
-              <div className={styles.staticAttrs}>
-                {sortSizes(product.sizes.map((s) => s.value)).map((size) => (
-                  <Badge key={size}>{size}</Badge>
-                ))}
-                {product.colors.map((c) => (
-                  <Badge key={c.id}>{c.name}</Badge>
-                ))}
+              <div className={styles.variants}>
+                {product.colors.length > 0 && (
+                  <div className={styles.variantGroup}>
+                    <SectionLabel>{product.colors.length > 1 ? "Цвета" : "Цвет"}</SectionLabel>
+                    <div className={styles.staticAttrs}>
+                      {product.colors.map((color) => (
+                        <span key={color.id} className={styles.staticColor}>
+                          <ColorSwatch color={color.hex ?? undefined} size="sm" />
+                          {color.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {product.sizes.length > 0 && (
+                  <div className={styles.variantGroup}>
+                    <SectionLabel>{product.sizes.length > 1 ? "Размеры" : "Размер"}</SectionLabel>
+                    <div className={styles.staticAttrs}>
+                      {sortSizes(product.sizes.map((size) => size.value)).map((size) => (
+                        <Badge key={size}>{size}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           )}

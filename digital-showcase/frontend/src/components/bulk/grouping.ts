@@ -167,7 +167,7 @@ export function isDraftValid(draft: BulkDraft) {
   return Boolean(draft.title.trim()) && isValidPrice(draft.price);
 }
 
-/** What goes to the product API. Variants only when both colors and sizes are known, like the simple form. */
+/** What goes to the product API: one price, so sizes and colors without combinations, like the form's one price. */
 export function toPayload(draft: BulkDraft): ProductPayload {
   const price = isValidPrice(draft.price) ? parsePrice(draft.price) : null;
   const sizes = list(draft.sizes);
@@ -182,6 +182,6 @@ export function toPayload(draft: BulkDraft): ProductPayload {
     isVisible: 1,
     sizes,
     colors,
-    variants: colors.length && sizes.length ? colors.flatMap((color) => sizes.map((size) => ({ colorName: color.name, colorHex: color.hex, size, price }))) : []
+    variants: []
   };
 }

@@ -91,6 +91,44 @@ test("учёт ИИ принимает превью и хранит прежни
   assert.equal((db.prepare("SELECT COUNT(*) as count FROM ai_usage").get() as { count: number }).count, 0);
 });
 
+test("товар с одной ценой теряет сетку комбинаций, а размеры и цвета остаются; разные цены не трогаются", () => {
+  const db = legacyDatabase();
+  migrate(db, migrations.filter((migration) => migration.version < 19));
+  const now = new Date().toISOString();
+  const product = (id: string, price: number | null) =>
+    db.prepare("INSERT INTO products (id, storeId, title, price, status, createdAt, updatedAt) VALUES (?, 's1', ?, ?, 'AVAILABLE', ?, ?)").run(id, id, price, now, now);
+  const variant = (productId: string, colorName: string, size: string, price: number | null) =>
+    db
+      .prepare("INSERT INTO product_variants (id, productId, colorName, colorHex, size, price) VALUES (?, ?, ?, '#000000', ?, ?)")
+      .run(`${productId}-${colorName}-${size}`, productId, colorName, size, price);
+  // One price: a full grid at the product's price; its sizes were saved, its colors weren't (an older save).
+  product("one", 3000);
+  for (const color of ["Чёрный", "Белый"]) for (const size of ["S", "M"]) variant("one", color, size, 3000);
+  db.prepare("INSERT INTO product_sizes VALUES ('one-s', 'one', 'S'), ('one-m', 'one', 'M')").run();
+  // Different prices, a partial grid, «Уточнить у продавца»: priced by combination — kept.
+  product("different", null);
+  variant("different", "Чёрный", "S", 3000);
+  variant("different", "Чёрный", "M", 3500);
+  product("partial", 3000);
+  variant("partial", "Чёрный", "S", 3000);
+  variant("partial", "Чёрный", "M", 3000);
+  variant("partial", "Белый", "S", 3000);
+  product("ask", 3000);
+  variant("ask", "Уточнить у продавца", "S", 3000);
+
+  migrate(db);
+  const variants = (id: string) => (db.prepare("SELECT COUNT(*) as count FROM product_variants WHERE productId = ?").get(id) as { count: number }).count;
+  assert.equal(variants("one"), 0);
+  assert.deepEqual(db.prepare("SELECT value FROM product_sizes WHERE productId = 'one' ORDER BY value").all(), [{ value: "M" }, { value: "S" }]);
+  assert.deepEqual(db.prepare("SELECT name, hex FROM product_colors WHERE productId = 'one' ORDER BY name").all(), [
+    { name: "Белый", hex: "#000000" },
+    { name: "Чёрный", hex: "#000000" }
+  ]);
+  assert.equal(variants("different"), 2);
+  assert.equal(variants("partial"), 3);
+  assert.equal(variants("ask"), 1);
+});
+
 test("новая база создаётся с нуля", () => {
   const db = new Database(":memory:");
   migrate(db);

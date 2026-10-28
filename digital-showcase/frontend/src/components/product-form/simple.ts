@@ -1,20 +1,35 @@
 import type { Product } from "../../types/models";
-import { parsePrice } from "../../utils/price";
-import { ASK_SELLER, createId, initialVariants, normalizeHex } from "./helpers";
-import type { ProductDraft, VariantFormRow } from "./types";
+import { sortSizes } from "../../utils/format";
+import { isValidPrice, parsePrice } from "../../utils/price";
+import { ASK_SELLER, normalizeHex } from "./helpers";
+import type { DetailsMode, ProductDraft, SavedProductFormDraft } from "./types";
 
 /**
- * The simple form: one price per product plus ticked sizes and colors.
- * Stored as the same color × size variants with one price, so a product can
- * be opened in the advanced (per-variant) form at any time.
+ * «Цена, размеры и цвета»: the ticked sizes and colors and the price — the
+ * same whichever way the product is priced.
+ *
+ * One price for everything is stored as sizes and colors alone, without
+ * combinations: buyers see them, there is nothing to pick. «Разные цены для
+ * размеров и цветов» adds VariantPrices on top and is stored as color × size
+ * combinations, which buyers pick from.
  */
 export interface SimpleDetails {
+  /** One price for everything; with different prices — the usual one, for combinations without their own. */
   price: string;
   sizes: string[];
   colors: { name: string; hex: string }[];
 }
 
+/** «Разные цены»: what differs from the usual price, by combinationKey. */
+export interface VariantPrices {
+  /** A combination's own price; absent or empty — the usual price. */
+  prices: Record<string, string>;
+  /** Combinations that aren't sold, e.g. no XS in white. */
+  missing: string[];
+}
+
 export const emptySimpleDetails: SimpleDetails = { price: "", sizes: [], colors: [] };
+export const emptyVariantPrices: VariantPrices = { prices: {}, missing: [] };
 
 export const LETTER_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 export const NUMBER_SIZES = ["40", "42", "44", "46", "48", "50", "52", "54", "56"];
@@ -58,97 +73,155 @@ function unique<T>(items: T[], key: (item: T) => string) {
   });
 }
 
-/** Rows fit the simple form when they are a full color × size grid with one price and no «Уточнить у продавца». */
-export function variantsToSimple(rows: VariantFormRow[]): SimpleDetails | null {
-  const cleanRows = rows.filter((row) => row.colorName.trim() || row.size.trim());
-  if (!cleanRows.length) return { ...emptySimpleDetails };
-  if (cleanRows.some((row) => row.colorName === ASK_SELLER || row.size === ASK_SELLER || row.price === ASK_SELLER)) return null;
-
-  const prices = unique(cleanRows.map((row) => row.price.trim()), (price) => price);
-  if (prices.length > 1) return null;
-
-  const colors = unique(
-    cleanRows.map((row) => ({ name: row.colorName.trim(), hex: hexForColorName(row.colorName, row.colorHex) })),
-    (color) => colorKey(color.name)
-  ).filter((color) => color.name);
-  const sizes = unique(cleanRows.map((row) => row.size.trim()), (size) => size).filter(Boolean);
-  const isFullGrid =
-    colors.length * sizes.length === cleanRows.length &&
-    colors.every((color) => sizes.every((size) => cleanRows.some((row) => colorKey(row.colorName) === colorKey(color.name) && row.size.trim() === size)));
-  if (!isFullGrid) return null;
-
-  return { price: prices[0] ?? "", sizes, colors };
+/** A color × size combination; one of them may be missing (only sizes or only colors are ticked). */
+export interface Combination {
+  key: string;
+  color: { name: string; hex: string } | null;
+  size: string | null;
 }
 
-/** Initial simple details of a product, or null when it needs the advanced (per-variant) form. */
-export function simpleFromProduct(product?: Product): SimpleDetails | null {
-  if (!product) return { ...emptySimpleDetails };
-  if (!product.variants.length) {
-    return {
-      price: product.price?.toString() ?? "",
-      sizes: product.sizes.map((size) => size.value).filter((size) => size && size !== ASK_SELLER),
-      colors: product.colors.filter((color) => color.name !== ASK_SELLER).map((color) => ({ name: color.name, hex: hexForColorName(color.name, color.hex) }))
-    };
-  }
-  return variantsToSimple(initialVariants(product));
+export function combinationKey(colorName: string | null, size: string | null) {
+  return `${colorName ? colorKey(colorName) : ""}|${size ?? ""}`;
 }
 
-/** Simple details → rows of the advanced builder (when the owner asks for different prices). */
-export function simpleToVariantRows(simple: SimpleDetails): VariantFormRow[] {
-  const colors = simple.colors.length ? simple.colors : [{ name: ASK_SELLER, hex: "" }];
-  const sizes = simple.sizes.length ? simple.sizes : [ASK_SELLER];
-  if (!simple.colors.length && !simple.sizes.length) return [];
-  return colors.flatMap((color) =>
-    sizes.map((size) => ({ id: createId(), colorName: color.name, colorHex: color.hex, size, price: simple.price.trim() }))
+/** Every combination of the ticked colors and sizes, color by color. */
+export function combinations({ sizes, colors }: SimpleDetails): Combination[] {
+  if (!sizes.length && !colors.length) return [];
+  return (colors.length ? colors : [null]).flatMap((color) =>
+    (sizes.length ? sizes : [null]).map((size) => ({ key: combinationKey(color?.name ?? null, size), color, size }))
   );
 }
 
-/** Advanced rows → simple details, even when that means one price for all (the owner confirms the loss). */
-export function simplifyVariantRows(rows: VariantFormRow[]): SimpleDetails {
-  const exact = variantsToSimple(rows);
-  if (exact) return exact;
-  const price = rows.map((row) => row.price.trim()).find((value) => value && value !== ASK_SELLER) ?? "";
+/** The usual price and every combination's own one are prices or empty. */
+export function arePricesValid(simple: SimpleDetails, variantPrices: VariantPrices | null) {
+  return isValidPrice(simple.price) && Object.values(variantPrices?.prices ?? {}).every(isValidPrice);
+}
+
+function priceOrNull(value: string) {
+  const parsed = parsePrice(value.trim());
+  return value.trim() && !Number.isNaN(parsed) ? parsed : null;
+}
+
+/** One price for everything: sizes and colors only — buyers see them and have nothing to pick. */
+export function simplePayload(simple: SimpleDetails) {
+  const colors = simple.colors.map((color) => ({ name: color.name, hex: color.hex || null }));
+  return { price: priceOrNull(simple.price), priceText: null, sizes: simple.sizes, colors, variants: [] };
+}
+
+/**
+ * Different prices: a combination for each color × size that is sold, at its
+ * own price or the usual one. Without a ticked color or size its place is
+ * «Уточнить у продавца», as the server needs both. Cards show «from» the
+ * lowest price.
+ */
+export function variantPayload(simple: SimpleDetails, { prices, missing }: VariantPrices) {
+  const notSold = new Set(missing);
+  const variants = combinations(simple)
+    .filter((combination) => !notSold.has(combination.key))
+    .map(({ key, color, size }) => ({
+      colorName: color?.name ?? ASK_SELLER,
+      colorHex: color?.hex ?? null,
+      size: size ?? ASK_SELLER,
+      price: priceOrNull(prices[key]?.trim() || simple.price)
+    }));
+  const colors = simple.colors.map((color) => ({ name: color.name, hex: color.hex || null }));
+  return { price: variants.length ? null : priceOrNull(simple.price), priceText: null, sizes: simple.sizes, colors, variants };
+}
+
+/** A combination as a saved product, an AI draft or an old form draft keeps it. */
+export interface PriceRow {
+  colorName: string;
+  colorHex: string | null;
+  size: string;
+  price: string;
+}
+
+/**
+ * Combinations → ticked sizes and colors, the usual price (the most common
+ * one) and what differs from it. `isOnePrice` — a full grid at one price:
+ * nothing differs, the product can be shown with one price.
+ */
+export function detailsFromRows(rows: PriceRow[], fallbackPrice = ""): { simple: SimpleDetails; variantPrices: VariantPrices; isOnePrice: boolean } {
+  const known = (value: string) => value.trim() && value !== ASK_SELLER;
+  const cleanRows = rows.map((row) => ({ ...row, price: known(row.price) ? row.price.trim() : "" })).filter((row) => known(row.colorName) || known(row.size));
+  const sizes = sortSizes(unique(cleanRows.map((row) => row.size.trim()).filter(known), (size) => size));
+  const colors = unique(
+    cleanRows.filter((row) => known(row.colorName)).map((row) => ({ name: row.colorName.trim(), hex: hexForColorName(row.colorName, row.colorHex) })),
+    (color) => colorKey(color.name)
+  );
+  const simpleWithoutPrice = { price: "", sizes, colors };
+
+  const counts = new Map<string, number>();
+  for (const row of cleanRows) if (row.price) counts.set(row.price, (counts.get(row.price) ?? 0) + 1);
+  const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallbackPrice;
+
+  const rowKey = (row: PriceRow) => combinationKey(known(row.colorName) ? row.colorName : null, known(row.size) ? row.size.trim() : null);
+  const priceByKey = new Map(cleanRows.map((row) => [rowKey(row), row.price]));
+  const prices: Record<string, string> = {};
+  for (const [key, price] of priceByKey) if (price && price !== usual) prices[key] = price;
+  const missing = combinations(simpleWithoutPrice)
+    .map((combination) => combination.key)
+    .filter((key) => !priceByKey.has(key));
+
   return {
-    price,
-    sizes: unique(rows.map((row) => row.size.trim()), (size) => size).filter((size) => size && size !== ASK_SELLER),
-    colors: unique(
-      rows.filter((row) => row.colorName.trim() && row.colorName !== ASK_SELLER).map((row) => ({ name: row.colorName.trim(), hex: hexForColorName(row.colorName, row.colorHex) })),
-      (color) => colorKey(color.name)
-    )
+    simple: { ...simpleWithoutPrice, price: usual },
+    variantPrices: { prices, missing },
+    isOnePrice: !Object.keys(prices).length && !missing.length
   };
 }
 
-/** Simple details from an AI draft, or null when the draft has really different prices per variant. */
-export function simpleFromDraft(draft: ProductDraft): SimpleDetails | null {
-  if (draft.variants?.length) {
-    const rows = draft.variants.map((variant) => ({
-      id: createId(),
-      colorName: variant.colorName,
-      colorHex: variant.colorHex ?? "",
-      size: variant.size,
-      price: variant.price?.toString() ?? ""
-    }));
-    const fromRows = variantsToSimple(rows.filter((row) => row.colorName !== ASK_SELLER && row.size !== ASK_SELLER));
-    if (!fromRows) return null;
-    if (fromRows.sizes.length || fromRows.colors.length) return { ...fromRows, price: fromRows.price || (draft.price?.toString() ?? "") };
+/** How a product opens in the form: one price, or different ones with what differs. */
+export function detailsFromProduct(product?: Product): { mode: DetailsMode; simple: SimpleDetails; variantPrices: VariantPrices } {
+  if (!product) return { mode: "simple", simple: emptySimpleDetails, variantPrices: emptyVariantPrices };
+  const price = product.price?.toString() ?? "";
+  if (!product.variants.length) {
+    return {
+      mode: "simple",
+      simple: {
+        price,
+        sizes: product.sizes.map((size) => size.value).filter((size) => size && size !== ASK_SELLER),
+        colors: product.colors.filter((color) => color.name !== ASK_SELLER).map((color) => ({ name: color.name, hex: hexForColorName(color.name, color.hex) }))
+      },
+      variantPrices: emptyVariantPrices
+    };
+  }
+  // Saved before one price stopped making combinations: a full grid at one price opens (and saves) as one price.
+  const rows = product.variants.map((variant) => ({ ...variant, price: variant.price?.toString() ?? "" }));
+  const details = detailsFromRows(rows, price);
+  return { mode: details.isOnePrice ? "simple" : "advanced", simple: details.simple, variantPrices: details.variantPrices };
+}
+
+/** A form draft left unsaved, in the shape this form keeps it; null when it has no prices to restore. */
+export function detailsFromSavedDraft(draft: SavedProductFormDraft | null): { mode: DetailsMode; simple: SimpleDetails; variantPrices: VariantPrices } | null {
+  if (!draft) return null;
+  // Saved before «Разные цены» became a switch: the combinations themselves.
+  if (draft.mode === "advanced" && !draft.variantPrices && draft.variants?.length) {
+    const details = detailsFromRows(draft.variants);
+    return { mode: details.isOnePrice ? "simple" : "advanced", simple: details.simple, variantPrices: details.variantPrices };
+  }
+  if (!draft.simple) return null;
+  return { mode: draft.mode ?? "simple", simple: draft.simple, variantPrices: draft.variantPrices ?? emptyVariantPrices };
+}
+
+/** What an AI draft says about price, sizes and colors; `isOnePrice` — it found no different prices. */
+export function detailsFromDraft(draft: ProductDraft) {
+  const rows = (draft.variants ?? [])
+    .filter((variant) => variant.colorName !== ASK_SELLER && variant.size !== ASK_SELLER)
+    .map((variant) => ({ ...variant, price: variant.price?.toString() ?? "" }));
+  const draftPrice = draft.price?.toString() ?? "";
+  if (rows.length) {
+    const details = detailsFromRows(rows, draftPrice);
+    if (details.simple.sizes.length || details.simple.colors.length) return details;
   }
   return {
-    price: draft.price?.toString() ?? "",
-    sizes: (draft.sizes ?? []).filter((size) => size && size !== ASK_SELLER),
-    colors: (draft.colors ?? [])
-      .filter((color) => color.name && color.name !== ASK_SELLER)
-      .map((color) => ({ name: color.name, hex: hexForColorName(color.name, color.hex) }))
+    simple: {
+      price: draftPrice,
+      sizes: (draft.sizes ?? []).filter((size) => size && size !== ASK_SELLER),
+      colors: (draft.colors ?? [])
+        .filter((color) => color.name && color.name !== ASK_SELLER)
+        .map((color) => ({ name: color.name, hex: hexForColorName(color.name, color.hex) }))
+    },
+    variantPrices: emptyVariantPrices,
+    isOnePrice: true
   };
-}
-
-/** What the API gets for a simple product: one price; variants only when both colors and sizes are set. */
-export function simplePayload(simple: SimpleDetails) {
-  const parsed = parsePrice(simple.price);
-  const price = Number.isNaN(parsed) ? null : parsed;
-  const colors = simple.colors.map((color) => ({ name: color.name, hex: color.hex || null }));
-  const variants =
-    colors.length && simple.sizes.length
-      ? colors.flatMap((color) => simple.sizes.map((size) => ({ colorName: color.name, colorHex: color.hex, size, price })))
-      : [];
-  return { price, priceText: null, sizes: simple.sizes, colors, variants };
 }

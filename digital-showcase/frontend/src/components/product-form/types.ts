@@ -1,20 +1,5 @@
 import type { ImageModeration, ProductStatus } from "../../types/models";
-import type { SimpleDetails } from "./simple";
-
-export interface VariantFormRow {
-  id: string;
-  colorName: string;
-  colorHex: string;
-  size: string;
-  price: string;
-}
-
-export interface ColorHistoryItem {
-  name: string;
-  hex: string;
-}
-
-export type VariantModalType = "color" | "size" | "price" | "all-colors" | "all-sizes" | "all-prices";
+import type { PriceRow, SimpleDetails, VariantPrices } from "./simple";
 
 export interface ProductFormState {
   title: string;
@@ -24,14 +9,17 @@ export interface ProductFormState {
   isVisible: number;
 }
 
+/** «Цена, размеры и цвета»: one price for everything, or «Разные цены для размеров и цветов». */
 export type DetailsMode = "simple" | "advanced";
 
 export interface SavedProductFormDraft {
   form: ProductFormState;
-  variants: VariantFormRow[];
   /** Absent in drafts saved before the simple form existed. */
   mode?: DetailsMode;
   simple?: SimpleDetails;
+  variantPrices?: VariantPrices;
+  /** Drafts saved before «Разные цены» became a switch kept the combinations themselves. */
+  variants?: PriceRow[];
 }
 
 export interface ProductPayload {

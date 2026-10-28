@@ -586,8 +586,52 @@ export const migrations: Migration[] = [
       // «Вручную + ИИ» fills one field: «Расходы на ИИ» tells its tokens from a whole card's. Older rows count as cards.
       addColumn(db, "ai_usage", "field", "TEXT");
     }
+  },
+  {
+    version: 19,
+    name: "one price products without combinations",
+    // A product priced «one price for everything» is now sizes and colors without combinations,
+    // so buyers have nothing to pick. Older ones kept the full color × size grid at that price.
+    up: dropOnePriceCombinations
   }
 ];
+
+/**
+ * Combinations of a product saved with one price for everything: a full
+ * color × size grid, every one at the product's own price, none «Уточнить у
+ * продавца». Its sizes and colors stay (added from the combinations if missing).
+ * Different prices or a partial grid mean the owner priced combinations: kept.
+ */
+function dropOnePriceCombinations(db: Database) {
+  const askSeller = "Уточнить у продавца";
+  const products = db
+    .prepare("SELECT id, price FROM products p WHERE EXISTS (SELECT 1 FROM product_variants v WHERE v.productId = p.id)")
+    .all() as { id: string; price: number | null }[];
+  for (const product of products) {
+    const variants = db.prepare("SELECT colorName, colorHex, size, price FROM product_variants WHERE productId = ?").all(product.id) as {
+      colorName: string;
+      colorHex: string | null;
+      size: string;
+      price: number | null;
+    }[];
+    if (variants.some((variant) => variant.colorName === askSeller || variant.size === askSeller)) continue;
+    if (variants.some((variant) => variant.price !== product.price)) continue;
+    const colors = new Map(variants.map((variant) => [variant.colorName, variant.colorHex]));
+    const sizes = new Set(variants.map((variant) => variant.size));
+    const pairs = new Set(variants.map((variant) => `${variant.colorName}\u0000${variant.size}`));
+    if (pairs.size !== colors.size * sizes.size) continue;
+
+    const savedSizes = new Set((db.prepare("SELECT value FROM product_sizes WHERE productId = ?").all(product.id) as { value: string }[]).map((row) => row.value));
+    const savedColors = new Set((db.prepare("SELECT name FROM product_colors WHERE productId = ?").all(product.id) as { name: string }[]).map((row) => row.name));
+    for (const size of sizes) {
+      if (!savedSizes.has(size)) db.prepare("INSERT INTO product_sizes (id, productId, value) VALUES (?, ?, ?)").run(crypto.randomUUID(), product.id, size);
+    }
+    for (const [name, hex] of colors) {
+      if (!savedColors.has(name)) db.prepare("INSERT INTO product_colors (id, productId, name, hex) VALUES (?, ?, ?, ?)").run(crypto.randomUUID(), product.id, name, hex);
+    }
+    db.prepare("DELETE FROM product_variants WHERE productId = ?").run(product.id);
+  }
+}
 
 /** Applies every migration newer than the database, each in its own transaction. Returns the names applied. */
 export function migrate(db: Database, list: Migration[] = migrations) {

@@ -21,11 +21,9 @@ interface PreviewGeneratorProps {
   /** The drawing itself lives in the form (usePreviewDrawing), so this window can be closed while it runs. */
   drawing: PreviewDrawing;
   images: ProductFormImage[];
-  /** The current cover: the photo to draw from by default. */
+  /** The current cover: the photo to draw from by default, and a drawn picture once it's ready. */
   coverId: string | null;
   product: { title: string; category: string; colors: string[] };
-  /** The owner liked a picture: it becomes the cover (with who is on it, for moderation). */
-  onUse: (file: File, livingBeings: string[]) => void;
   onClose: () => void;
 }
 
@@ -33,24 +31,35 @@ interface PreviewGeneratorProps {
  * «Превью с ИИ»: the product photo becomes a storefront cover — a nicer scene
  * and, if wanted, a headline, a badge and benefit icons. Based on the
  * «Генератор карточек товара» template (its simple mode); the server builds
- * the prompt and calls the image model.
+ * the prompt and calls the image model. A finished picture is the cover at
+ * once (usePreviewDrawing): the window just shows it.
  */
-export function PreviewGenerator({ drawing, images, coverId, product, onUse, onClose }: PreviewGeneratorProps) {
+export function PreviewGenerator({ drawing, images, coverId, product, onClose }: PreviewGeneratorProps) {
   const toast = useToast();
-  const { results, selected, setSelected, isDrawing, seconds, error } = drawing;
-  const [photoId, setPhotoId] = useState(() => (images.some((image) => image.id === coverId) ? coverId : images[0]?.id ?? null));
+  const { results, selected, isDrawing, seconds, error } = drawing;
+  // A drawn cover isn't drawn from again: only the product's own photos.
+  const sources = images.filter((image) => image.id !== drawing.coverImageId);
+  const [photoId, setPhotoId] = useState(
+    () => [drawing.sourcePhotoId, coverId].find((id) => sources.some((image) => image.id === id)) ?? sources[0]?.id ?? null
+  );
   const [options, setOptions] = useState<PreviewOptions>(readPreviewOptions);
   const [isHeadlineOpen, setIsHeadlineOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
-  const photo = images.find((image) => image.id === photoId);
+  const photo = sources.find((image) => image.id === photoId);
   const colors = [...new Set(product.colors.map((color) => color.trim()).filter(Boolean))];
   const chosen = results[selected];
+  // The owner may have picked another photo as the cover or removed the picture since.
+  const isCover = Boolean(chosen) && drawing.coverImageId === coverId;
   const withText = options.text === "with_text";
 
   // A new picture shows up at the top of the window.
   useEffect(() => {
     if (results.length) resultRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [results.length]);
+
+  function choose(index: number) {
+    if (index !== selected || !isCover) drawing.chooseResult(results[index], index);
+  }
 
   function update(patch: Partial<PreviewOptions>) {
     setOptions((current) => ({ ...current, ...patch }));
@@ -82,16 +91,10 @@ export function PreviewGenerator({ drawing, images, coverId, product, onUse, onC
         colors
       })
     );
-    void drawing.draw(formData);
+    void drawing.draw(formData, photo.id);
     // The request is on its way: the window folds away, the owner keeps filling in the product.
-    // When the picture is ready, a toast and the button under the photos say so (usePreviewDrawing).
-    toast.show("Рисуем превью — будет готово в течение минуты. Можно заполнять товар дальше", { duration: 5000 });
-    onClose();
-  }
-
-  function applyChosen() {
-    if (!chosen) return;
-    onUse(chosen.file, chosen.livingBeings);
+    // When the picture is ready, it becomes the cover and the form opens this window again to show it.
+    toast.show("Рисуем превью — через минуту оно само станет обложкой. Можно заполнять товар дальше", { duration: 5000 });
     onClose();
   }
 
@@ -111,9 +114,15 @@ export function PreviewGenerator({ drawing, images, coverId, product, onUse, onC
             <Button variant="secondary" loading={isDrawing} disabled={!photo} onClick={draw}>
               {drawLabel}
             </Button>
-            <Button variant="primary" disabled={isDrawing || !chosen} onClick={applyChosen}>
-              Сделать обложкой
-            </Button>
+            {isCover ? (
+              <Button variant="primary" onClick={onClose}>
+                Готово
+              </Button>
+            ) : (
+              <Button variant="primary" disabled={isDrawing || !chosen} onClick={() => choose(selected)}>
+                Сделать обложкой
+              </Button>
+            )}
           </>
         ) : (
           <>
@@ -139,7 +148,7 @@ export function PreviewGenerator({ drawing, images, coverId, product, onUse, onC
                   className={cx(styles.variant, index === selected && styles.variantActive)}
                   aria-label={`Вариант ${index + 1}`}
                   aria-pressed={index === selected}
-                  onClick={() => setSelected(index)}
+                  onClick={() => choose(index)}
                 >
                   <img src={result.url} alt="" />
                 </button>
@@ -151,22 +160,26 @@ export function PreviewGenerator({ drawing, images, coverId, product, onUse, onC
               Товар будет отправлен на проверку администратору. Если выявится нарушение правил, товар будет отозван.
             </Notice>
           )}
-          <p className={styles.hint}>Нравится — нажмите «Сделать обложкой». Нет — поменяйте настройки ниже и нарисуйте ещё.</p>
+          <p className={styles.hint}>
+            {isCover
+              ? "Превью уже стоит обложкой товара. Не нравится — поменяйте настройки ниже и нарисуйте ещё: новое займёт его место."
+              : "Сейчас обложка — другое фото. Чтобы вернуть это превью, нажмите «Сделать обложкой»."}
+          </p>
         </div>
       )}
 
       {isDrawing && (
         <Notice tone="accent" icon={AiMagicIcon}>
-          Рисуем превью — обычно это до минуты. Окно можно закрыть и заполнять товар дальше: когда превью будет готово, придёт уведомление.
+          Рисуем превью — обычно это до минуты. Окно можно закрыть и заполнять товар дальше: готовое превью само станет обложкой, а окно откроется и покажет его.
         </Notice>
       )}
       {error && <Notice tone="danger">{error}</Notice>}
 
-      {images.length > 1 && (
+      {sources.length > 1 && (
         <div className={styles.group}>
           <SectionLabel>С какого фото рисовать</SectionLabel>
           <div className={styles.photos} role="group" aria-label="Фото товара">
-            {images.map((image, index) => (
+            {sources.map((image, index) => (
               <button
                 type="button"
                 key={image.id}

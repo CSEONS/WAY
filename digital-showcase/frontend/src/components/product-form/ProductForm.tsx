@@ -128,12 +128,17 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false);
   const [isNoPhotosConfirmOpen, setIsNoPhotosConfirmOpen] = useState(false);
-  const previewDrawing = usePreviewDrawing(aiPreviewPath ?? null, isPreviewOpen);
+  const imageManager = useImageManager(initial);
+  const previewDrawing = usePreviewDrawing(aiPreviewPath ?? null, isPreviewOpen, imageManager.addCover);
   const hasSubmittedRef = useRef(false);
   const photosRef = useRef<HTMLDivElement>(null);
-  const imageManager = useImageManager(initial);
   const builder = useVariantBuilder(initial, savedDraft, draftKey);
   const { variants } = builder;
+
+  // A finished preview is already the cover: the window opens to show it.
+  useEffect(() => {
+    if (previewDrawing.results.length) setIsPreviewOpen(true);
+  }, [previewDrawing.results.length]);
 
   useEffect(() => {
     if (!draftKey) return;
@@ -430,15 +435,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           manager={imageManager}
           onCreatePreview={aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
           previewLabel={
-            previewDrawing.isDrawing
-              ? `Рисуем превью… ${previewDrawing.seconds} с`
-              : previewDrawing.hasUnseen
-                ? "Превью готово — посмотреть"
-                : previewDrawing.results.length
-                  ? "Посмотреть превью"
-                  : undefined
+            previewDrawing.isDrawing ? `Рисуем превью… ${previewDrawing.seconds} с` : previewDrawing.results.length ? "Посмотреть превью" : undefined
           }
-          previewReady={previewDrawing.hasUnseen}
         />
       </div>
 
@@ -516,7 +514,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
 
           {previewDrawing.isDrawing && (
             <Notice tone="accent" icon={AiMagicIcon}>
-              Превью ещё рисуется. Если сохранить сейчас, оно не попадёт в товар — лучше дождаться и сделать его обложкой.
+              Превью ещё рисуется. Если сохранить сейчас, оно не попадёт в товар — лучше дождаться: готовое само станет обложкой.
             </Notice>
           )}
           <Button type="submit" variant="primary" size="lg" block>
@@ -535,7 +533,6 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
             category: form.category,
             colors: mode === "simple" ? simple.colors.map((color) => color.name) : variants.map((variant) => variant.colorName).filter((name) => name !== ASK_SELLER)
           }}
-          onUse={imageManager.addCover}
           onClose={() => setIsPreviewOpen(false)}
         />
       )}

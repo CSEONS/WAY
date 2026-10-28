@@ -13,27 +13,37 @@ export interface PreviewResult {
 /**
  * «Превью с ИИ» is drawn here, in the product form, not in its window: the
  * owner can close the window and keep filling in the product for the minute
- * it takes. A finished picture waits here — a toast and the button say so.
+ * it takes. A finished picture goes straight to the photos as the cover
+ * (`addCover`); a newer one, or another variant, takes its place there.
  * Leaving the form drops it, like any unsaved change.
  */
-export function usePreviewDrawing(path: string | null, isOpen: boolean) {
+export function usePreviewDrawing(
+  path: string | null,
+  isOpen: boolean,
+  addCover: (file: File, livingBeings: string[], replaceId: string | null) => string
+) {
   const toast = useToast();
   const [results, setResults] = useState<PreviewResult[]>([]);
   const [selected, setSelected] = useState(0);
+  /** The photo the selected picture became; null until the first one is ready. */
+  const [coverImageId, setCoverImageId] = useState<string | null>(null);
+  /** The product photo drawn from last: the next attempt starts from it, not from the drawn cover. */
+  const [sourcePhotoId, setSourcePhotoId] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
-  const [hasUnseen, setHasUnseen] = useState(false);
   const isOpenRef = useRef(isOpen);
   const resultsRef = useRef(results);
+  const coverImageIdRef = useRef(coverImageId);
+  const addCoverRef = useRef(addCover);
   const isMounted = useRef(true);
   // Every attempt costs money and an AI card: a double tap must not start two.
   const isDrawingRef = useRef(false);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
-    if (isOpen) setHasUnseen(false);
-  }, [isOpen]);
+    addCoverRef.current = addCover;
+  });
 
   useEffect(() => {
     resultsRef.current = results;
@@ -56,22 +66,28 @@ export function usePreviewDrawing(path: string | null, isOpen: boolean) {
     return () => window.clearInterval(timer);
   }, [isDrawing]);
 
-  /** One picture from the photo and options in formData (see PreviewGenerator). */
-  async function draw(formData: FormData) {
+  /** Makes a drawn picture the cover, in place of the one made the cover before. */
+  function chooseResult(result: PreviewResult, index: number) {
+    coverImageIdRef.current = addCoverRef.current(result.file, result.livingBeings, coverImageIdRef.current);
+    setCoverImageId(coverImageIdRef.current);
+    setSelected(index);
+  }
+
+  /** One picture from the photo and options in formData (see PreviewGenerator); ready, it becomes the cover. */
+  async function draw(formData: FormData, photoId: string) {
     if (!path || isDrawingRef.current) return;
     isDrawingRef.current = true;
+    setSourcePhotoId(photoId);
     setError("");
     setIsDrawing(true);
     try {
       const { data } = await api.post<{ image: string; livingBeings: string[] }>(path, formData);
       if (!isMounted.current) return;
       const file = dataUrlToFile(data.image, `ai-preview-${Date.now()}`);
-      setSelected(resultsRef.current.length);
-      setResults((current) => [...current, { file, url: URL.createObjectURL(file), livingBeings: data.livingBeings ?? [] }]);
-      if (!isOpenRef.current) {
-        setHasUnseen(true);
-        toast.show("Превью готово — откройте его кнопкой под фото товара", { tone: "success", duration: 6000 });
-      }
+      const result = { file, url: URL.createObjectURL(file), livingBeings: data.livingBeings ?? [] };
+      chooseResult(result, resultsRef.current.length);
+      resultsRef.current = [...resultsRef.current, result];
+      setResults(resultsRef.current);
     } catch (err: any) {
       if (!isMounted.current) return;
       const message = err.response?.data?.message ?? "Не удалось нарисовать превью. Проверьте интернет и попробуйте ещё раз.";
@@ -83,7 +99,7 @@ export function usePreviewDrawing(path: string | null, isOpen: boolean) {
     }
   }
 
-  return { results, selected, setSelected, isDrawing, seconds, error, hasUnseen, draw };
+  return { results, selected, coverImageId, sourcePhotoId, isDrawing, seconds, error, draw, chooseResult };
 }
 
 export type PreviewDrawing = ReturnType<typeof usePreviewDrawing>;

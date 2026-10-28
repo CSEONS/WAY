@@ -23,11 +23,17 @@ export function useImageManager(initial?: Product) {
     setPreviewImageId((current) => current ?? nextImages[0]?.id ?? null);
   }
 
-  /** A picture drawn by «Превью с ИИ»: added to the photos and made the cover. */
-  function addCover(file: File, livingBeings: string[] = []) {
+  /** A picture drawn by «Превью с ИИ» becomes the cover: added to the photos, or in place of `replaceId` (the one drawn before). */
+  function addCover(file: File, livingBeings: string[] = [], replaceId: string | null = null) {
     const image = { id: createId(), existingId: null, file, name: file.name, url: URL.createObjectURL(file), livingBeings };
-    setImages((current) => [...current, image]);
+    setImages((current) => {
+      const replaced = current.find((item) => item.id === replaceId);
+      if (!replaced) return [...current, image];
+      URL.revokeObjectURL(replaced.url);
+      return current.map((item) => (item === replaced ? image : item));
+    });
     setPreviewImageId(image.id);
+    return image.id;
   }
 
   function removeImage(id: string) {
@@ -50,18 +56,16 @@ export type ImageManagerState = ReturnType<typeof useImageManager>;
  * marked «Обложка» and goes first on the storefront), remove extras, add more
  * with the «+» tile after the last photo.
  * `onCreatePreview` — the store has AI: «Превью с ИИ»; `previewLabel` says how
- * the drawing goes, `previewReady` — a finished picture waits to be seen.
+ * the drawing goes.
  */
 export function ImageManager({
   manager,
   onCreatePreview,
-  previewLabel = "Сделать превью с ИИ",
-  previewReady = false
+  previewLabel = "Сделать превью с ИИ"
 }: {
   manager: ImageManagerState;
   onCreatePreview?: () => void;
   previewLabel?: string;
-  previewReady?: boolean;
 }) {
   const { images, previewImage, setPreviewImageId, addImages, removeImage } = manager;
 
@@ -138,7 +142,7 @@ export function ImageManager({
             </Notice>
           )}
           {onCreatePreview && (
-            <Button variant={previewReady ? "primary" : "secondary"} icon={AiMagicIcon} block onClick={onCreatePreview}>
+            <Button variant="secondary" icon={AiMagicIcon} block onClick={onCreatePreview}>
               {previewLabel}
             </Button>
           )}

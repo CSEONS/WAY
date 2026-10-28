@@ -31,7 +31,7 @@ export function BackgroundJobsWidget() {
           {job.status === "done" && (
             <p className={cx(styles.message, styles.success)}>
               <Icon icon={CheckmarkCircle02Icon} size="xs" />
-              Товар сохранён
+              {job.message}
             </p>
           )}
           {job.status === "error" && (

@@ -376,6 +376,9 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     if (hasSubmittedRef.current) return;
     setIsNoPhotosConfirmOpen(false);
     hasSubmittedRef.current = true;
+    const picture = previewDrawing.pendingPicture();
+    // A preview drawn before the one still drawing would make way for it in the form; the save does the same.
+    const replaces = imageManager.images.some((image) => image.id === previewDrawing.coverImageId) ? previewDrawing.coverImageId : null;
 
     onSubmit(
       {
@@ -386,7 +389,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
         isVisible: Number(form.isVisible),
         ...(mode === "simple" ? simplePayload(simple) : advancedPayload())
       },
-      { images: imageManager.images, previewImageId: imageManager.previewImageId }
+      { images: imageManager.images, previewImageId: imageManager.previewImageId, pendingPreview: picture ? { picture, replaces } : undefined }
     );
     clearSavedDraft();
   }
@@ -445,9 +448,16 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       <div ref={photosRef}>
         <ImageManager
           manager={imageManager}
-          onCreatePreview={aiPreviewPath ? () => setIsPreviewOpen(true) : undefined}
+          // In «Авто» the AI draws the preview with the card: the button appears with the card, for a variant of the owner's own.
+          onCreatePreview={aiPreviewPath && showFields ? () => setIsPreviewOpen(true) : undefined}
           previewLabel={
-            previewDrawing.isDrawing ? `Рисуем превью… ${previewDrawing.seconds} с` : previewDrawing.results.length ? "Посмотреть превью" : undefined
+            previewDrawing.isDrawing
+              ? `Рисуем превью… ${previewDrawing.seconds} с`
+              : fillMode === "auto"
+                ? "Свой вариант превью"
+                : previewDrawing.results.length
+                  ? "Посмотреть превью"
+                  : undefined
           }
         />
       </div>
@@ -519,7 +529,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
 
           {previewDrawing.isDrawing && (
             <Notice tone="accent" icon={AiMagicIcon}>
-              Превью ещё рисуется. Если сохранить сейчас, оно не попадёт в товар — лучше дождаться: готовое само станет обложкой.
+              Превью ещё рисуется. Можно сохранять: оно дорисуется в фоне и само станет обложкой товара.
             </Notice>
           )}
           <Button type="submit" variant="primary" size="lg" block>

@@ -2,12 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { useToast } from "../../ui";
 import { dataUrlToFile } from "./previewOptions";
+import type { DrawnPicture } from "./types";
 
-export interface PreviewResult {
-  file: File;
+export interface PreviewResult extends DrawnPicture {
   url: string;
-  /** People or animals the model drew anyway: with this cover the product goes to moderation when saved. */
-  livingBeings: string[];
 }
 
 /**
@@ -15,7 +13,8 @@ export interface PreviewResult {
  * owner can close the window and keep filling in the product for the minute
  * it takes. A finished picture goes straight to the photos as the cover
  * (`addCover`); a newer one, or another variant, takes its place there.
- * Leaving the form drops it, like any unsaved change.
+ * Saved before the picture is ready, the product gets it in the background
+ * (`pendingPicture` → backgroundJobs); leaving the form otherwise drops it.
  */
 export function usePreviewDrawing(
   path: string | null,
@@ -37,8 +36,8 @@ export function usePreviewDrawing(
   const coverImageIdRef = useRef(coverImageId);
   const addCoverRef = useRef(addCover);
   const isMounted = useRef(true);
-  // Every attempt costs money and an AI card: a double tap must not start two.
-  const isDrawingRef = useRef(false);
+  // The picture on its way. Every attempt costs money and an AI card: a double tap must not start two.
+  const pendingRef = useRef<Promise<DrawnPicture | null> | null>(null);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -75,16 +74,19 @@ export function usePreviewDrawing(
 
   /** One picture from the photo and options in formData (see PreviewGenerator); ready, it becomes the cover. */
   async function draw(formData: FormData, photoId: string) {
-    if (!path || isDrawingRef.current) return;
-    isDrawingRef.current = true;
+    if (!path || pendingRef.current) return;
     setSourcePhotoId(photoId);
     setError("");
     setIsDrawing(true);
+    const request = api
+      .post<{ image: string; livingBeings: string[] }>(path, formData)
+      .then(({ data }): DrawnPicture => ({ file: dataUrlToFile(data.image, `ai-preview-${Date.now()}`), livingBeings: data.livingBeings ?? [] }));
+    pendingRef.current = request.catch(() => null);
     try {
-      const { data } = await api.post<{ image: string; livingBeings: string[] }>(path, formData);
+      const picture = await request;
+      // Saved meanwhile: the background save has taken the picture over.
       if (!isMounted.current) return;
-      const file = dataUrlToFile(data.image, `ai-preview-${Date.now()}`);
-      const result = { file, url: URL.createObjectURL(file), livingBeings: data.livingBeings ?? [] };
+      const result = { ...picture, url: URL.createObjectURL(picture.file) };
       chooseResult(result, resultsRef.current.length);
       resultsRef.current = [...resultsRef.current, result];
       setResults(resultsRef.current);
@@ -94,12 +96,17 @@ export function usePreviewDrawing(
       setError(message);
       if (!isOpenRef.current) toast.show(message, { tone: "danger", duration: 6000 });
     } finally {
-      isDrawingRef.current = false;
+      pendingRef.current = null;
       if (isMounted.current) setIsDrawing(false);
     }
   }
 
-  return { results, selected, coverImageId, sourcePhotoId, isDrawing, seconds, error, draw, chooseResult };
+  /** The picture still being drawn, for a save that can't wait for it; null when nothing is drawing. */
+  function pendingPicture() {
+    return pendingRef.current;
+  }
+
+  return { results, selected, coverImageId, sourcePhotoId, isDrawing, seconds, error, draw, chooseResult, pendingPicture };
 }
 
 export type PreviewDrawing = ReturnType<typeof usePreviewDrawing>;

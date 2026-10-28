@@ -14,6 +14,8 @@ export interface BackgroundJob {
   /** Known once the product is created on the server: «Посмотреть товар» after saving. */
   productId?: string;
   status: BackgroundJobStatus;
+  /** The product is saved and waits only for «Превью с ИИ» still drawing: it can be opened already. */
+  waitsForPreview?: boolean;
   percent: number;
   message: string;
 }
@@ -32,10 +34,12 @@ export interface QueueProductSaveArgs {
  */
 interface SaveProgress {
   productId?: string;
-  /** Form image id → id of the uploaded image on the server. */
+  /** Form image id → id of the uploaded image on the server; the preview drawn after saving is under PREVIEW. */
   uploaded: Map<string, string>;
   deleted: Set<string>;
 }
+
+const PREVIEW = "ai-preview-after-save";
 
 interface BackgroundJobsContextValue {
   jobs: BackgroundJob[];
@@ -57,6 +61,7 @@ const WEIGHT_SAVE = 10;
 const WEIGHT_DELETE = 10;
 const WEIGHT_UPLOAD = 70;
 const WEIGHT_ORDER = 10;
+const WEIGHT_PREVIEW = 20;
 
 export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
@@ -89,9 +94,9 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
       if (!entry) return;
       updateJob(id, { status: "running", percent: 1, message: "Сохраняем товар…" });
       try {
-        await runProductSave(entry.args, entry.progress, (patch) => updateJob(id, patch));
+        const note = await runProductSave(entry.args, entry.progress, (patch) => updateJob(id, patch));
         runsRef.current.delete(id);
-        updateJob(id, { status: "done", percent: 100, message: "Товар сохранён" });
+        updateJob(id, { status: "done", waitsForPreview: false, percent: 100, message: note ?? "Товар сохранён" });
         window.setTimeout(() => dismissJob(id), 6000);
       } catch (err: any) {
         updateJob(id, { status: "error", message: err?.response?.data?.message ?? "Не удалось сохранить товар. Проверьте интернет." });
@@ -149,27 +154,34 @@ export function useBackgroundJobs() {
   return ctx;
 }
 
-/** Grows each time a product of this store finishes saving: a cue for a list to reload itself. */
+/**
+ * Grows each time a product of this store finishes saving: a cue for a list to
+ * reload itself. One waiting for its preview counts twice — saved, then with the preview.
+ */
 export function useSavedProductCount(storeId: string | undefined) {
   const { jobs } = useBackgroundJobs();
   const seenRef = useRef(new Set<string>());
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const fresh = jobs.filter((job) => job.status === "done" && job.storeId === storeId && !seenRef.current.has(job.id));
+    const fresh = jobs
+      .filter((job) => job.storeId === storeId && (job.status === "done" || job.waitsForPreview))
+      .map((job) => `${job.id}:${job.status}`)
+      .filter((key) => !seenRef.current.has(key));
     if (!fresh.length) return;
-    fresh.forEach((job) => seenRef.current.add(job.id));
+    fresh.forEach((key) => seenRef.current.add(key));
     setCount((current) => current + fresh.length);
   }, [jobs, storeId]);
 
   return count;
 }
 
+/** Saves the product; a note for the dock when not everything worked out (the preview couldn't be drawn). */
 async function runProductSave(
   { storeId, payload, imageSelection, existingImageIds }: QueueProductSaveArgs,
   progress: SaveProgress,
   onProgress: (patch: Partial<BackgroundJob>) => void
-) {
+): Promise<string | undefined> {
   const basePath = `/owner/stores/${storeId}/products`;
 
   const orderedImages = [...imageSelection.images].sort((left, right) => {
@@ -183,7 +195,8 @@ async function runProductSave(
 
   const weightDelete = imagesToDelete.length ? WEIGHT_DELETE : 0;
   const weightUpload = imagesToUpload.length ? WEIGHT_UPLOAD : 0;
-  const totalWeight = WEIGHT_SAVE + weightDelete + weightUpload + WEIGHT_ORDER;
+  const { pendingPreview } = imageSelection;
+  const totalWeight = WEIGHT_SAVE + weightDelete + weightUpload + WEIGHT_ORDER + (pendingPreview ? WEIGHT_PREVIEW : 0);
   let doneWeight = 0;
 
   function setPercent(extra = 0) {
@@ -213,28 +226,32 @@ async function runProductSave(
 
   const knownImageIds = new Set([...existingImageIds.filter((imageId) => keptExistingIds.has(imageId)), ...progress.uploaded.values()]);
 
+  /** Uploads one photo; its id on the server is remembered under `key`. */
+  async function upload(key: string, file: File, livingBeings: string[] | undefined, weight: number) {
+    const formData = new FormData();
+    formData.append("image", file);
+    // A cover from «Превью с ИИ» with people or animals on it: the server sends the product to moderation at once.
+    if (livingBeings?.length) formData.append("livingBeings", JSON.stringify(livingBeings));
+    const response = await api.post<Product>(`${basePath}/${data.id}/images`, formData, {
+      onUploadProgress: (event) => {
+        if (!event.total) return;
+        setPercent(weight * (event.loaded / event.total));
+      }
+    });
+    doneWeight += weight;
+    const uploaded = response.data.images.find((item) => !knownImageIds.has(item.id));
+    if (uploaded) {
+      progress.uploaded.set(key, uploaded.id);
+      knownImageIds.add(uploaded.id);
+    }
+    setPercent();
+  }
+
   for (const [index, image] of imagesToUpload.entries()) {
     onProgress({
       message: imagesToUpload.length > 1 ? `Загружаем фото ${index + 1} из ${imagesToUpload.length}…` : "Загружаем фото…"
     });
-    const formData = new FormData();
-    formData.append("image", image.file as File);
-    // A cover from «Превью с ИИ» with people or animals on it: the server sends the product to moderation at once.
-    if (image.livingBeings?.length) formData.append("livingBeings", JSON.stringify(image.livingBeings));
-    const perImageWeight = weightUpload / imagesToUpload.length;
-    const response = await api.post<Product>(`${basePath}/${data.id}/images`, formData, {
-      onUploadProgress: (event) => {
-        if (!event.total) return;
-        setPercent(perImageWeight * (event.loaded / event.total));
-      }
-    });
-    doneWeight += perImageWeight;
-    const uploaded = response.data.images.find((item) => !knownImageIds.has(item.id));
-    if (uploaded) {
-      progress.uploaded.set(image.id, uploaded.id);
-      knownImageIds.add(uploaded.id);
-    }
-    setPercent();
+    await upload(image.id, image.file as File, image.livingBeings, weightUpload / imagesToUpload.length);
   }
 
   const imageIds = orderedImages
@@ -246,4 +263,24 @@ async function runProductSave(
   }
   doneWeight += WEIGHT_ORDER;
   setPercent();
+  if (!pendingPreview) return undefined;
+
+  // The owner saved before «Превью с ИИ» finished: the product is there already, the picture joins it as the cover.
+  onProgress({ waitsForPreview: true, message: "Товар сохранён, дорисовываем превью…" });
+  const picture = await pendingPreview.picture;
+  if (!picture) return "Товар сохранён, но превью нарисовать не удалось";
+  if (!progress.uploaded.has(PREVIEW)) {
+    onProgress({ message: "Загружаем превью…" });
+    await upload(PREVIEW, picture.file, picture.livingBeings, WEIGHT_PREVIEW);
+  }
+  const previewId = progress.uploaded.get(PREVIEW);
+  if (!previewId) return undefined;
+  // It takes the place of the preview drawn before it, as it would have in the form.
+  const replacedId = pendingPreview.replaces ? progress.uploaded.get(pendingPreview.replaces) : undefined;
+  if (replacedId && !progress.deleted.has(replacedId)) {
+    await api.delete(`${basePath}/${data.id}/images/${replacedId}`);
+    progress.deleted.add(replacedId);
+  }
+  await api.patch(`${basePath}/${data.id}/images/order`, { imageIds: [previewId, ...imageIds.filter((imageId) => imageId !== replacedId)] });
+  return "Товар сохранён с превью";
 }

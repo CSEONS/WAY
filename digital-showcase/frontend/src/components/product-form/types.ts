@@ -65,4 +65,19 @@ export interface ProductFormImage {
 export interface ProductImageSelection {
   images: ProductFormImage[];
   previewImageId: string | null;
+  /** «Превью с ИИ» was still drawing when the owner saved: the save waits for it (backgroundJobs). */
+  pendingPreview?: PendingPreview;
+}
+
+/** A picture «Превью с ИИ» drew, with who is on it (for moderation). */
+export interface DrawnPicture {
+  file: File;
+  livingBeings: string[];
+}
+
+export interface PendingPreview {
+  /** Null — the drawing failed: the product stays as it was saved. */
+  picture: Promise<DrawnPicture | null>;
+  /** The form photo it takes the place of — a preview drawn before it — as it would have in the form. */
+  replaces: string | null;
 }

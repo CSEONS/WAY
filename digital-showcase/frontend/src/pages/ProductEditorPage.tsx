@@ -23,9 +23,10 @@ export function ProductEditorPage() {
   const [savedProductId, setSavedProductId] = useState<string | null>(null);
   const job = jobs.find((item) => item.id === jobId);
 
+  // A product waiting only for its preview can be opened already: the preview joins it in a minute.
   useEffect(() => {
-    if (job?.status === "done" && job.productId) setSavedProductId(job.productId);
-  }, [job?.status, job?.productId]);
+    if ((job?.status === "done" || job?.waitsForPreview) && job.productId) setSavedProductId(job.productId);
+  }, [job?.status, job?.waitsForPreview, job?.productId]);
 
   const load = useCallback(() => {
     if (!storeId) return;

@@ -1,2 +1,2 @@
 export { ProductForm } from "./ProductForm";
-export type { ProductFormImage, ProductImageSelection, ProductPayload } from "./types";
+export type { DrawnPicture, PendingPreview, ProductFormImage, ProductImageSelection, ProductPayload } from "./types";

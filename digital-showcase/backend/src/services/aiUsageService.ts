@@ -108,7 +108,7 @@ export function previewUnits() {
  * a preview takes one package preview. With neither left the units still count
  * against the month (the request was let in while some was left).
  */
-export async function recordUsage(storeId: string, kind: AiUsageKind, units: number, tokens: TokenUsage) {
+export async function recordUsage(storeId: string, kind: AiUsageKind, units: number, tokens: TokenUsage, field?: string) {
   const db = rawDb();
   const total = Math.max(1, units);
   db.transaction(() => {
@@ -129,8 +129,20 @@ export async function recordUsage(storeId: string, kind: AiUsageKind, units: num
       db.prepare(`UPDATE stores SET ${column} = MAX(0, ${column} - ?) WHERE id = ?`).run(packageUnits, storeId);
     }
     db.prepare(
-      "INSERT INTO ai_usage (id, storeId, kind, units, planUnits, packageUnits, inputTokens, outputTokens, model, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(crypto.randomUUID(), storeId, kind, total, planUnits, packageUnits, tokens.inputTokens, tokens.outputTokens, tokens.model ?? null, new Date().toISOString());
+      "INSERT INTO ai_usage (id, storeId, kind, units, planUnits, packageUnits, inputTokens, outputTokens, model, field, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      crypto.randomUUID(),
+      storeId,
+      kind,
+      total,
+      planUnits,
+      packageUnits,
+      tokens.inputTokens,
+      tokens.outputTokens,
+      tokens.model ?? null,
+      field ?? null,
+      new Date().toISOString()
+    );
   })();
 }
 
@@ -157,6 +169,43 @@ export interface CurrentModels {
  * out of them and named in `unpricedModels`.
  */
 type UsageRow = { kind: AiUsageKind; units: number; planUnits: number | null; inputTokens: number; outputTokens: number; model: string | null };
+
+/** What one request asked for: a whole card, one field of it («Вручную + ИИ»), a bulk upload or a preview. */
+export type AiRequest = "CARD" | "FIELD" | "BULK" | "PREVIEW";
+const AI_REQUESTS: AiRequest[] = ["CARD", "FIELD", "BULK", "PREVIEW"];
+
+function requestOf(row: UsageRow & { field: string | null }): AiRequest {
+  return row.kind === "DRAFT" ? (row.field ? "FIELD" : "CARD") : row.kind;
+}
+
+/**
+ * Tokens one request of each kind takes, with min and max, and what it costs.
+ * Requests a provider sent no token count for are counted but not averaged.
+ */
+function requestStats(rows: { request: AiRequest; inputTokens: number; outputTokens: number; usd: number | null }[]) {
+  return AI_REQUESTS.flatMap((request) => {
+    const own = rows.filter((row) => row.request === request);
+    if (!own.length) return [];
+    const counted = own.filter((row) => row.inputTokens || row.outputTokens);
+    const totals = counted.map((row) => row.inputTokens + row.outputTokens);
+    const costs = own.flatMap(({ usd }) => (usd == null ? [] : [usd]));
+    const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+    return [
+      {
+        request,
+        count: own.length,
+        avgInput: counted.length ? Math.round(average(counted.map((row) => row.inputTokens))) : null,
+        avgOutput: counted.length ? Math.round(average(counted.map((row) => row.outputTokens))) : null,
+        avgTokens: totals.length ? Math.round(average(totals)) : null,
+        minTokens: totals.length ? Math.min(...totals) : null,
+        maxTokens: totals.length ? Math.max(...totals) : null,
+        avgRub: costs.length ? toRubles(average(costs)) : null,
+        minRub: costs.length ? toRubles(Math.min(...costs)) : null,
+        maxRub: costs.length ? toRubles(Math.max(...costs)) : null
+      }
+    ];
+  });
+}
 
 /**
  * Dollars one ai_usage row cost. `unpriced` — the model has no known price;
@@ -219,16 +268,18 @@ function monthKey(date: Date) {
 
 /**
  * «Расходы на ИИ» in the admin panel: the last `months` months (oldest
- * first, empty months included) and this month by store, most expensive
- * first. Cards are drafts and products of bulk uploads; `used` also counts
+ * first, empty months included), this month by store, most expensive
+ * first, and this month's tokens by kind of request. Cards are drafts and products of bulk uploads; `used` also counts
  * previews, as the store's limit does, but not what packages paid for. Ruble
  * sums are null until the rate is set.
  */
 export async function spendReport(current: CurrentModels, now = new Date(), months = 6) {
   const db = await getDb();
   const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-  const rows = await db.all<UsageRow & { createdAt: string; storeId: string; storeName: string; aiMonthlyLimit: number | null; planId: string | null }>(
-    `SELECT u.kind, u.units, u.planUnits, u.inputTokens, u.outputTokens, u.model, u.createdAt, u.storeId, s.name as storeName, s.aiMonthlyLimit, s.planId
+  const rows = await db.all<
+    UsageRow & { field: string | null; createdAt: string; storeId: string; storeName: string; aiMonthlyLimit: number | null; planId: string | null }
+  >(
+    `SELECT u.kind, u.units, u.planUnits, u.inputTokens, u.outputTokens, u.model, u.field, u.createdAt, u.storeId, s.name as storeName, s.aiMonthlyLimit, s.planId
      FROM ai_usage u JOIN stores s ON s.id = u.storeId WHERE u.createdAt >= ?`,
     from.toISOString()
   );
@@ -241,6 +292,7 @@ export async function spendReport(current: CurrentModels, now = new Date(), mont
   const thisMonth = monthKey(now);
   const byStore = new Map<string, { storeId: string; name: string; cards: number; previews: number; used: number; limit: number; usd: number }>();
   const unpriced = new Set<string>();
+  const requests: Parameters<typeof requestStats>[0] = [];
 
   for (const row of rows) {
     const { usd, unpriced: model } = rowCost(row, current);
@@ -253,6 +305,7 @@ export async function spendReport(current: CurrentModels, now = new Date(), mont
       month.usd += usd ?? 0;
     }
     if (monthKey(new Date(row.createdAt)) !== thisMonth) continue;
+    requests.push({ request: requestOf(row), inputTokens: row.inputTokens, outputTokens: row.outputTokens, usd });
     const store = byStore.get(row.storeId) ?? {
       storeId: row.storeId,
       name: row.storeName,
@@ -273,6 +326,7 @@ export async function spendReport(current: CurrentModels, now = new Date(), mont
     rubPerUsd: rublesPerDollar(),
     months: [...byMonth.values()].map(({ usd, ...month }) => ({ ...month, costRub: toRubles(usd) })),
     stores: [...byStore.values()].sort((a, b) => b.usd - a.usd || b.used - a.used).map(({ usd, ...store }) => ({ ...store, costRub: toRubles(usd) })),
+    requests: requestStats(requests),
     unpricedModels: [...unpriced]
   };
 }

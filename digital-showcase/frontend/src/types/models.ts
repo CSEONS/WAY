@@ -457,7 +457,26 @@ export interface AiSpendReport {
   months: { month: string; cards: number; previews: number; costRub: number | null }[];
   /** This month by store, most expensive first. `used` counts previews too, like the limit. */
   stores: { storeId: string; name: string; cards: number; previews: number; used: number; limit: number; costRub: number | null }[];
+  /** This month's tokens per request of each kind that was made. Token figures are null when the provider sent no counts. */
+  requests: AiRequestStats[];
   unpricedModels: string[];
+}
+
+/** A whole card, one field of it («Вручную + ИИ»), a bulk upload or a preview. */
+export type AiRequest = "CARD" | "FIELD" | "BULK" | "PREVIEW";
+
+export interface AiRequestStats {
+  request: AiRequest;
+  count: number;
+  avgInput: number | null;
+  avgOutput: number | null;
+  avgTokens: number | null;
+  minTokens: number | null;
+  maxTokens: number | null;
+  /** Rubles a request costs; null until the rate is set or for a model without a known price. */
+  avgRub: number | null;
+  minRub: number | null;
+  maxRub: number | null;
 }
 
 /** This month's AI, in cards and rubles. Ruble sums are null until the rate is set on «Настройки». */

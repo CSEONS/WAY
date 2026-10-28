@@ -1,6 +1,6 @@
 import { ArrowLeft01Icon, ArrowRight01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { type KeyboardEvent, type TouchEvent, useEffect, useRef } from "react";
-import { IconButton } from "../../ui";
+import { IconButton, cx } from "../../ui";
 import { photoSources } from "../ProductPhoto";
 import styles from "./PhotoViewer.module.css";
 
@@ -18,8 +18,9 @@ interface PhotoViewerProps {
 
 /**
  * A product photo on the whole screen, as large as it fits. Arrows, swipes and
- * the keyboard (← →) go through the photos; Escape, the cross or a tap beside
- * the photo closes it. A native <dialog>: above everything, focus stays inside.
+ * the keyboard (← →) go through the photos; dots at the bottom show which one
+ * it is and how many are left, a tap on a dot opens that photo. Escape, the
+ * cross or a tap beside the photo closes it. A native <dialog>: above everything, focus stays inside.
  */
 export function PhotoViewer({ images, index, alt, onIndexChange, onClose }: PhotoViewerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -83,6 +84,18 @@ export function PhotoViewer({ images, index, alt, onIndexChange, onClose }: Phot
         <>
           <IconButton icon={ArrowLeft01Icon} label="Предыдущее фото" variant="neutral" className={styles.prev} onClick={() => go(-1)} />
           <IconButton icon={ArrowRight01Icon} label="Следующее фото" variant="neutral" className={styles.next} onClick={() => go(1)} />
+          <div className={styles.dots} role="group" aria-label="Фото товара">
+            {images.map((image, dot) => (
+              <button
+                type="button"
+                key={image}
+                className={cx(styles.dot, dot === index && styles.dotActive)}
+                aria-label={`Фото ${dot + 1} из ${count}`}
+                aria-current={dot === index || undefined}
+                onClick={() => onIndexChange(dot)}
+              />
+            ))}
+          </div>
         </>
       )}
     </dialog>

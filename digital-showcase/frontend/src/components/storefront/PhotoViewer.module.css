@@ -63,3 +63,56 @@
 .next {
   right: var(--space-3);
 }
+
+/* A dot per photo under it: the current one is long and bright. Each dot is a 20 px tap target. */
+.dots {
+  position: absolute;
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  left: 50%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100% - 2 * var(--space-4));
+  transform: translateX(-50%);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-overlay);
+}
+
+.dot {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.dot::before {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  content: "";
+  opacity: 0.45;
+  transition:
+    width 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.dotActive {
+  width: 28px;
+}
+
+.dotActive::before {
+  width: 20px;
+  opacity: 1;
+}
+
+.dot:focus-visible {
+  outline: 2px solid var(--color-surface);
+  outline-offset: -2px;
+}

@@ -153,7 +153,6 @@ export function hasDraftContent(draft: SavedProductFormDraft) {
     draft.form.title.trim() ||
     draft.form.description.trim() ||
     draft.form.category.trim() ||
-    draft.aiPrompt.trim() ||
     draft.simple?.price.trim() ||
     draft.simple?.sizes.length ||
     draft.simple?.colors.length ||

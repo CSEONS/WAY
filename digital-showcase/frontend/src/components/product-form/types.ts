@@ -28,7 +28,6 @@ export type DetailsMode = "simple" | "advanced";
 
 export interface SavedProductFormDraft {
   form: ProductFormState;
-  aiPrompt: string;
   variants: VariantFormRow[];
   /** Absent in drafts saved before the simple form existed. */
   mode?: DetailsMode;

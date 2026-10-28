@@ -80,14 +80,6 @@
   }
 }
 
-/* «Авто»: price and sizes by voice or text */
-
-.autoHint,
-.voice {
-  display: grid;
-  gap: var(--space-3);
-}
-
 /* Images */
 
 .imagePreview {

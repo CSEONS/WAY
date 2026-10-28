@@ -578,6 +578,14 @@ export const migrations: Migration[] = [
       // «Отклонить» on an overdue store: the admin stopped serving it (the storefront is off too).
       addColumn(db, "stores", "servingEndedAt", "TEXT");
     }
+  },
+  {
+    version: 18,
+    name: "ai usage remembers the field asked for",
+    up(db) {
+      // «Вручную + ИИ» fills one field: «Расходы на ИИ» tells its tokens from a whole card's. Older rows count as cards.
+      addColumn(db, "ai_usage", "field", "TEXT");
+    }
   }
 ];
 

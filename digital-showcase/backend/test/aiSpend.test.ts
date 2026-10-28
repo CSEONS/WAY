@@ -93,6 +93,24 @@ test("«Расходы на ИИ»: полгода по месяцам и это
   assert.equal((await spendReport(current, now)).months[5].costRub, null);
 });
 
+test("«Токены по запросам»: сколько берёт запрос каждого вида — в среднем, меньше и больше всего", async () => {
+  process.env.AI_RUB_PER_USD = "100";
+  const store = (await db.get<{ id: string }>("SELECT id FROM stores WHERE slug = 'ai-spend'"))!;
+  // «Вручную + ИИ»: one field, 400 + 100 tokens on Luna — 0.02 ₽.
+  await recordUsage(store.id, "DRAFT", 1, { inputTokens: 400, outputTokens: 100, model: "gpt-5.6-luna" }, "title");
+
+  const { requests } = await spendReport(current);
+  assert.deepEqual(requests, [
+    // Four cards this month; the one without a token count isn't averaged, the unpriced one has no rubles.
+    { request: "CARD", count: 4, avgInput: 1300, avgOutput: 967, avgTokens: 2267, minTokens: 1800, maxTokens: 2500, avgRub: 0.15, minRub: 0.15, maxRub: 0.15 },
+    { request: "FIELD", count: 1, avgInput: 400, avgOutput: 100, avgTokens: 500, minTokens: 500, maxTokens: 500, avgRub: 0.02, minRub: 0.02, maxRub: 0.02 },
+    { request: "BULK", count: 1, avgInput: 3000, avgOutput: 2000, avgTokens: 5000, minTokens: 5000, maxTokens: 5000, avgRub: 0.3, minRub: 0.3, maxRub: 0.3 },
+    { request: "PREVIEW", count: 2, avgInput: 1150, avgOutput: 350, avgTokens: 1500, minTokens: 1300, maxTokens: 1700, avgRub: 1.97, minRub: 1.7, maxRub: 2.24 }
+  ]);
+  delete process.env.AI_RUB_PER_USD;
+  assert.equal((await spendReport(current)).requests[0].avgRub, null, "no rate — tokens only");
+});
+
 test.after(() => {
   closeDb();
   fs.rmSync(dir, { recursive: true, force: true });

@@ -6,7 +6,7 @@ import { Button, Card, CardHeader, Chip, ChipGroup, ConfirmModal, Field, Input, 
 import { AiBadge } from "./AiBadge";
 import { AiFieldButton } from "./AiFieldButton";
 import { type AiDraftField, requestAiDraft } from "./aiDraft";
-import { type AutoHint, AutoPanel } from "./AutoPanel";
+import { AutoPanel } from "./AutoPanel";
 import { ASK_SELLER, hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
 import { PreviewGenerator } from "./PreviewGenerator";
@@ -68,7 +68,6 @@ const fieldNames: Record<AiDraftField, string> = { title: "название", de
 const fieldTitles: Record<AiDraftField, string> = { title: "Название", description: "Описание", category: "Категория", colors: "Цвета" };
 
 const FILL_MODE_KEY = "product-form-fill-mode";
-const emptyHint: AutoHint = { prompt: "", voice: null };
 
 function savedFillMode(): FillMode {
   try {
@@ -114,11 +113,9 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   // A new product opens in the way the owner filled the last one; an existing one — by hand.
   const [preferredFillMode, setPreferredFillMode] = useState<FillMode>(() => (initial ? "manual" : savedFillMode()));
   const fillMode: FillMode = aiFormEnabled ? preferredFillMode : "manual";
-  const [aiPrompt, setAiPrompt] = useState(savedDraft?.aiPrompt ?? "");
   // «Авто»: the card was generated (or restored), so the fields are shown instead of the panel.
   const [isAutoDone, setIsAutoDone] = useState(Boolean(savedDraft));
   const [isGenerating, setIsGenerating] = useState(false);
-  const pendingHint = useRef<AutoHint>(emptyHint);
   const [fillingField, setFillingField] = useState<AiDraftField | null>(null);
   const [aiFilled, setAiFilled] = useState<Set<AiField>>(new Set());
   const [isDraftNoticeVisible, setIsDraftNoticeVisible] = useState(Boolean(savedDraft));
@@ -142,13 +139,13 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
 
   useEffect(() => {
     if (!draftKey) return;
-    const draft: SavedProductFormDraft = { form, aiPrompt, variants, mode, simple };
+    const draft: SavedProductFormDraft = { form, variants, mode, simple };
     if (!hasDraftContent(draft)) {
       localStorage.removeItem(draftKey);
       return;
     }
     localStorage.setItem(draftKey, JSON.stringify(draft));
-  }, [aiPrompt, draftKey, form, variants, mode, simple]);
+  }, [draftKey, form, variants, mode, simple]);
 
   function clearSavedDraft() {
     if (draftKey) localStorage.removeItem(draftKey);
@@ -246,9 +243,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     if (next === "auto") setIsAutoDone(isAutoDone || hasOwnerDetails);
   }
 
-  /** «Авто» → «Сгенерировать карточку». */
-  function askToGenerate(hint: AutoHint) {
-    pendingHint.current = hint;
+  /** «Авто» → «Сгенерировать карточку» (or «Сгенерировать заново» over a filled card). */
+  function askToGenerate() {
     if (hasOwnerDetails) setIsReplaceConfirmOpen(true);
     else void generateCard();
   }
@@ -257,13 +253,11 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     setIsReplaceConfirmOpen(false);
     setIsGenerating(true);
     try {
-      const { prompt, voice } = pendingHint.current;
-      applyDraft(await requestAiDraft(aiDraftPath, { images: imageManager.images, coverId: imageManager.previewImageId, prompt, voice }));
+      applyDraft(await requestAiDraft(aiDraftPath, { images: imageManager.images, coverId: imageManager.previewImageId }));
     } catch (err: any) {
       toast.show(err.response?.data?.message ?? "Не удалось сгенерировать карточку. Проверьте интернет и попробуйте ещё раз.", { tone: "danger", duration: 6000 });
     } finally {
       setIsGenerating(false);
-      pendingHint.current = emptyHint;
     }
   }
 
@@ -421,7 +415,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
         <Notice
           tone={aiFilled.size ? "success" : "accent"}
           action={
-            <Button variant="ghost" size="sm" icon={AiMagicIcon} onClick={() => setIsAutoDone(false)}>
+            <Button variant="ghost" size="sm" icon={AiMagicIcon} loading={isGenerating} disabled={!imageManager.images.length} onClick={askToGenerate}>
               {aiFilled.size ? "Сгенерировать заново" : "Сгенерировать"}
             </Button>
           }
@@ -441,14 +435,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       </div>
 
       {!showFields && (
-        <AutoPanel
-          hasPhotos={imageManager.images.length > 0}
-          prompt={aiPrompt}
-          onPromptChange={setAiPrompt}
-          isGenerating={isGenerating}
-          onGenerate={askToGenerate}
-          onBack={hasOwnerDetails ? () => setIsAutoDone(true) : undefined}
-        />
+        <AutoPanel hasPhotos={imageManager.images.length > 0} isGenerating={isGenerating} onGenerate={askToGenerate} />
       )}
 
       {showFields && (

@@ -29,14 +29,3 @@ export function VoiceStatus({ recorder }: { recorder: Recorder }) {
 export function voiceButtonLabel(recorder: Recorder) {
   return recorder.isRecording ? "Остановить запись" : recorder.blob ? "Перезаписать" : "Надиктовать";
 }
-
-/** Hints for what to say in the voice message. */
-export function VoiceQuestions({ questions }: { questions: string[] }) {
-  return (
-    <ol className={styles.questions}>
-      {questions.map((question) => (
-        <li key={question}>{question}</li>
-      ))}
-    </ol>
-  );
-}

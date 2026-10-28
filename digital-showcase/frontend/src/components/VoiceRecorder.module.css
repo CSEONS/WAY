@@ -46,11 +46,3 @@
   }
 }
 
-.questions {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding-left: var(--space-5);
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-sm);
-}

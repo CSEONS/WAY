@@ -53,6 +53,13 @@
   color: var(--color-danger);
 }
 
+/* Under a request's average price: the cheapest and the dearest one. */
+.range {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+}
+
 .muted {
   margin: 0;
   color: var(--color-ink-muted);

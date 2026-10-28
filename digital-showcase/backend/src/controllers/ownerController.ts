@@ -240,7 +240,7 @@ export const createProductDraft = asyncHandler(async (req, res) => {
   const { result, usage } = await aiUsageService.measureTokens(() =>
     createProductAiDraft(field ? { field, known, images, imageUrls } : { prompt, voice, images, imageUrls })
   );
-  await aiUsageService.recordUsage(store.id, "DRAFT", 1, usage);
+  await aiUsageService.recordUsage(store.id, "DRAFT", 1, usage, field);
   res.json(result);
 });
 

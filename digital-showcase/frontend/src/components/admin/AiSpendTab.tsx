@@ -1,7 +1,7 @@
 import { AiMagicIcon, Coins01Icon, Image01Icon, Money03Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
-import type { AiSpend, AiSpendReport } from "../../types/models";
+import type { AiRequest, AiSpend, AiSpendReport } from "../../types/models";
 import { ButtonLink, Card, CardHeader, ErrorState, LoadingState, Notice, Stat } from "../../ui";
 import { formatMoney, formatMonth, plural } from "../../utils/format";
 import styles from "./AiSpendTab.module.css";
@@ -10,10 +10,21 @@ function rubles(value: number | null) {
   return value == null ? "—" : `≈${formatMoney(value)}`;
 }
 
+function tokens(value: number | null) {
+  return value == null ? "—" : value.toLocaleString("ru-RU");
+}
+
+const requestNames: Record<AiRequest, string> = {
+  CARD: "Карточка целиком",
+  FIELD: "Одно поле («Вручную + ИИ»)",
+  BULK: "Пачка фото",
+  PREVIEW: "Превью"
+};
+
 /**
  * «Расходы на ИИ» in the admin panel: this month at a glance (from the
- * overview), the last six months and this month by store — to compare with
- * what the AI plan brings in.
+ * overview), the last six months, this month by store — to compare with
+ * what the AI plan brings in — and how many tokens each kind of request takes.
  */
 export function AiSpendTab({ summary }: { summary: AiSpend }) {
   const [report, setReport] = useState<AiSpendReport>();
@@ -102,6 +113,52 @@ export function AiSpendTab({ summary }: { summary: AiSpend }) {
                         </td>
                         <td>{store.previews}</td>
                         <td>{rubles(store.costRub)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className={styles.muted}>В этом месяце ИИ ещё не использовали.</p>
+            )}
+          </Card>
+
+          <Card as="section" padding="lg" className={styles.section}>
+            <CardHeader
+              title="Токены по запросам"
+              description="Этот месяц: сколько токенов берёт один запрос — всего, из них вход (фото и инструкции) и ответ ИИ"
+            />
+            {report.requests.length ? (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Запрос</th>
+                      <th>Запросов</th>
+                      <th>В среднем</th>
+                      <th>Вход · ответ</th>
+                      <th>Меньше всего</th>
+                      <th>Больше всего</th>
+                      <th>Цена запроса</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.requests.map((row) => (
+                      <tr key={row.request}>
+                        <td>{requestNames[row.request]}</td>
+                        <td>{row.count}</td>
+                        <td>{tokens(row.avgTokens)}</td>
+                        <td>{row.avgTokens == null ? "—" : `${tokens(row.avgInput)} · ${tokens(row.avgOutput)}`}</td>
+                        <td>{tokens(row.minTokens)}</td>
+                        <td>{tokens(row.maxTokens)}</td>
+                        <td>
+                          {rubles(row.avgRub)}
+                          {row.minRub != null && row.maxRub != null && row.minRub !== row.maxRub && (
+                            <span className={styles.range}>
+                              {formatMoney(row.minRub)} – {formatMoney(row.maxRub)}
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

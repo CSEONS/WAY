@@ -9,31 +9,25 @@ export type AiDraftField = "title" | "description" | "category" | "colors";
 
 /**
  * Asks the AI to fill the product form: from the photos alone («Сгенерировать
- * карточку»), with what the owner said or typed, or just one `field` built on
- * what the owner already typed (`known`). The cover goes first: it shows the
- * product best.
+ * карточку»), or just one `field` built on what the owner already typed
+ * (`known`). The cover goes first: it shows the product best.
  */
 export async function requestAiDraft(
   path: string,
   {
     images,
     coverId,
-    prompt = "",
-    voice,
     field,
     known
   }: {
     images: ProductFormImage[];
     coverId?: string | null;
-    prompt?: string;
-    voice?: Blob | null;
     field?: AiDraftField;
     known?: { title: string; description: string; category: string };
   }
 ) {
   const ordered = [...images].sort((left, right) => Number(right.id === coverId) - Number(left.id === coverId)).slice(0, MAX_DRAFT_PHOTOS);
   const formData = new FormData();
-  if (prompt.trim()) formData.append("prompt", prompt.trim());
   if (field) {
     formData.append("field", field);
     if (known) formData.append("known", JSON.stringify(known));
@@ -43,7 +37,6 @@ export async function requestAiDraft(
     if (image.file) formData.append("images", image.file);
     else if (image.url) formData.append("imageUrls", image.url);
   }
-  if (voice) formData.append("voice", voice, "product-voice.webm");
   const { data } = await api.post<ProductDraft>(path, formData);
   return data;
 }

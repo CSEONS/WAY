@@ -1,9 +1,9 @@
-import { Delete02Icon, FloppyDiskIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon, Delete02Icon, FloppyDiskIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { refreshSiteSettings } from "../state/siteSettings";
 import type { HelpVideo, Legal, PreviewQuality, Settings } from "../types/models";
-import { Button, Card, CardHeader, ErrorState, Field, IconButton, Input, LoadingState, Notice, Page, PageHeader, SegmentedControl, Switch, Textarea, useToast } from "../ui";
+import { Button, ButtonLink, Card, CardHeader, ErrorState, Field, IconButton, Input, LoadingState, Notice, Page, PageHeader, SegmentedControl, Switch, Textarea, useToast } from "../ui";
 import styles from "./AdminSettingsPage.module.css";
 
 interface SettingsResponse {
@@ -49,7 +49,12 @@ const PARTS: Record<SettingsPart, { title: string; description: string; back: { 
   ai: { title: "Настройки ИИ", description: "Модели, курс рубля и превью. Сервер провайдера и ключ — в .env", back: BACK_TO_SECTIONS, saved: "Настройки ИИ сохранены" },
   contacts: { title: "Контакты", description: "Куда пишут владельцы магазинов и те, кто хочет подключиться", back: BACK_TO_SECTIONS, saved: "Контакты сохранены" },
   videos: { title: "Видеоинструкции", description: "Короткие видео в «Помощи» у владельцев", back: BACK_TO_SECTIONS, saved: "Видео сохранены" },
-  legal: { title: "Реквизиты", description: "Для оферты и политики конфиденциальности", back: BACK_TO_SECTIONS, saved: "Реквизиты сохранены" }
+  legal: {
+    title: "Реквизиты",
+    description: "Подставляются в оферту и политику обработки персональных данных. Тексты документов стоит показать юристу",
+    back: BACK_TO_SECTIONS,
+    saved: "Реквизиты сохранены"
+  }
 };
 
 /**
@@ -181,27 +186,31 @@ export function AdminSettingsPage({ part }: { part: SettingsPart }) {
         )}
 
         {part === "contacts" && (
-          <Section title="Контакты">
-            <div className={styles.fields}>
-              <Field label="WhatsApp поддержки" hint="Для владельцев: «Помощь» и «Подписка и итоги»">
-                <Input type="tel" {...bind(draft.support.whatsapp, (whatsapp) => change({ support: { ...draft.support, whatsapp } }))} />
-              </Field>
-              <Field label="Телефон поддержки">
-                <Input type="tel" {...bind(draft.support.phone, (phone) => change({ support: { ...draft.support, phone } }))} />
-              </Field>
-              <Field label="Telegram поддержки" hint="@имя или ссылка">
-                <Input {...bind(draft.support.telegram, (telegram) => change({ support: { ...draft.support, telegram } }))} />
-              </Field>
-            </div>
-            <div className={styles.fields}>
-              <Field label="WhatsApp для заявок" hint="На лендинге, рядом с формой заявки">
-                <Input type="tel" {...bind(draft.salesContacts.whatsapp, (whatsapp) => change({ salesContacts: { ...draft.salesContacts, whatsapp } }))} />
-              </Field>
-              <Field label="Телефон для заявок">
-                <Input type="tel" {...bind(draft.salesContacts.phone, (phone) => change({ salesContacts: { ...draft.salesContacts, phone } }))} />
-              </Field>
-            </div>
-          </Section>
+          <>
+            <Section title="Поддержка владельцев" description="Владельцы магазинов видят эти контакты в «Помощи» и в «Подписке и оплате»">
+              <div className={styles.fields}>
+                <Field label="WhatsApp">
+                  <Input type="tel" placeholder="+7 900 000-00-00" {...bind(draft.support.whatsapp, (whatsapp) => change({ support: { ...draft.support, whatsapp } }))} />
+                </Field>
+                <Field label="Телефон">
+                  <Input type="tel" placeholder="+7 900 000-00-00" {...bind(draft.support.phone, (phone) => change({ support: { ...draft.support, phone } }))} />
+                </Field>
+                <Field label="Telegram" hint="@имя или ссылка" className={styles.wide}>
+                  <Input placeholder="@support" {...bind(draft.support.telegram, (telegram) => change({ support: { ...draft.support, telegram } }))} />
+                </Field>
+              </div>
+            </Section>
+            <Section title="Заявки на подключение" description="На главной странице, рядом с формой «Оставить заявку»: для тех, кто хочет подключить магазин">
+              <div className={styles.fields}>
+                <Field label="WhatsApp">
+                  <Input type="tel" placeholder="+7 900 000-00-00" {...bind(draft.salesContacts.whatsapp, (whatsapp) => change({ salesContacts: { ...draft.salesContacts, whatsapp } }))} />
+                </Field>
+                <Field label="Телефон">
+                  <Input type="tel" placeholder="+7 900 000-00-00" {...bind(draft.salesContacts.phone, (phone) => change({ salesContacts: { ...draft.salesContacts, phone } }))} />
+                </Field>
+              </div>
+            </Section>
+          </>
         )}
 
         {part === "videos" && (
@@ -229,37 +238,56 @@ export function AdminSettingsPage({ part }: { part: SettingsPart }) {
         )}
 
         {part === "legal" && (
-          <Section title="Реквизиты" description="Для оферты и политики конфиденциальности. Тексты стоит показать юристу">
-            <div className={styles.fields}>
-              <Field label="Исполнитель" hint="ФИО, «ИП …» или название компании">
-                <Input {...bind(draft.legal.operator, (operator) => changeLegal({ operator }))} />
-              </Field>
-              <Field label="Статус">
-                <Input {...bind(draft.legal.taxStatus, (taxStatus) => changeLegal({ taxStatus }))} />
-              </Field>
-              <Field label="ИНН">
-                <Input inputMode="numeric" {...bind(draft.legal.inn, (inn) => changeLegal({ inn }))} />
-              </Field>
-              <Field label="ОГРН или ОГРНИП" hint="Самозанятому — пусто">
-                <Input inputMode="numeric" {...bind(draft.legal.ogrn, (ogrn) => changeLegal({ ogrn }))} />
-              </Field>
-              <Field label="Почта" hint="Для вопросов о персональных данных">
-                <Input type="email" {...bind(draft.legal.email, (email) => changeLegal({ email }))} />
-              </Field>
-              <Field label="Телефон">
-                <Input type="tel" {...bind(draft.legal.phone, (phone) => changeLegal({ phone }))} />
-              </Field>
-              <Field label="Адрес" hint="Самозанятому достаточно города">
-                <Input {...bind(draft.legal.address, (address) => changeLegal({ address }))} />
-              </Field>
-              <Field label="Дата редакции документов">
-                <Input type="date" {...bind(draft.legal.updatedAt, (updatedAt) => changeLegal({ updatedAt }))} />
-              </Field>
-              <Field label="Хранить данные после оплаты, дней" hint="Потом админка напомнит удалить данные магазина">
-                <Input inputMode="numeric" {...bind(draft.legal.keepDataDays, (keepDataDays) => changeLegal({ keepDataDays }))} />
-              </Field>
-            </div>
-          </Section>
+          <>
+            <Section title="Кто оказывает услуги" description="Так вы названы в оферте и политике">
+              <div className={styles.fields}>
+                <Field label="Исполнитель" hint="ФИО, «ИП …» или название компании" className={styles.wide}>
+                  <Input placeholder="Иванов Иван Иванович" {...bind(draft.legal.operator, (operator) => changeLegal({ operator }))} />
+                </Field>
+                <Field label="Статус" hint="Например: самозанятый, индивидуальный предприниматель, ООО" className={styles.wide}>
+                  <Input {...bind(draft.legal.taxStatus, (taxStatus) => changeLegal({ taxStatus }))} />
+                </Field>
+                <Field label="ИНН">
+                  <Input inputMode="numeric" {...bind(draft.legal.inn, (inn) => changeLegal({ inn }))} />
+                </Field>
+                <Field label="ОГРН или ОГРНИП" hint="Самозанятому — оставьте пустым">
+                  <Input inputMode="numeric" {...bind(draft.legal.ogrn, (ogrn) => changeLegal({ ogrn }))} />
+                </Field>
+              </div>
+            </Section>
+            <Section title="Связь по документам" description="Сюда пишут по вопросам договора и персональных данных">
+              <div className={styles.fields}>
+                <Field label="Почта">
+                  <Input type="email" placeholder="you@example.ru" {...bind(draft.legal.email, (email) => changeLegal({ email }))} />
+                </Field>
+                <Field label="Телефон">
+                  <Input type="tel" placeholder="+7 900 000-00-00" {...bind(draft.legal.phone, (phone) => changeLegal({ phone }))} />
+                </Field>
+                <Field label="Адрес" hint="Самозанятому достаточно города" className={styles.wide}>
+                  <Input {...bind(draft.legal.address, (address) => changeLegal({ address }))} />
+                </Field>
+              </div>
+            </Section>
+            <Section title="Документы" description="Оферта и политика собираются из шаблона и этих реквизитов">
+              <div className={styles.fields}>
+                <Field label="Дата редакции" hint="Вверху обоих документов">
+                  <Input type="date" {...bind(draft.legal.updatedAt, (updatedAt) => changeLegal({ updatedAt }))} />
+                </Field>
+                <Field label="Хранить данные после оплаты, дней" hint="Потом админка напомнит удалить данные магазина">
+                  <Input inputMode="numeric" {...bind(draft.legal.keepDataDays, (keepDataDays) => changeLegal({ keepDataDays }))} />
+                </Field>
+              </div>
+              <div className={styles.links}>
+                <ButtonLink variant="secondary" size="sm" iconEnd={ArrowUpRight01Icon} to="/offer" target="_blank" rel="noreferrer">
+                  Открыть оферту
+                </ButtonLink>
+                <ButtonLink variant="secondary" size="sm" iconEnd={ArrowUpRight01Icon} to="/privacy" target="_blank" rel="noreferrer">
+                  Открыть политику
+                </ButtonLink>
+              </div>
+              <p className={styles.groupHint}>Открываются в новой вкладке, с последними сохранёнными реквизитами.</p>
+            </Section>
+          </>
         )}
 
         {error && <Notice tone="danger">{error}</Notice>}

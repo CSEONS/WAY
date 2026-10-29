@@ -147,9 +147,6 @@ export function AdminPlansPage() {
                   <div className={styles.badges}>
                     {!plan.isPublic && <Badge tone="warning">Скрыт с лендинга</Badge>}
                     <Badge tone={plan.aiEnabled ? "accent" : "neutral"}>{plan.aiEnabled ? "С ИИ" : "Без ИИ"}</Badge>
-                    <Badge>
-                      {plan.storeCount} {plural(plan.storeCount, ["магазин", "магазина", "магазинов"])}
-                    </Badge>
                   </div>
                   <div className={styles.actions}>
                     <ButtonLink variant="secondary" icon={Edit02Icon} to={`/admin/plans/${plan.id}/edit`} className={styles.edit}>

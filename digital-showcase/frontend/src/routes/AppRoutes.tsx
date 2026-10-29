@@ -5,6 +5,7 @@ import { Logout } from "../components/Logout";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { HomePage } from "../pages/HomePage";
 import { LoginPage } from "../pages/LoginPage";
+import { NotFoundPage } from "../pages/NotFoundPage";
 import { PublicProductPage } from "../pages/PublicProductPage";
 import { PublicStorePage } from "../pages/PublicStorePage";
 import type { User } from "../types/models";
@@ -99,6 +100,7 @@ export function AppRoutes({ user, isAuthLoading, onLogin, onLogout }: Props) {
             <Route path="/admin/moderation" element={<AdminModerationPage />} />
             <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
           </Route>
+          <Route path="*" element={<NotFoundPage user={user} />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

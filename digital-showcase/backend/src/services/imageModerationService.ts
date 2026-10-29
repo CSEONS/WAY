@@ -253,6 +253,21 @@ export async function unblockProduct(productId: string) {
 export type ReviewDecision = "APPROVED" | "REJECTED" | "PRODUCT_BLOCKED";
 
 /**
+ * «Показывать все» / «Скрыть все»: one decision for each of these photos that
+ * is still waiting — one decided meanwhile (by another tab) is left as it is.
+ * Each goes through review(): the owner is told about every photo.
+ */
+export async function reviewMany(ids: string[], decision: "APPROVED" | "REJECTED", reviewerId: string) {
+  const db = await getDb();
+  const reviewed: Awaited<ReturnType<typeof review>>[] = [];
+  for (const id of new Set(ids)) {
+    const waiting = await db.get("SELECT id FROM image_checks WHERE id = ? AND status = 'PENDING'", id);
+    if (waiting) reviewed.push(await review(id, decision, reviewerId));
+  }
+  return reviewed;
+}
+
+/**
  * The moderator's decision: «Показывать» (APPROVED; a product taken off for
  * this photo comes back), «Скрыть фото» (REJECTED) or «Снять товар» (the photo
  * is hidden and the whole product leaves the storefront). The owner gets a

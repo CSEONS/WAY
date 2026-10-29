@@ -104,6 +104,26 @@ test("превью с людьми: товар уходит на проверк�
   assert.equal((await productService.getProduct(product.id, store.id, true))!.images.length, 1, "visible until the moderator decides");
 });
 
+test("«Показывать все» / «Скрыть все»: решение для каждого фото, которое ещё ждёт; уже решённые не трогаются", async () => {
+  const product = (await productService.createProduct({ storeId: store.id, title: "Шапка", isVisible: 1 }))!;
+  const urls = [];
+  for (let index = 0; index < 3; index += 1) {
+    const added = (await productService.addProductImage(product.id, store.id, await photo()))!;
+    await moderation.flagImage({ url: added.url, kind: "PRODUCT", storeId: store.id, productId: product.id }, ["лицо человека"]);
+    urls.push(added.url);
+  }
+  const waiting = (await moderation.listChecks("PENDING")).filter((check) => urls.includes(check.url));
+  assert.equal(waiting.length, 3);
+  // One was decided in another tab: hidden, and «Показывать все» doesn't bring it back.
+  await moderation.review(waiting[0].id, "REJECTED", admin.id);
+
+  const reviewed = await moderation.reviewMany([...waiting.map((check) => check.id), waiting[1].id, "missing"], "APPROVED", admin.id);
+  assert.equal(reviewed.length, 2);
+  const statuses = await db.all<{ status: string }>(`SELECT status FROM image_checks WHERE url IN (${urls.map(() => "?").join(", ")}) ORDER BY status`, ...urls);
+  assert.deepEqual(statuses.map((row) => row.status), ["APPROVED", "APPROVED", "REJECTED"]);
+  assert.equal((await productService.getProduct(product.id, store.id, true))!.images.length, 2);
+});
+
 test.after(() => {
   ai.close();
   closeDb();

@@ -1,7 +1,7 @@
 import * as auditService from "../services/auditService.js";
 import * as moderation from "../services/imageModerationService.js";
 import { asyncHandler } from "../utils/http.js";
-import { moderationReviewSchema, parseBody } from "../utils/validation.js";
+import { moderationBulkReviewSchema, moderationReviewSchema, parseBody } from "../utils/validation.js";
 
 const STATUSES: moderation.ModerationStatus[] = ["PENDING", "APPROVED", "REJECTED"];
 
@@ -28,6 +28,14 @@ const JOURNAL: Record<moderation.ReviewDecision, auditService.AuditAction> = {
   REJECTED: "IMAGE_REJECTED",
   PRODUCT_BLOCKED: "PRODUCT_BLOCKED"
 };
+
+/** «Показывать все» / «Скрыть все» on «На проверке». Every photo is recorded in the journal. */
+export const reviewImages = asyncHandler(async (req, res) => {
+  const { ids, status } = parseBody(moderationBulkReviewSchema, req.body);
+  const checks = await moderation.reviewMany(ids, status, req.user!.userId);
+  for (const check of checks) await auditService.logAction(req.user!.userId, JOURNAL[status], { type: "store", id: check.storeId });
+  res.json({ reviewed: checks.length });
+});
 
 /** «Показывать» (APPROVED), «Скрыть фото» (REJECTED) or «Снять товар» (PRODUCT_BLOCKED). Recorded in the journal. */
 export const reviewImage = asyncHandler(async (req, res) => {

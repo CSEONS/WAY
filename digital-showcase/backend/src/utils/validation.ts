@@ -255,6 +255,11 @@ export const connectSchema = z.object({
 export const leadStatusSchema = z.object({ status: z.enum(["NEW", "DONE"]) });
 
 export const moderationReviewSchema = z.object({ status: z.enum(["APPROVED", "REJECTED", "PRODUCT_BLOCKED"]) });
+/** «Показывать все» / «Скрыть все»: the photos the moderator has on the page. */
+export const moderationBulkReviewSchema = z.object({
+  ids: z.array(z.string().trim().min(1)).min(1).max(500),
+  status: z.enum(["APPROVED", "REJECTED"])
+});
 
 /** «Уведомления» in the admin panel: storeId null — to every owner. */
 export const notificationSendSchema = z.object({

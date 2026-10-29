@@ -8,6 +8,7 @@ import styles from "./AdminModerationPage.module.css";
 
 type Filter = ModerationStatus | "BLOCKED";
 type Decision = "APPROVED" | "REJECTED" | "PRODUCT_BLOCKED";
+type BulkDecision = "APPROVED" | "REJECTED";
 
 const filters: { value: Filter; label: string }[] = [
   { value: "PENDING", label: "На проверке" },
@@ -45,6 +46,7 @@ export function AdminModerationPage() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toBlock, setToBlock] = useState<ImageCheck | null>(null);
+  const [bulk, setBulk] = useState<BulkDecision | null>(null);
 
   function load() {
     setState("loading");
@@ -68,6 +70,20 @@ export function AdminModerationPage() {
     } finally {
       setBusyId(null);
       setToBlock(null);
+    }
+  }
+
+  /** «Показывать все» / «Скрыть все»: the photos on the page; a new one that came meanwhile waits for its own decision. */
+  async function decideAll(decision: BulkDecision) {
+    const ids = checks?.map((check) => check.id) ?? [];
+    try {
+      const { data } = await api.post<{ reviewed: number }>("/moderation/images/review", { ids, status: decision });
+      toast.show(decision === "APPROVED" ? `Показываются: ${data.reviewed} фото` : `Скрыто: ${data.reviewed} фото, товары остаются на витрине`, { tone: "success" });
+      load();
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не удалось сохранить решение", { tone: "danger" });
+    } finally {
+      setBulk(null);
     }
   }
 
@@ -98,6 +114,22 @@ export function AdminModerationPage() {
       {state === "error" && <ErrorState onRetry={load} />}
       {state === "loading" && <LoadingState />}
       {state === "ready" && isEmpty && <EmptyState title="Пусто" description={emptyText[filter]} />}
+
+      {state === "ready" && filter === "PENDING" && checks && checks.length > 0 && (
+        <div className={styles.bulk}>
+          <span>
+            На проверке: {checks.length} фото
+          </span>
+          <div className={styles.actions}>
+            <Button variant="secondary" size="sm" icon={CheckmarkCircle02Icon} disabled={busyId !== null} onClick={() => setBulk("APPROVED")}>
+              Показывать все
+            </Button>
+            <Button variant="outline" size="sm" icon={ViewOffSlashIcon} disabled={busyId !== null} onClick={() => setBulk("REJECTED")}>
+              Скрыть все
+            </Button>
+          </div>
+        </div>
+      )}
 
       {state === "ready" && filter !== "BLOCKED" && checks && checks.length > 0 && (
         <div className={styles.grid}>
@@ -175,6 +207,21 @@ export function AdminModerationPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {bulk && checks && (
+        <ConfirmModal
+          danger={bulk === "REJECTED"}
+          title={bulk === "APPROVED" ? `Показывать все фото (${checks.length})?` : `Скрыть все фото (${checks.length})?`}
+          description={
+            bulk === "APPROVED"
+              ? "Нарушений нет: фото и логотипы остаются у покупателей, товары, снятые из-за них, вернутся на витрину. Владельцы получат уведомление о каждом фото."
+              : "Покупатели перестанут видеть эти фото и логотипы, сами товары останутся на витрине. Владельцы получат уведомление о каждом фото с причиной."
+          }
+          confirmLabel={bulk === "APPROVED" ? "Показывать все" : "Скрыть все"}
+          onCancel={() => setBulk(null)}
+          onConfirm={() => decideAll(bulk)}
+        />
       )}
 
       {toBlock && (

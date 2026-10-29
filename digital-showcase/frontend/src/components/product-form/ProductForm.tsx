@@ -2,18 +2,18 @@ import { AiEditingIcon, AiMagicIcon, Edit02Icon, InformationCircleIcon, LockKeyI
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Product, ProductStatus } from "../../types/models";
 import { PRICE_ERROR } from "../../utils/price";
-import { Button, Card, CardHeader, Chip, ChipGroup, ConfirmModal, Field, Input, Notice, SegmentedControl, Textarea, useToast } from "../../ui";
+import { Button, Card, CardHeader, ConfirmModal, Field, Input, Notice, SegmentedControl, Textarea, useToast } from "../../ui";
 import { AiBadge } from "./AiBadge";
 import { AiFieldButton } from "./AiFieldButton";
 import { type AiDraftField, requestAiDraft } from "./aiDraft";
 import { AutoPanel } from "./AutoPanel";
+import { CategoryPicker } from "./CategoryPicker";
 import { hasDraftContent, readSavedDraft } from "./helpers";
 import { ImageManager, useImageManager } from "./ImageManager";
 import { PreviewGenerator } from "./PreviewGenerator";
 import { previewRequest, readPreviewOptions } from "./previewOptions";
 import { usePreviewDrawing } from "./usePreviewDrawing";
 import {
-  CATEGORY_PRESETS,
   arePricesValid,
   detailsFromDraft,
   detailsFromProduct,
@@ -34,6 +34,8 @@ interface ProductFormProps {
   /** POST endpoint of «Превью с ИИ»; without it (or without AI) there's no such button. */
   aiPreviewPath?: string;
   aiFormEnabled: boolean;
+  /** Categories the store already uses: buttons next to the usual ones. */
+  storeCategories?: string[];
   /** localStorage key for the unsaved draft and remembered values. */
   draftKey?: string;
   onSubmit: (payload: ProductPayload, imageSelection: ProductImageSelection) => void;
@@ -95,7 +97,7 @@ function selectFieldText(event: KeyboardEvent<HTMLFormElement>) {
   event.target.select();
 }
 
-export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled, draftKey, onSubmit }: ProductFormProps) {
+export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled, storeCategories = [], draftKey, onSubmit }: ProductFormProps) {
   const toast = useToast();
   const savedDraft = useMemo(() => readSavedDraft(draftKey), [draftKey]);
   // A draft left unsaved wins over the product as it is on the server.
@@ -197,7 +199,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     if (draftSimple.colors.length) filled.add("colors");
     setAiFilled(filled);
     setIsAutoDone(true);
-    const isDrawingPreview = drawAutoPreview(draft);
+    const isDrawingPreview = drawAutoPreview(draft, draftSimple.colors.length ? draftSimple.colors : simple.colors);
     const noPrice = !draftSimple.price && !simple.price.trim();
     toast.show(
       `ИИ заполнил форму. Проверьте поля с пометкой «ИИ»${noPrice ? " и укажите цену" : ""}.${isDrawingPreview ? " Превью рисуется — через минуту оно само станет обложкой." : ""}`,
@@ -210,10 +212,10 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
    * time, with what the AI just called the product. Once per form — a card
    * generated again keeps its preview («Посмотреть превью» draws another).
    */
-  function drawAutoPreview(draft: ProductDraft) {
+  function drawAutoPreview(draft: ProductDraft, colors: SimpleDetailsValue["colors"]) {
     const photo = imageManager.previewImage;
     if (!aiPreviewPath || !photo || previewDrawing.isDrawing || previewDrawing.results.length) return false;
-    const product = { title: draft.title ?? form.title, category: draft.category ?? form.category, colors: (draft.colors ?? []).map((color) => color.name) };
+    const product = { title: draft.title ?? form.title, category: draft.category ?? form.category, colors };
     void previewDrawing.draw(previewRequest(photo, readPreviewOptions(), product), photo.id);
     return true;
   }
@@ -440,23 +442,17 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
             >
               <Textarea value={form.description} onChange={(e) => updateForm({ description: e.target.value })} placeholder="Ткань, посадка, уход" />
             </Field>
-            <Field
+            <CategoryPicker
+              value={form.category}
+              onChange={(category) => updateForm({ category })}
+              storeCategories={storeCategories}
               label={
                 <>
                   Категория <AiBadge show={aiFilled.has("category")} />
                 </>
               }
               action={aiAction("category")}
-            >
-              <Input value={form.category} onChange={(e) => updateForm({ category: e.target.value })} placeholder="Выберите ниже или впишите свою" />
-            </Field>
-            <ChipGroup label="Частые категории">
-              {CATEGORY_PRESETS.map((category) => (
-                <Chip key={category} selected={form.category === category} onClick={() => updateForm({ category: form.category === category ? "" : category })}>
-                  {category}
-                </Chip>
-              ))}
-            </ChipGroup>
+            />
           </Card>
 
           <PriceDetails
@@ -496,7 +492,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           product={{
             title: form.title,
             category: form.category,
-            colors: simple.colors.map((color) => color.name)
+            colors: simple.colors
           }}
           onClose={() => setIsPreviewOpen(false)}
         />

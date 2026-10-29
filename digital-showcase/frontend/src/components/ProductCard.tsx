@@ -15,8 +15,6 @@ const statusMap = {
 
 // Two columns on phones, four from 720px, the page is at most 1180px wide.
 const PHOTO_SIZES = "(min-width: 1180px) 280px, (min-width: 720px) 25vw, 50vw";
-/** Color dots on the photo; more colors — «+3» after them. */
-const MAX_DOTS = 5;
 
 interface ProductCardProps {
   product: Product;
@@ -30,7 +28,6 @@ export function ProductCard({ product, slug, favorite = false, onToggleFavorite 
   const minPrice = variantPrices.length ? Math.min(...variantPrices) : null;
   const displayPrice = product.price ?? minPrice;
   const isUnavailable = product.status === "NOT_AVAILABLE";
-  const colorNames = product.colors.map((color) => color.name).join(", ");
   const priceText = product.priceText
     ? `Цена: ${product.priceText}`
     : displayPrice != null
@@ -59,14 +56,6 @@ export function ProductCard({ product, slug, favorite = false, onToggleFavorite 
               <Icon icon={Image01Icon} size="lg" strokeWidth={1.6} />
             </div>
           )}
-          {product.colors.length > 0 && (
-            <span className={styles.colors} role="img" aria-label={`Цвета: ${colorNames}`} title={colorNames}>
-              {product.colors.slice(0, MAX_DOTS).map((color) => (
-                <ColorSwatch key={color.id} color={color.hex} size="sm" />
-              ))}
-              {product.colors.length > MAX_DOTS && <span className={styles.moreColors}>+{product.colors.length - MAX_DOTS}</span>}
-            </span>
-          )}
         </div>
         <div className={styles.body}>
           <h3 className={styles.title}>{product.title}</h3>
@@ -75,6 +64,9 @@ export function ProductCard({ product, slug, favorite = false, onToggleFavorite 
           <div className={styles.meta}>
             {sortSizes(product.sizes.map((size) => size.value)).map((size) => (
               <Badge key={size}>{size}</Badge>
+            ))}
+            {product.colors.map((color) => (
+              <ColorSwatch key={color.id} color={color.hex} label={color.name} size="sm" />
             ))}
           </div>
           {!isUnavailable && (

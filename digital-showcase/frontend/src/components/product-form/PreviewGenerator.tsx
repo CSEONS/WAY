@@ -24,7 +24,7 @@ interface PreviewGeneratorProps {
   images: ProductFormImage[];
   /** The current cover: the photo to draw from by default, and a drawn picture once it's ready. */
   coverId: string | null;
-  product: { title: string; category: string; colors: string[] };
+  product: { title: string; category: string; colors: { name: string; hex: string }[] };
   onClose: () => void;
 }
 
@@ -47,7 +47,7 @@ export function PreviewGenerator({ drawing, images, coverId, product, onClose }:
   const [isHeadlineOpen, setIsHeadlineOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const photo = sources.find((image) => image.id === photoId);
-  const colors = [...new Set(product.colors.map((color) => color.trim()).filter(Boolean))];
+  const colors = [...new Set(product.colors.map((color) => color.name.trim()).filter(Boolean))];
   const chosen = results[selected];
   // The owner may have picked another photo as the cover or removed the picture since.
   const isCover = Boolean(chosen) && drawing.coverImageId === coverId;
@@ -258,6 +258,22 @@ export function PreviewGenerator({ drawing, images, coverId, product, onClose }:
         </>
       )}
 
+      {colors.length > 0 && (
+        <Checkbox
+          checked={options.colorDots}
+          onChange={(colorDots) => update({ colorDots })}
+          label={
+            <span className={styles.dotsLabel}>
+              Кружки с цветами товара в углу
+              <span className={styles.dots} aria-hidden="true">
+                {product.colors.slice(0, 8).map((color) => (
+                  <ColorSwatch key={color.name} color={color.hex} size="sm" />
+                ))}
+              </span>
+            </span>
+          }
+        />
+      )}
       {colors.length > 1 && (
         <Checkbox checked={options.showColors} onChange={(showColors) => update({ showColors })} label={`Показать все цвета: ${colors.join(", ").toLowerCase()}`} />
       )}

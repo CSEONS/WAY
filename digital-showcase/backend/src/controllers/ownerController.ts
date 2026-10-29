@@ -200,6 +200,12 @@ export const listProducts = asyncHandler(async (req, res) => {
   res.json(await productService.listProducts(store.id));
 });
 
+/** The store's own categories, for the product form. */
+export const listCategories = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  res.json(await productService.listStoreCategories(store.id));
+});
+
 export const getAnalytics = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
   const [productCount, analytics] = await Promise.all([productService.countProducts(store.id), analyticsService.getStoreAnalytics(store.id)]);

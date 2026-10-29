@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { z } from "zod";
+import { parseColorHex } from "../utils/colorHex.js";
 import { HttpError } from "../utils/http.js";
 import { parseBody } from "../utils/validation.js";
 import { editImage } from "./aiProvider.js";
@@ -84,7 +85,9 @@ const previewOptionsSchema = z.object({
   showColors: z.boolean().default(false),
   title: z.string().trim().max(120).default(""),
   category: z.string().trim().max(60).default(""),
-  colors: z.array(z.string().trim().max(40)).max(10).default([])
+  colors: z.array(z.string().trim().max(40)).max(10).default([]),
+  /** The product's colors as codes: drawn as overlapping circles in the bottom-right corner. Empty — none. */
+  swatches: z.array(z.string().trim().max(30)).max(10).default([])
 });
 
 export type PreviewOptions = z.infer<typeof previewOptionsSchema>;
@@ -155,6 +158,7 @@ export function buildPreviewPrompt(options: PreviewOptions) {
         : `3–4 round icons on the left side${iconStyle}, each showing one of the product's most relevant benefits with a short Russian caption.`
     );
     lines.push("Keep all text and icons well inside the frame, away from the edges, and spell the Russian words correctly.");
+    if (swatchCodes(options).length) lines.push("Keep the bottom-right corner free of text, icons and badges.");
   } else {
     lines.push("No text, letters, numbers, icons or badges anywhere in the image: only the product in the scene.");
     if (!theme) autos.push("color mood");
@@ -170,6 +174,39 @@ export function buildPreviewPrompt(options: PreviewOptions) {
   if (!withText) avoid.push("any text", "letters", "numbers");
   lines.push(`Avoid: ${avoid.join(", ")}.`);
   return lines.join("\n");
+}
+
+/** The swatch codes that are real colors, in order, without repeats. */
+function swatchCodes(options: PreviewOptions) {
+  return [...new Set(options.swatches.map(parseColorHex).filter((code): code is string => code !== null))].slice(0, MAX_SWATCHES);
+}
+
+const MAX_SWATCHES = 8;
+
+/**
+ * The product's colors on the cover: circles in the bottom-right corner, each
+ * over the one before, with a white rim and a soft shadow so they show on any
+ * background. Drawn here, not by the model: the colors come out exactly as in
+ * the card. Codes are #rrggbb (parseColorHex), so nothing else gets into the SVG.
+ */
+export async function drawColorSwatches(picture: Buffer, codes: string[]) {
+  const { width = 0, height = 0 } = await sharp(picture).metadata();
+  if (!codes.length || !width || !height) return picture;
+  const size = Math.round(width * 0.075);
+  const step = Math.round(size * 0.62);
+  const rim = Math.max(2, Math.round(size * 0.07));
+  const margin = Math.round(width * 0.045);
+  const radius = size / 2;
+  const left = width - margin - size - step * (codes.length - 1);
+  const top = height - margin - size;
+  const circles = codes
+    .map((code, index) => `<circle cx="${left + radius + step * index}" cy="${top + radius}" r="${radius - rim / 2}" fill="${code}" stroke="#ffffff" stroke-width="${rim}" filter="url(#shadow)"/>`)
+    .join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="${rim}" stdDeviation="${rim}" flood-color="#000000" flood-opacity="0.25"/></filter></defs>${circles}</svg>`;
+  return sharp(picture)
+    .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+    .webp({ quality: 90 })
+    .toBuffer();
 }
 
 /**
@@ -195,6 +232,8 @@ export async function createProductPreview(options: PreviewOptions, photo: Uploa
     prompt: buildPreviewPrompt(options),
     images: [{ buffer: reference, mimetype: "image/jpeg", filename: "product.jpg" }]
   });
-  const beings = await findLivingBeings(Buffer.from(base64, "base64")).catch(() => null);
-  return { image: `data:${mimetype};base64,${base64}`, livingBeings: beings?.found ?? [] };
+  const codes = swatchCodes(options);
+  const picture = codes.length ? await drawColorSwatches(Buffer.from(base64, "base64"), codes) : Buffer.from(base64, "base64");
+  const beings = await findLivingBeings(picture).catch(() => null);
+  return { image: `data:${codes.length ? "image/webp" : mimetype};base64,${picture.toString("base64")}`, livingBeings: beings?.found ?? [] };
 }

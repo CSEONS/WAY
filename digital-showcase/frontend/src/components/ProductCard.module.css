@@ -45,30 +45,8 @@
 }
 
 .media {
-  position: relative;
   overflow: hidden;
   background: var(--color-surface-muted);
-}
-
-/* The product's colors as dots in the photo's corner, on a pale pill so they show on any photo. */
-.colors {
-  position: absolute;
-  bottom: var(--space-2);
-  left: var(--space-2);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  max-width: calc(100% - 2 * var(--space-2));
-  border-radius: var(--radius-pill);
-  padding: var(--space-1) var(--space-2);
-  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
-  box-shadow: var(--shadow-hover);
-}
-
-.moreColors {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
 }
 
 .image,

@@ -83,6 +83,22 @@ test("владелец А не видит и не меняет магазин Б
   assert.deepEqual(ownList.data.map((store: { id: string }) => store.id), [storeA.id]);
 });
 
+test("свои категории магазина — для кнопок в форме товара: сначала частые, скрытые товары тоже, чужие нет", async () => {
+  const shop = (await createStore({ ownerId: ownerA.id, name: "Сумки", slug: "categories-shop" }))!;
+  await createProduct({ storeId: shop.id, title: "Тоут", category: "Сумки" });
+  await createProduct({ storeId: shop.id, title: "Клатч", category: "Сумки" });
+  await createProduct({ storeId: shop.id, title: "Шарф", category: "Шарфы", isVisible: 0 });
+  await createProduct({ storeId: shop.id, title: "Платье", category: "Платья" });
+  await createProduct({ storeId: shop.id, title: "Без категории" });
+  await createProduct({ storeId: storeB.id, title: "Чужое", category: "Чужая" });
+
+  const token = await login("+79280000011", "password-a");
+  const response = await call("GET", `/api/owner/stores/${shop.id}/categories`, { token });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.data, ["Сумки", "Платья", "Шарфы"]);
+  assert.equal((await call("GET", `/api/owner/stores/${storeB.id}/categories`, { token })).status, 404);
+});
+
 test("владелец не попадает в админку", async () => {
   const token = await login("+79280000011", "password-a");
   assert.equal((await call("GET", "/api/admin/stores", { token })).status, 403);

@@ -27,6 +27,8 @@ export interface PreviewOptions {
   /** Empty — the AI picks the benefits. */
   features: PreviewFeature[];
   showColors: boolean;
+  /** The product's colors as overlapping circles in the picture's corner (drawn by the server, exact). */
+  colorDots: boolean;
 }
 
 export const SCENES: { value: PreviewScene; label: string }[] = [
@@ -72,7 +74,7 @@ export const FEATURES: { value: PreviewFeature; label: string }[] = [
 export const MAX_FEATURES = 4;
 export const MAX_HEADLINE = 40;
 
-const DEFAULT_OPTIONS: PreviewOptions = { scene: "auto", theme: "auto", text: "with_text", headline: "", features: [], showColors: false };
+const DEFAULT_OPTIONS: PreviewOptions = { scene: "auto", theme: "auto", text: "with_text", headline: "", features: [], showColors: false, colorDots: true };
 
 // The look carries over to the next product, so the storefront stays in one style.
 // The headline doesn't: it belongs to one product.
@@ -88,7 +90,8 @@ export function readPreviewOptions(): PreviewOptions {
       theme: THEMES.some((theme) => theme.value === saved.theme) ? saved.theme! : "auto",
       text: saved.text === "no_text" ? "no_text" : "with_text",
       features: Array.isArray(saved.features) ? saved.features.filter((value) => FEATURES.some((feature) => feature.value === value)).slice(0, MAX_FEATURES) : [],
-      showColors: Boolean(saved.showColors)
+      showColors: Boolean(saved.showColors),
+      colorDots: saved.colorDots !== false
     };
   } catch {
     return DEFAULT_OPTIONS;
@@ -107,8 +110,12 @@ export function savePreviewOptions({ headline: _headline, ...look }: PreviewOpti
  * What «Превью с ИИ» sends: the photo (a new one as a file, a saved one by its
  * address), the options and what the product is — the window and «Авто» both.
  */
-export function previewRequest(photo: ProductFormImage, options: PreviewOptions, product: { title: string; category: string; colors: string[] }) {
-  const colors = [...new Set(product.colors.map((color) => color.trim()).filter(Boolean))];
+export function previewRequest(
+  photo: ProductFormImage,
+  { colorDots, ...options }: PreviewOptions,
+  product: { title: string; category: string; colors: { name: string; hex: string }[] }
+) {
+  const colors = [...new Set(product.colors.map((color) => color.name.trim()).filter(Boolean))];
   const formData = new FormData();
   if (photo.file) formData.append("image", photo.file);
   else formData.append("imageUrl", photo.url);
@@ -120,7 +127,8 @@ export function previewRequest(photo: ProductFormImage, options: PreviewOptions,
       showColors: options.showColors && colors.length > 1,
       title: product.title.trim(),
       category: product.category.trim(),
-      colors
+      colors,
+      swatches: colorDots ? [...new Set(product.colors.map((color) => color.hex))] : []
     })
   );
   return formData;

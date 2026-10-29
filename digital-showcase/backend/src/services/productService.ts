@@ -133,6 +133,16 @@ export async function countProducts(storeId: string, publicOnly = false, filters
   return row?.count ?? 0;
 }
 
+/** Categories the store has given its products, hidden ones too — the most used first: the form offers them as buttons. */
+export async function listStoreCategories(storeId: string) {
+  const db = await getDb();
+  const rows = await db.all<{ category: string }>(
+    "SELECT category FROM products WHERE storeId = ? AND category IS NOT NULL AND TRIM(category) != '' GROUP BY category ORDER BY COUNT(*) DESC, category",
+    storeId
+  );
+  return rows.map((row) => row.category);
+}
+
 /** Filter options of a storefront: categories, sizes and colors of its visible products. */
 export async function listFacets(storeId: string) {
   const db = await getDb();

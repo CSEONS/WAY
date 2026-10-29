@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPreviewPrompt, parsePreviewOptions } from "../src/services/previewImageService.js";
+import sharp from "sharp";
+import { buildPreviewPrompt, drawColorSwatches, parsePreviewOptions } from "../src/services/previewImageService.js";
 
 const options = (value: Record<string, unknown> = {}) => parsePreviewOptions(JSON.stringify(value));
 
@@ -61,4 +62,20 @@ test("неверные настройки — понятная ошибка 400"
   assert.throws(() => options({ features: ["warm", "water", "wind", "light", "eco"] }), (error: { status?: number }) => error.status === 400);
   assert.throws(() => options({ headline: "x".repeat(41) }), (error: { status?: number }) => error.status === 400);
   assert.deepEqual(parsePreviewOptions(undefined).features, []);
+});
+
+test("цвета из карточки — кружками внахлёст в правом нижнем углу; модель держит угол свободным", async () => {
+  assert.match(buildPreviewPrompt(options({ swatches: ["#7f1d1d"] })), /Keep the bottom-right corner free/);
+  assert.doesNotMatch(buildPreviewPrompt(options({ swatches: ["красный", "javascript:"] })), /bottom-right corner/, "only real color codes count");
+  assert.doesNotMatch(buildPreviewPrompt(options()), /bottom-right corner/);
+
+  const white = await sharp({ create: { width: 400, height: 500, channels: 3, background: "#ffffff" } }).png().toBuffer();
+  const picture = await drawColorSwatches(white, ["#ff0000", "#0000ff"]);
+  const { data, info } = await sharp(picture).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const pixel = (x: number, y: number) => [...data.subarray((y * info.width + x) * 3, (y * info.width + x) * 3 + 3)];
+  // 400 px wide: circles of 30 px, 19 px apart, 18 px from the edges — centers at (348, 467) and (367, 467).
+  const [red, blue, corner] = [pixel(346, 467), pixel(369, 467), pixel(10, 10)];
+  assert.ok(red[0] > 200 && red[1] < 60 && red[2] < 60, `red: ${red}`);
+  assert.ok(blue[2] > 200 && blue[0] < 60 && blue[1] < 60, `blue on top of red: ${blue}`);
+  assert.deepEqual(corner, [255, 255, 255], "the rest of the picture is untouched");
 });

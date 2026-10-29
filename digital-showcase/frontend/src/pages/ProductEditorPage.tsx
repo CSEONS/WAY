@@ -14,6 +14,7 @@ export function ProductEditorPage() {
   const { jobs, queueProductSave } = useBackgroundJobs();
   const [store, setStore] = useState<Store>();
   const [product, setProduct] = useState<Product>();
+  const [categories, setCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(Boolean(storeId));
   const [hasLoadError, setHasLoadError] = useState(false);
   const [stage, setStage] = useState<"form" | "queued">("form");
@@ -39,6 +40,14 @@ export function ProductEditorPage() {
         if (!ignore) setStore(res.data);
       })
     ];
+
+    // The store's own categories are a convenience: the form opens without them if they don't load.
+    api
+      .get<string[]>(`/owner/stores/${storeId}/categories`)
+      .then((res) => {
+        if (!ignore) setCategories(res.data);
+      })
+      .catch(() => undefined);
 
     if (id) {
       requests.push(
@@ -159,6 +168,7 @@ export function ProductEditorPage() {
           aiDraftPath={`/owner/stores/${storeId}/products/ai-draft`}
           aiPreviewPath={store?.aiPreviewEnabled ? `/owner/stores/${storeId}/products/ai-preview` : undefined}
           aiFormEnabled={Boolean(store?.aiFormEnabled)}
+          storeCategories={categories}
           draftKey={`product-form-draft:${storeId}:${id ?? "new"}`}
           onSubmit={handleSubmit}
         />

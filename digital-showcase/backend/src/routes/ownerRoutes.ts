@@ -15,6 +15,7 @@ ownerRoutes.get("/stores/:storeId/subscription", controller.getSubscription);
 ownerRoutes.post("/stores/:storeId/packages/:packageId/request", controller.requestPackage);
 ownerRoutes.delete("/stores/:storeId/package-orders/:orderId", controller.withdrawPackageRequest);
 ownerRoutes.get("/stores/:storeId/products", controller.listProducts);
+ownerRoutes.get("/stores/:storeId/categories", controller.listCategories);
 ownerRoutes.post("/stores/:storeId/products/ai-draft", aiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 8 }]), controller.createProductDraft);
 ownerRoutes.post("/stores/:storeId/products/bulk-ai-draft", bulkAiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 40 }]), controller.createBulkProductDraft);
 ownerRoutes.post("/stores/:storeId/products/ai-preview", previewUpload.single("image"), controller.createPreview);

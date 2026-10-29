@@ -105,3 +105,19 @@
   color: var(--color-ink-subtle);
   font-size: var(--font-size-xs);
 }
+
+/* «Кружки с цветами товара»: the circles as they'll look on the picture, each over the one before. */
+.dotsLabel {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dots {
+  display: inline-flex;
+}
+
+.dots > * + * {
+  margin-left: calc(-1 * var(--space-1));
+}

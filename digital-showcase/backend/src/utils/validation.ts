@@ -240,8 +240,13 @@ export const paymentSchema = z.object({
 
 export const receiptSchema = z.object({ receipt: optionalText(500) });
 
-/** «Оплатить онлайн»: how many months; which are offered is checked by onlinePaymentService. */
-export const onlinePaymentSchema = z.object({ months: z.coerce.number().int().min(1).max(12) });
+/** «Оплатить»: the plan for some months or a package; which are offered is checked by onlinePaymentService. */
+export const onlinePaymentSchema = z
+  .object({
+    months: z.coerce.number().int().min(1).max(12).optional(),
+    packageId: z.string().min(1).max(100).optional()
+  })
+  .refine((payment) => Boolean(payment.months) !== Boolean(payment.packageId), { message: "выберите срок или пакет", path: ["months"] });
 
 export const connectSchema = z.object({
   ownerName: requiredText(100),

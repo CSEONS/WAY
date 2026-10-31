@@ -86,7 +86,12 @@ export function SubscriptionPage() {
           if (cancelled) return;
           if (result.status === "SUCCEEDED") {
             setChecking(null);
-            toast.show(`Оплата прошла — подписка продлена до ${formatDate(result.subscription.endsAt)}`, { tone: "success" });
+            const paid = !result.packageId
+              ? `подписка продлена до ${formatDate(result.subscription.endsAt)}`
+              : result.isService
+                ? `пакет «${result.name}» оплачен, администратор свяжется`
+                : `пакет «${result.name}» уже у вас`;
+            toast.show(`Оплата прошла — ${paid}`, { tone: "success" });
             load();
             return;
           }
@@ -108,16 +113,26 @@ export function SubscriptionPage() {
     };
   }, [returnedPayment, storeId]);
 
-  /** «Оплатить»: to ЮKassa's page; it sends the owner back here. */
-  async function payOnline() {
-    setPaying(true);
+  /** «Оплатить» the plan ({ months }) or a package ({ packageId }): to ЮKassa's page, which sends the owner back here. False — it didn't go. */
+  async function payOnline(body: { months: number } | { packageId: string }) {
     try {
-      const { data: started } = await api.post<{ id: string; confirmationUrl: string }>(`/owner/stores/${storeId}/online-payments`, { months });
+      const { data: started } = await api.post<{ id: string; confirmationUrl: string }>(`/owner/stores/${storeId}/online-payments`, body);
       window.location.assign(started.confirmationUrl);
+      return true;
     } catch (err: any) {
       toast.show(err?.response?.data?.message ?? "Не удалось перейти к оплате", { tone: "danger" });
-      setPaying(false);
+      return false;
     }
+  }
+
+  async function payPlan() {
+    setPaying(true);
+    if (!(await payOnline({ months }))) setPaying(false);
+  }
+
+  async function payPackage(packageId: string) {
+    setBusyId(packageId);
+    if (!(await payOnline({ packageId }))) setBusyId(null);
   }
 
   function setOrders(update: (orders: OwnerOrder[]) => OwnerOrder[]) {
@@ -247,7 +262,7 @@ export function SubscriptionPage() {
                 {formatMoney(online.price)} в месяц · тариф «{online.planName}»
               </small>
             </div>
-            <Button variant="primary" icon={CreditCardIcon} loading={paying} disabled={checking === "checking"} onClick={() => void payOnline()}>
+            <Button variant="primary" icon={CreditCardIcon} loading={paying} disabled={checking === "checking"} onClick={() => void payPlan()}>
               Оплатить {formatMoney(onlineTotal)}
             </Button>
             <small>
@@ -316,7 +331,14 @@ export function SubscriptionPage() {
 
       {(packages.length > 0 || orders.length > 0) && (
         <Card as="section" padding="lg" className={styles.card}>
-          <CardHeader title="Пакеты" description="Докупаются разово к любому тарифу. Запросите — администратор свяжется и примет оплату" />
+          <CardHeader
+            title="Пакеты"
+            description={
+              data.packagesOnline
+                ? "Докупаются разово к любому тарифу. Превью и карточки добавятся сразу после оплаты, услугу администратор сделает после неё"
+                : "Докупаются разово к любому тарифу. Запросите — администратор свяжется и примет оплату"
+            }
+          />
           {packages.length > 0 && (
             <div className={styles.packages}>
               {packages.map((item) => (
@@ -324,7 +346,18 @@ export function SubscriptionPage() {
                   key={item.id}
                   item={item}
                   action={
-                    requested.has(item.id) ? (
+                    data.packagesOnline && item.price > 0 ? (
+                      <Button
+                        variant="primary"
+                        block
+                        icon={CreditCardIcon}
+                        loading={busyId === item.id}
+                        disabled={checking === "checking"}
+                        onClick={() => void payPackage(item.id)}
+                      >
+                        Оплатить {formatMoney(item.price)}
+                      </Button>
+                    ) : requested.has(item.id) ? (
                       <Button variant="secondary" block disabled>
                         Запрос отправлен
                       </Button>

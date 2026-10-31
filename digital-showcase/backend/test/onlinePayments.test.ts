@@ -22,6 +22,8 @@ const { createStore, getStore, updateStore } = await import("../src/services/sto
 const { createOwner } = await import("../src/services/userService.js");
 const { listForUser } = await import("../src/services/notificationService.js");
 const { listActions } = await import("../src/services/auditService.js");
+const packages = await import("../src/services/packageService.js");
+const { onlinePaymentSchema, parseBody } = await import("../src/utils/validation.js");
 
 await initDatabase();
 const owner = (await createOwner({ name: "Владелец", email: "owner@shop.test", phone: "+79280000006", password: "secret123" }))!;
@@ -86,7 +88,7 @@ test("онлайн-оплата есть, только когда ЮKassa нас
   assert.equal(online.onlineOffer({ ...store, planId: "basic" }), null);
   assert.equal(online.onlineOffer({ ...store, subscriptionEndsAt: null }), null);
   assert.equal(online.onlineOffer({ ...store, isActive: 0 }), null);
-  await assert.rejects(online.startOnlinePayment(store.id, 2, owner.id), /Период — 1, 3, 6, 12 мес/);
+  await assert.rejects(online.startOnlinePayment(store.id, { months: 2 }, owner.id), /Период — 1, 3, 6, 12 мес/);
 });
 
 test("оплата на 3 месяца: платёж в ЮKassa, после оплаты подписка продлена один раз", async () => {
@@ -95,7 +97,7 @@ test("оплата на 3 месяца: платёж в ЮKassa, после оп
   const store = (await createStore({ ownerId: owner.id, name: "Три месяца", slug: "online-three", planId: plan.id, subscriptionEndsAt: endsAt }))!;
   requests.length = 0;
 
-  const started = await online.startOnlinePayment(store.id, 3, owner.id);
+  const started = await online.startOnlinePayment(store.id, { months: 3 }, owner.id);
   assert.match(started.confirmationUrl, /^https:\/\/yoomoney\.test\/checkout/);
   const [create] = requests;
   assert.equal(create.headers["Idempotence-Key"], started.id);
@@ -141,7 +143,7 @@ test("оплата на 3 месяца: платёж в ЮKassa, после оп
 test("отменённая оплата ничего не продлевает; чужие и выдуманные уведомления пропускаются", async () => {
   setYookassa(true);
   const store = (await createStore({ ownerId: owner.id, name: "Передумал", slug: "online-cancel", planId: plan.id }))!;
-  const started = await online.startOnlinePayment(store.id, 1, owner.id);
+  const started = await online.startOnlinePayment(store.id, { months: 1 }, owner.id);
   const externalId = `yk-${remote.size}`;
   pay(externalId, "canceled");
   assert.equal((await online.handleNotification({ event: "payment.canceled", object: { id: externalId } }))?.status, "CANCELED");
@@ -160,7 +162,7 @@ test("отменённая оплата ничего не продлевает; 
 test("уведомление не пришло, владелец не вернулся: оплата применяется при открытии «Подписки»", async () => {
   setYookassa(true);
   const store = (await createStore({ ownerId: owner.id, name: "Закрыл вкладку", slug: "online-sync", planId: plan.id }))!;
-  await online.startOnlinePayment(store.id, 12, owner.id);
+  await online.startOnlinePayment(store.id, { months: 12 }, owner.id);
   pay(`yk-${remote.size}`);
   await online.syncPending(store.id);
   const [payment] = await listPayments({ storeId: store.id });
@@ -175,7 +177,7 @@ test("чек от ЮKassa: в платеже — покупатель и усл�
   try {
     const store = (await createStore({ ownerId: owner.id, name: "С чеком", slug: "online-receipt", planId: plan.id }))!;
     requests.length = 0;
-    const started = await online.startOnlinePayment(store.id, 1, owner.id);
+    const started = await online.startOnlinePayment(store.id, { months: 1 }, owner.id);
     assert.deepEqual(requests[0].body.receipt, {
       customer: { email: "owner@shop.test" },
       items: [
@@ -199,7 +201,7 @@ test("чек от ЮKassa: в платеже — покупатель и усл�
     const db = await getDb();
     await db.run("UPDATE users SET email = NULL WHERE id = ?", owner.id);
     requests.length = 0;
-    await online.startOnlinePayment(store.id, 1, owner.id);
+    await online.startOnlinePayment(store.id, { months: 1 }, owner.id);
     assert.deepEqual(requests[0].body.receipt.customer, { phone: "79280000006" });
   } finally {
     delete process.env.YOOKASSA_RECEIPTS;
@@ -214,14 +216,87 @@ test("ЮKassa не ответила: попытка отменена, владе
   const working = globalThis.fetch;
   globalThis.fetch = (async () => new Response(JSON.stringify({ type: "error", description: "Internal error" }), { status: 500 })) as typeof fetch;
   try {
-    await assert.rejects(online.startOnlinePayment(store.id, 1, owner.id), /Не удалось перейти к оплате/);
+    await assert.rejects(online.startOnlinePayment(store.id, { months: 1 }, owner.id), /Не удалось перейти к оплате/);
   } finally {
     globalThis.fetch = working;
   }
   const db = await getDb();
   assert.deepEqual(await db.all("SELECT status FROM online_payments WHERE storeId = ?", store.id), [{ status: "CANCELED" }]);
   await updateStore(store.id, { isActive: 0 });
-  await assert.rejects(online.startOnlinePayment(store.id, 1, owner.id), /недоступна/);
+  await assert.rejects(online.startOnlinePayment(store.id, { months: 1 }, owner.id), /недоступна/);
+});
+
+test("пакет онлайн: превью и карточки сразу у магазина, открытый запрос на него закрыт этой оплатой", async () => {
+  setYookassa(true);
+  const store = (await createStore({ ownerId: owner.id, name: "Пакет онлайн", slug: "online-package", planId: plan.id }))!;
+  const input = { name: "Превью и карточки", price: 300, description: "", previews: 10, fills: 50, isService: 0, isPublic: 1 };
+  const item = await packages.savePackage(null, input);
+  assert.equal(online.packagesOnline(store), true);
+  // Asked for before ЮKassa was set up: the admin sees it in «Нужно сделать сейчас».
+  const request = await packages.requestPackage(store.id, item.id);
+
+  requests.length = 0;
+  const started = await online.startOnlinePayment(store.id, { packageId: item.id }, owner.id);
+  assert.deepEqual(requests[0].body.amount, { value: "300.00", currency: "RUB" });
+  assert.equal(requests[0].body.description, "Пакет «Превью и карточки» — витрина «Пакет онлайн»");
+  // The package changes before ЮKassa answers: the owner gets what they paid for.
+  await packages.savePackage(item.id, { ...input, price: 500, previews: 20 });
+  pay(`yk-${remote.size}`);
+  const back = await online.checkOnlinePayment(started.id, store.id);
+  assert.deepEqual([back.status, back.months, back.packageId], ["SUCCEEDED", 0, item.id]);
+
+  const updated = (await getStore(store.id))!;
+  assert.deepEqual([updated.extraPreviews, updated.extraFills], [10, 50]);
+  assert.equal(updated.subscriptionEndsAt, store.subscriptionEndsAt);
+  const [payment] = await listPayments({ storeId: store.id });
+  assert.deepEqual([payment.amount, payment.months, payment.method, payment.packageName, payment.periodEnd], [300, 0, "ONLINE", "Превью и карточки", null]);
+  const orders = await packages.listOrders(store.id);
+  assert.deepEqual(
+    orders.map((order) => [order.id, order.status, order.paymentId, order.previews, order.price]),
+    [[request.id, "DONE", payment.id, 10, 300]]
+  );
+  assert.equal((await packages.openOrders()).some((order) => order.storeId === store.id), false);
+
+  const notice = (await listForUser(owner.id)).items.find((item) => item.storeId === store.id && item.title === "Оплата получена");
+  assert.equal(notice?.body, "Пакет «Превью и карточки» оплачен. Уже у вас: +10 ИИ-превью, +50 карточек с ИИ. Спасибо!");
+  const entry = (await listActions()).find((item) => item.action === "PAYMENT_ONLINE" && item.targetId === store.id);
+  assert.equal(entry?.details, "пакет «Превью и карточки» (+10 ИИ-превью, +50 карточек с ИИ) за 300 ₽");
+
+  // Cancelled in «Оплаты»: what's left of the package goes back, as with any package sale.
+  await cancelPayment(payment.id);
+  await packages.returnPackage(payment.id);
+  assert.deepEqual([(await getStore(store.id))!.extraPreviews, (await getStore(store.id))!.extraFills], [0, 0]);
+});
+
+test("услуга оплачена онлайн — ждёт «Выполнено»; скрытый и бесплатный пакет онлайн не купить", async () => {
+  setYookassa(true);
+  const store = (await createStore({ ownerId: owner.id, name: "Услуга онлайн", slug: "online-service", planId: plan.id }))!;
+  const service = await packages.savePackage(null, { name: "Заполним за вас", price: 1000, description: "", previews: 0, fills: 0, isService: 1, isPublic: 1 });
+  await online.startOnlinePayment(store.id, { packageId: service.id }, owner.id);
+  const externalId = `yk-${remote.size}`;
+  pay(externalId);
+  await online.handleNotification({ event: "payment.succeeded", object: { id: externalId } });
+  const [order] = await packages.listOrders(store.id);
+  assert.equal(order.status, "PAID");
+  assert.ok((await packages.openOrders()).some((open) => open.id === order.id));
+  const notice = (await listForUser(owner.id)).items.find((item) => item.storeId === store.id);
+  assert.equal(notice?.body, "Пакет «Заполним за вас» оплачен. Администратор свяжется, чтобы сделать услугу.");
+
+  const hidden = await packages.savePackage(null, { ...service, name: "Скрытый", isPublic: 0 });
+  await assert.rejects(online.startOnlinePayment(store.id, { packageId: hidden.id }, owner.id), /Такого пакета нет/);
+  const free = await packages.savePackage(null, { ...service, name: "Подарок", price: 0 });
+  await assert.rejects(online.startOnlinePayment(store.id, { packageId: free.id }, owner.id), /бесплатный/);
+
+  // The plan or a package, not both and not neither.
+  assert.throws(() => parseBody(onlinePaymentSchema, {}), /выберите срок или пакет/);
+  assert.throws(() => parseBody(onlinePaymentSchema, { months: 1, packageId: service.id }), /выберите срок или пакет/);
+  assert.deepEqual(parseBody(onlinePaymentSchema, { packageId: service.id }), { packageId: service.id });
+
+  await updateStore(store.id, { isActive: 0 });
+  assert.equal(online.packagesOnline((await getStore(store.id))!), false);
+  await assert.rejects(online.startOnlinePayment(store.id, { packageId: service.id }, owner.id), /пакетов недоступна/);
+  setYookassa(false);
+  assert.equal(online.packagesOnline(store), false);
 });
 
 test.after(async () => {

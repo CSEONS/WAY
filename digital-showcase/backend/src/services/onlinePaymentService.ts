@@ -15,14 +15,16 @@ import {
 import { reportProblem } from "./alertService.js";
 import { logAction } from "./auditService.js";
 import { notifyStoreOwner } from "./notificationService.js";
+import { contentsLabel, getPackage, sellPackage } from "./packageService.js";
 import { acceptPayment } from "./paymentService.js";
 import { planOf } from "./planService.js";
 import { getStore } from "./storeService.js";
 import { subscriptionInfo } from "./subscriptionService.js";
 
-// The owner pays the plan on «Подписка и оплата» through ЮKassa: a row here
-// for every attempt, a redirect to ЮKassa's page, and once ЮKassa says it's
-// paid — the same extension the admin's «Продлить» makes (paymentService),
+// The owner pays on «Подписка и оплата» through ЮKassa — the plan for some
+// months or a package: a row here for every attempt, a redirect to ЮKassa's
+// page, and once ЮKassa says it's paid — what the admin's «Продлить» or
+// «Оплачено» would do (paymentService.acceptPayment, packageService.sellPackage),
 // method ONLINE. Paid is learned from ЮKassa's notification, from the owner
 // coming back to the page, or from the page being opened later: whichever is
 // first applies it, the others find it done.
@@ -39,10 +41,17 @@ export interface OnlinePayment {
   storeId: string;
   /** ЮKassa's payment id; null until it's created there. */
   externalId: string | null;
-  planName: string;
+  /** The plan's or the package's name. */
+  name: string;
+  /** Months of the plan; 0 — a package. */
   months: number;
   /** Rubles asked. */
   amount: number;
+  /** The package paid for (null — the plan) and a copy of what's in it, as it was then. */
+  packageId: string | null;
+  previews: number;
+  fills: number;
+  isService: number;
   status: OnlinePaymentStatus;
   /** The recorded payment once it succeeded. */
   paymentId: string | null;
@@ -51,6 +60,12 @@ export interface OnlinePayment {
   createdAt: string;
   finishedAt: string | null;
 }
+
+/** What one payment is for, priced when the owner presses «Оплатить». */
+type Purchase = Pick<OnlinePayment, "name" | "months" | "amount" | "packageId" | "previews" | "fills" | "isService"> & {
+  /** Shown on ЮKassa's page and in the receipt. */
+  description: string;
+};
 
 /**
  * What the owner can pay online now, or null: ЮKassa isn't set up in .env,
@@ -64,6 +79,11 @@ export function onlineOffer(store: Pick<Store, "planId" | "isActive" | "subscrip
   const { state } = subscriptionInfo(store);
   if (state === "unlimited" || state === "disabled") return null;
   return { planName: plan.name, price: plan.price, months: ONLINE_MONTHS };
+}
+
+/** Packages with a price can be paid online: ЮKassa is set up and the admin hasn't turned the store off. Free ones are still asked for. */
+export function packagesOnline(store: Pick<Store, "isActive" | "subscriptionEndsAt">) {
+  return yookassaConfigured() && subscriptionInfo(store).state !== "disabled";
 }
 
 async function getOnlinePayment(id: string) {
@@ -103,27 +123,62 @@ async function receiptFor(ownerId: string, description: string, amount: number):
   };
 }
 
-/** «Оплатить»: a payment on ЮKassa for the store's plan; the owner is sent to `confirmationUrl`. */
-export async function startOnlinePayment(storeId: string, months: number, userId: string) {
-  const store = await getStore(storeId);
-  if (!store) throw new HttpError(404, "Магазин не найден");
+/** The plan for `months`, or a package shown on «Подписка»: what will be paid for. */
+async function purchaseFor(store: Store, what: { months?: number; packageId?: string }): Promise<Purchase> {
+  if (what.packageId) {
+    if (!packagesOnline(store)) throw new HttpError(409, "Онлайн-оплата пакетов недоступна — запросите пакет, администратор свяжется с вами");
+    const item = await getPackage(what.packageId);
+    if (!item || !item.isPublic) throw new HttpError(404, "Такого пакета нет");
+    if (item.price <= 0) throw new HttpError(409, "Этот пакет бесплатный — запросите его, администратор добавит");
+    return {
+      name: item.name,
+      months: 0,
+      amount: Math.round(item.price),
+      packageId: item.id,
+      previews: item.previews,
+      fills: item.fills,
+      isService: item.isService,
+      description: `Пакет «${item.name}» — витрина «${store.name}»`
+    };
+  }
+
   const offer = onlineOffer(store);
   if (!offer) throw new HttpError(409, "Онлайн-оплата для этого магазина недоступна — продлите подписку у администратора");
+  const months = what.months ?? 0;
   if (!offer.months.includes(months)) throw new HttpError(400, `Период — ${offer.months.join(", ")} мес.`);
+  return {
+    name: offer.planName,
+    months,
+    // Payments are whole rubles; a plan priced with kopecks is rounded.
+    amount: Math.round(offer.price * months),
+    packageId: null,
+    previews: 0,
+    fills: 0,
+    isService: 0,
+    description: `Подписка «${offer.planName}» на ${months} мес. — витрина «${store.name}»`
+  };
+}
 
-  // Payments are whole rubles; a plan priced with kopecks is rounded.
-  const amount = Math.round(offer.price * months);
-  const description = `Подписка «${offer.planName}» на ${months} мес. — витрина «${store.name}»`;
-  const receipt = yookassaReceiptsOn() ? await receiptFor(store.ownerId, description, amount) : undefined;
+/** «Оплатить»: a payment on ЮKassa for the plan ({ months }) or a package ({ packageId }); the owner is sent to `confirmationUrl`. */
+export async function startOnlinePayment(storeId: string, what: { months?: number; packageId?: string }, userId: string) {
+  const store = await getStore(storeId);
+  if (!store) throw new HttpError(404, "Магазин не найден");
+  const purchase = await purchaseFor(store, what);
+  const receipt = yookassaReceiptsOn() ? await receiptFor(store.ownerId, purchase.description, purchase.amount) : undefined;
   const id = crypto.randomUUID();
   const db = await getDb();
   await db.run(
-    `INSERT INTO online_payments (id, storeId, planName, months, amount, status, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+    `INSERT INTO online_payments (id, storeId, name, months, amount, packageId, previews, fills, isService, status, createdBy, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
     id,
     store.id,
-    offer.planName,
-    months,
-    amount,
+    purchase.name,
+    purchase.months,
+    purchase.amount,
+    purchase.packageId,
+    purchase.previews,
+    purchase.fills,
+    purchase.isService,
     userId,
     new Date().toISOString()
   );
@@ -132,8 +187,8 @@ export async function startOnlinePayment(storeId: string, months: number, userId
   try {
     payment = await createYookassaPayment(
       {
-        amount,
-        description,
+        amount: purchase.amount,
+        description: purchase.description,
         returnUrl: `${siteOrigin()}/dashboard/stores/${store.id}/subscription?payment=${id}`,
         metadata: { onlinePaymentId: id, storeId: store.id },
         receipt
@@ -142,7 +197,7 @@ export async function startOnlinePayment(storeId: string, months: number, userId
     );
   } catch (error) {
     await db.run("UPDATE online_payments SET status = 'CANCELED', finishedAt = ? WHERE id = ?", new Date().toISOString(), id);
-    await reportProblem("ЮKassa не создала платёж", error, `Магазин «${store.name}», ${amount} ₽`);
+    await reportProblem("ЮKassa не создала платёж", error, `Магазин «${store.name}», ${purchase.description}, ${purchase.amount} ₽`);
     throw new HttpError(502, "Не удалось перейти к оплате — попробуйте ещё раз через минуту или напишите администратору");
   }
   await db.run("UPDATE online_payments SET externalId = ? WHERE id = ?", payment.id, id);
@@ -150,7 +205,30 @@ export async function startOnlinePayment(storeId: string, months: number, userId
   return { id, confirmationUrl: payment.confirmation.confirmation_url };
 }
 
-/** Paid: the subscription is extended once, however many times ЮKassa's answer arrives. */
+/**
+ * The plan extended or the package given — the same as the admin's «Продлить»
+ * or «Оплачено». Returns what's said in the journal and to the owner.
+ */
+async function deliver(row: OnlinePayment, remoteId: string, amount: number) {
+  const recorded = { amount, method: "ONLINE" as const, comment: `ЮKassa, платёж ${remoteId}`, receipt: yookassaReceiptsOn() ? YOOKASSA_RECEIPT : null };
+  const money = `${amount.toLocaleString("ru-RU")} ₽`;
+  if (row.packageId) {
+    const bought = { packageId: row.packageId, name: row.name, price: row.amount, previews: row.previews, fills: row.fills, isService: row.isService };
+    const { payment, store } = await sellPackage(row.storeId, { ...recorded, bought }, null);
+    const added = contentsLabel({ ...bought, isService: 0 });
+    return {
+      payment,
+      store,
+      done: `пакет «${row.name}» (${contentsLabel(bought)}) за ${money}${row.isService ? " — услугу нужно выполнить" : ""}`,
+      body: `Пакет «${row.name}» оплачен.${added ? ` Уже у вас: ${added}.` : ""}${row.isService ? " Администратор свяжется, чтобы сделать услугу." : " Спасибо!"}`
+    };
+  }
+  const { payment, store } = await acceptPayment(row.storeId, { ...recorded, months: row.months }, null);
+  const until = new Date(payment.periodEnd!).toLocaleDateString("ru-RU");
+  return { payment, store, done: `${money} за ${row.months} мес., до ${until}`, body: `Подписка «${row.name}» продлена до ${until}. Спасибо!` };
+}
+
+/** Paid: given once, however many times ЮKassa's answer arrives. */
 async function succeed(row: OnlinePayment, remote: YookassaPayment) {
   const finishedAt = new Date().toISOString();
   const claimed = rawDb()
@@ -161,26 +239,16 @@ async function succeed(row: OnlinePayment, remote: YookassaPayment) {
   // What ЮKassa took, which is what was asked.
   const amount = Math.round(Number(remote.amount.value));
   try {
-    const { payment, store } = await acceptPayment(
-      row.storeId,
-      { amount, months: row.months, method: "ONLINE", comment: `ЮKassa, платёж ${remote.id}`, receipt: yookassaReceiptsOn() ? YOOKASSA_RECEIPT : null },
-      null
-    );
+    const { payment, store, done, body } = await deliver(row, remote.id, amount);
     const db = await getDb();
     await db.run("UPDATE online_payments SET paymentId = ? WHERE id = ?", payment.id, row.id);
-    const until = new Date(payment.periodEnd!).toLocaleDateString("ru-RU");
-    const money = `${amount.toLocaleString("ru-RU")} ₽`;
-    await logAction(row.createdBy, "PAYMENT_ONLINE", { type: "store", id: store.id, name: store.name }, `${money} за ${row.months} мес., до ${until}`);
-    await notifyStoreOwner(store.id, {
-      source: "SYSTEM",
-      title: "Оплата получена",
-      body: `Подписка «${row.planName}» продлена до ${until}. Спасибо!`,
-      link: `/dashboard/stores/${store.id}/subscription`
-    });
-    void sendTelegram(`Онлайн-оплата: «${store.name}» — ${money} за ${row.months} мес., подписка до ${until}`);
+    await logAction(row.createdBy, "PAYMENT_ONLINE", { type: "store", id: store.id, name: store.name }, done);
+    await notifyStoreOwner(store.id, { source: "SYSTEM", title: "Оплата получена", body, link: `/dashboard/stores/${store.id}/subscription` });
+    void sendTelegram(`Онлайн-оплата: «${store.name}» — ${done}`);
   } catch (error) {
-    // Money taken but nothing extended (e.g. the store was deleted meanwhile): the admin sorts it out by hand.
-    await reportProblem("Оплата через ЮKassa прошла, но подписка не продлена", error, `Платёж ${remote.id}, магазин ${row.storeId}, ${amount} ₽`);
+    // Money taken but nothing given (e.g. the store was deleted meanwhile): the admin sorts it out by hand.
+    const what = row.packageId ? "пакет не выдан" : "подписка не продлена";
+    await reportProblem(`Оплата через ЮKassa прошла, но ${what}`, error, `Платёж ${remote.id}, магазин ${row.storeId}, ${amount} ₽`);
   }
   return (await getOnlinePayment(row.id))!;
 }

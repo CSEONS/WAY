@@ -149,6 +149,8 @@ export const getSubscription = asyncHandler(async (req, res) => {
     graceDays: GRACE_DAYS,
     // Paying the plan through ЮKassa: price a month and periods; null — only through the admin.
     online: onlinePaymentService.onlineOffer(store),
+    // Packages with a price are paid here too; otherwise asked for, and the admin takes the money.
+    packagesOnline: onlinePaymentService.packagesOnline(store),
     ai,
     // Admin comments stay in the admin panel.
     payments: payments.map(({ id, amount, months, method, periodEnd, receipt, packageName, createdAt }) => ({
@@ -182,11 +184,10 @@ export const getSubscription = asyncHandler(async (req, res) => {
   });
 });
 
-/** «Оплатить»: the owner goes to ЮKassa's page and comes back to «Подписка и оплата». */
+/** «Оплатить» the plan or a package: the owner goes to ЮKassa's page and comes back to «Подписка и оплата». */
 export const startOnlinePayment = asyncHandler(async (req, res) => {
   const store = await scopedStore(req);
-  const { months } = parseBody(onlinePaymentSchema, req.body);
-  res.status(201).json(await onlinePaymentService.startOnlinePayment(store.id, months, req.user!.userId));
+  res.status(201).json(await onlinePaymentService.startOnlinePayment(store.id, parseBody(onlinePaymentSchema, req.body), req.user!.userId));
 });
 
 /** Back from ЮKassa: paid, cancelled or still waiting, and the subscription as it is now. */
@@ -195,7 +196,15 @@ export const checkOnlinePayment = asyncHandler(async (req, res) => {
   const payment = await onlinePaymentService.checkOnlinePayment(String(req.params.paymentId), store.id);
   // Re-read: a paid one has just moved the date.
   const updated = await scopedStore(req);
-  res.json({ status: payment.status, months: payment.months, amount: payment.amount, subscription: withSubscription(updated).subscription });
+  res.json({
+    status: payment.status,
+    name: payment.name,
+    packageId: payment.packageId,
+    isService: Boolean(payment.isService),
+    months: payment.months,
+    amount: payment.amount,
+    subscription: withSubscription(updated).subscription
+  });
 });
 
 /** «Хочу этот пакет»: the admin sees the request at the top of the admin panel and takes the money. */

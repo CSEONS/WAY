@@ -257,6 +257,8 @@ export interface OwnerSubscription {
   graceDays: number;
   /** Paying the plan through ЮKassa: its month price and the periods to pick; null — only through the admin. */
   online: { planName: string; price: number; months: number[] } | null;
+  /** Packages with a price are paid through ЮKassa too; false — asked for, the admin takes the money. */
+  packagesOnline: boolean;
   ai: AiStatus;
   payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "receipt" | "packageName" | "createdAt">[];
   /** Empty unless the plan has «Итоги в любой день»: the others get month results in a notification. */
@@ -272,6 +274,12 @@ export interface OwnerSubscription {
 /** POST /owner/stores/:id/online-payments/:paymentId/check — back from ЮKassa. */
 export interface OnlinePaymentCheck {
   status: "PENDING" | "SUCCEEDED" | "CANCELED";
+  /** The plan's or the package's name. */
+  name: string;
+  /** The package paid for; null — the plan. */
+  packageId: string | null;
+  isService: boolean;
+  /** 0 for a package. */
   months: number;
   amount: number;
   subscription: SubscriptionInfo;

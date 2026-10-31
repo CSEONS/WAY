@@ -640,6 +640,19 @@ export const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS payments_store ON payments(storeId, createdAt);
       `);
     }
+  },
+  {
+    version: 21,
+    name: "packages paid online",
+    // A package paid through ЮKassa: what's in it is copied, as in package_orders,
+    // months are 0. planName becomes name — of the plan or of the package.
+    up(db) {
+      if (columns(db, "online_payments").includes("planName")) db.exec("ALTER TABLE online_payments RENAME COLUMN planName TO name");
+      addColumn(db, "online_payments", "packageId", "TEXT");
+      addColumn(db, "online_payments", "previews", "INTEGER NOT NULL DEFAULT 0");
+      addColumn(db, "online_payments", "fills", "INTEGER NOT NULL DEFAULT 0");
+      addColumn(db, "online_payments", "isService", "INTEGER NOT NULL DEFAULT 0");
+    }
   }
 ];
 

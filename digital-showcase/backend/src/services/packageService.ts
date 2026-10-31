@@ -62,11 +62,16 @@ export interface PackageOrder {
   doneAt: string | null;
 }
 
+/** What a sale gives: a copy of the package as it was bought. */
+export type PackageContents = Pick<PackageOrder, "packageId" | "name" | "price" | "previews" | "fills" | "isService">;
+
 export interface PackageSale {
   /** A package straight from the list… */
   packageId?: string;
-  /** …or the owner's request for one. */
+  /** …or the owner's request for one… */
   orderId?: string;
+  /** …or what the owner paid for online, as it was then; an open request for the same package is the one paid. */
+  bought?: PackageContents;
   amount: number;
   method: PaymentMethod;
   comment?: string | null;
@@ -215,7 +220,7 @@ export async function closeRequest(orderId: string, status: "CANCELLED" | "DECLI
 }
 
 /**
- * The admin took the money: a payment that extends nothing, the order paid
+ * The money is in (the admin took it, or the owner paid online): a payment that extends nothing, the order paid
  * (done at once unless there's a service to do), previews and cards added to
  * the store's balance.
  */
@@ -226,8 +231,19 @@ export async function sellPackage(storeId: string, sale: PackageSale, adminId: s
   if (!store) throw new HttpError(404, "Магазин не найден");
 
   let request: PackageOrder | null = null;
-  let bought: Pick<PackageOrder, "packageId" | "name" | "price" | "previews" | "fills" | "isService">;
-  if (sale.orderId) {
+  let bought: PackageContents;
+  if (sale.bought) {
+    bought = sale.bought;
+    if (bought.packageId) {
+      const db = await getDb();
+      request =
+        (await db.get<PackageOrder>(
+          "SELECT * FROM package_orders WHERE storeId = ? AND packageId = ? AND status = 'REQUESTED' ORDER BY createdAt LIMIT 1",
+          storeId,
+          bought.packageId
+        )) ?? null;
+    }
+  } else if (sale.orderId) {
     request = await getOrder(sale.orderId);
     if (!request || request.storeId !== storeId) throw new HttpError(404, "Запрос не найден");
     if (request.status !== "REQUESTED") throw new HttpError(409, "Запрос уже обработан");
@@ -259,7 +275,20 @@ export async function sellPackage(storeId: string, sale: PackageSale, adminId: s
   const doneAt = status === "DONE" ? now : null;
   const orderId = request?.id ?? crypto.randomUUID();
   if (request) {
-    await db.run("UPDATE package_orders SET status = ?, paymentId = ?, paidAt = ?, doneAt = ? WHERE id = ?", status, payment.id, now, doneAt, orderId);
+    // What was paid for: the request's own copy, or the package as it was when paid online.
+    await db.run(
+      "UPDATE package_orders SET name = ?, price = ?, previews = ?, fills = ?, isService = ?, status = ?, paymentId = ?, paidAt = ?, doneAt = ? WHERE id = ?",
+      bought.name,
+      bought.price,
+      bought.previews,
+      bought.fills,
+      bought.isService,
+      status,
+      payment.id,
+      now,
+      doneAt,
+      orderId
+    );
   } else {
     await db.run(
       `INSERT INTO package_orders (id, storeId, packageId, name, price, previews, fills, isService, status, paymentId, createdAt, paidAt, doneAt)

@@ -149,7 +149,7 @@ export function AdminPreviewStyleEditPage() {
     }
   }
 
-  function useAsSample() {
+  function takeAsSample() {
     if (!testResult) return;
     setSample({ url: testResult, file: dataUrlToFile(testResult, "sample") });
     toast.show("Картинка станет примером, когда вы сохраните стиль");
@@ -365,7 +365,7 @@ export function AdminPreviewStyleEditPage() {
               <>
                 <SectionLabel>Результат</SectionLabel>
                 <img className={styles.picture} src={testResult} alt="Пробное превью" />
-                <Button variant="secondary" onClick={useAsSample} disabled={sample?.url === testResult}>
+                <Button variant="secondary" onClick={takeAsSample} disabled={sample?.url === testResult}>
                   {sample?.url === testResult ? "Это пример" : "Сделать примером"}
                 </Button>
               </>

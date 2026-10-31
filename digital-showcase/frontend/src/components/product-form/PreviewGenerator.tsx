@@ -1,6 +1,8 @@
-import { AiMagicIcon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, Image01Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from "react";
-import { Button, Checkbox, Chip, ChipGroup, ColorSwatch, Field, Input, Modal, Notice, SectionLabel, SegmentedControl, cx, useToast } from "../../ui";
+import { api } from "../../api/client";
+import type { PreviewStyleView } from "../../types/models";
+import { Button, Checkbox, Chip, ChipGroup, ColorSwatch, Field, Icon, Input, Modal, Notice, SectionLabel, SegmentedControl, cx, useToast } from "../../ui";
 import { ProductPhoto } from "../ProductPhoto";
 import {
   FEATURES,
@@ -45,13 +47,25 @@ export function PreviewGenerator({ drawing, images, coverId, product, onClose }:
   );
   const [options, setOptions] = useState<PreviewOptions>(readPreviewOptions);
   const [isHeadlineOpen, setIsHeadlineOpen] = useState(false);
+  /** Styles from «Стили превью»; until they load (or if they don't), every choice is shown. */
+  const [previewStyles, setPreviewStyles] = useState<PreviewStyleView[]>([]);
   const resultRef = useRef<HTMLDivElement>(null);
   const photo = sources.find((image) => image.id === photoId);
   const colors = [...new Set(product.colors.map((color) => color.name.trim()).filter(Boolean))];
   const chosen = results[selected];
   // The owner may have picked another photo as the cover or removed the picture since.
   const isCover = Boolean(chosen) && drawing.coverImageId === coverId;
-  const withText = options.text === "with_text";
+  // A saved style the admin has hidden since: the first one, as the server does.
+  const style = previewStyles.find((item) => item.id === options.styleId) ?? previewStyles[0];
+  const hasText = style?.hasText ?? true;
+  const withText = hasText && options.text === "with_text";
+
+  useEffect(() => {
+    api
+      .get<PreviewStyleView[]>("/owner/preview-styles")
+      .then((res) => setPreviewStyles(res.data))
+      .catch(() => undefined);
+  }, []);
 
   // A new picture shows up at the top of the window.
   useEffect(() => {
@@ -76,8 +90,9 @@ export function PreviewGenerator({ drawing, images, coverId, product, onClose }:
 
   function draw() {
     if (!photo) return;
-    savePreviewOptions(options);
-    void drawing.draw(previewRequest(photo, options, product), photo.id);
+    const request = style ? { ...options, styleId: style.id } : options;
+    savePreviewOptions(request);
+    void drawing.draw(previewRequest(photo, request, product), photo.id);
     // The request is on its way: the window folds away, the owner keeps filling in the product.
     // When the picture is ready, it becomes the cover and the form opens this window again to show it.
     toast.show("Рисуем превью — через минуту оно само станет обложкой. Можно заполнять товар дальше", { duration: 5000 });
@@ -181,46 +196,80 @@ export function PreviewGenerator({ drawing, images, coverId, product, onClose }:
         </div>
       )}
 
-      <div className={styles.group}>
-        <SectionLabel>Фон</SectionLabel>
-        <ChipGroup label="Фон">
-          {SCENES.map((scene) => (
-            <Chip key={scene.value} selected={options.scene === scene.value} onClick={() => update({ scene: scene.value })}>
-              {scene.label}
-            </Chip>
-          ))}
-        </ChipGroup>
-      </div>
+      {previewStyles.length > 1 && (
+        <div className={styles.group}>
+          <SectionLabel>Стиль</SectionLabel>
+          <div className={styles.styles} role="group" aria-label="Стиль">
+            {previewStyles.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={cx(styles.style, item.id === style?.id && styles.styleActive)}
+                aria-pressed={item.id === style?.id}
+                onClick={() => update({ styleId: item.id })}
+              >
+                {item.sample ? (
+                  <img className={styles.styleSample} src={item.sample} alt="" />
+                ) : (
+                  <span className={cx(styles.styleSample, styles.styleEmpty)} aria-hidden="true">
+                    <Icon icon={Image01Icon} size="lg" />
+                  </span>
+                )}
+                <span className={styles.styleName}>{item.name}</span>
+                {item.description && <span className={styles.styleDescription}>{item.description}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-      <div className={styles.group}>
-        <SectionLabel>Цвета оформления</SectionLabel>
-        <ChipGroup label="Цвета оформления">
-          {THEMES.map((theme) => (
-            <Chip key={theme.value} selected={options.theme === theme.value} onClick={() => update({ theme: theme.value })}>
-              {theme.colors && (
-                <span className={styles.swatches} aria-hidden="true">
-                  <ColorSwatch color={theme.colors[0]} size="sm" />
-                  <ColorSwatch color={theme.colors[1]} size="sm" />
-                </span>
-              )}
-              {theme.label}
-            </Chip>
-          ))}
-        </ChipGroup>
-      </div>
+      {(style?.usesScene ?? true) && (
+        <div className={styles.group}>
+          <SectionLabel>Фон</SectionLabel>
+          <ChipGroup label="Фон">
+            {SCENES.map((scene) => (
+              <Chip key={scene.value} selected={options.scene === scene.value} onClick={() => update({ scene: scene.value })}>
+                {scene.label}
+              </Chip>
+            ))}
+          </ChipGroup>
+        </div>
+      )}
 
-      <SegmentedControl
-        label="Надписи на превью"
-        value={options.text}
-        onChange={(text) => update({ text })}
-        options={[
-          { value: "with_text", label: "С надписями" },
-          { value: "no_text", label: "Без надписей" }
-        ]}
-      />
+      {(style?.usesTheme ?? true) && (
+        <div className={styles.group}>
+          <SectionLabel>Цвета оформления</SectionLabel>
+          <ChipGroup label="Цвета оформления">
+            {THEMES.map((theme) => (
+              <Chip key={theme.value} selected={options.theme === theme.value} onClick={() => update({ theme: theme.value })}>
+                {theme.colors && (
+                  <span className={styles.swatches} aria-hidden="true">
+                    <ColorSwatch color={theme.colors[0]} size="sm" />
+                    <ColorSwatch color={theme.colors[1]} size="sm" />
+                  </span>
+                )}
+                {theme.label}
+              </Chip>
+            ))}
+          </ChipGroup>
+        </div>
+      )}
+
+      {hasText && (
+        <SegmentedControl
+          label="Надписи на превью"
+          value={options.text}
+          onChange={(text) => update({ text })}
+          options={[
+            { value: "with_text", label: "С надписями" },
+            { value: "no_text", label: "Без надписей" }
+          ]}
+        />
+      )}
 
       {withText && (
         <>
+          {(style?.usesFeatures ?? true) && (
           <div className={styles.group}>
             <SectionLabel>
               Преимущества · {options.features.length ? `${options.features.length} из ${MAX_FEATURES}` : "подберёт ИИ"}
@@ -245,6 +294,7 @@ export function PreviewGenerator({ drawing, images, coverId, product, onClose }:
             </ChipGroup>
             <span className={styles.hint}>Каждое станет иконкой с подписью.</span>
           </div>
+          )}
 
           {isHeadlineOpen || options.headline ? (
             <Field label="Заголовок" hint="Пусто — ИИ придумает сам.">

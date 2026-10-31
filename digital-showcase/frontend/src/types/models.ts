@@ -526,3 +526,38 @@ export interface AuditEntry {
   details: string | null;
   createdAt: string;
 }
+
+/** «Превью с ИИ»: a style the owner can pick, as the preview window gets it. */
+export interface PreviewStyleView {
+  id: string;
+  name: string;
+  description: string;
+  /** A cover drawn in this style; null — none yet. */
+  sample: string | null;
+  /** The headline, labels and icons can be switched on. */
+  hasText: boolean;
+  /** The owner picks the background. */
+  usesScene: boolean;
+  /** The owner picks the colors. */
+  usesTheme: boolean;
+  /** The owner picks the benefit icons. */
+  usesFeatures: boolean;
+}
+
+/** A style in «Стили превью»: what the image model is told. */
+export interface AdminPreviewStyle {
+  id: string;
+  name: string;
+  description: string;
+  sample: string | null;
+  /** How the picture looks: framing, background, light, mood. */
+  look: string;
+  /** Where and how the text goes. Empty — no text. */
+  textLayout: string;
+  usesScene: number;
+  usesTheme: number;
+  usesFeatures: number;
+  /** In the owners' preview window. */
+  isActive: number;
+  sortOrder: number;
+}

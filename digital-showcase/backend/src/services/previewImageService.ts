@@ -6,10 +6,12 @@ import { parseBody } from "../utils/validation.js";
 import { editImage } from "./aiProvider.js";
 import { findLivingBeings } from "./imageModerationService.js";
 import type { UploadedImage } from "./imageService.js";
+import { DEFAULT_PREVIEW_STYLE } from "./previewStylePresets.js";
+import type { PreviewStyleLook } from "./previewStyleService.js";
 
 // «Превью с ИИ» in the product form: the owner's photo turned into a storefront
-// cover — the same product on a nicer scene, with a headline and benefit icons
-// if wanted. Ported from the «Генератор карточек товара» template (its simple
+// cover — the same product in the style the owner picks (previewStyleService),
+// on a nicer scene, with a headline and benefit icons if the style has them. Ported from the «Генератор карточек товара» template (its simple
 // mode): the owner only picks presets and the prompt is assembled here, so the
 // paid image model only ever draws covers of the owner's own product.
 
@@ -73,6 +75,8 @@ type FeatureKey = keyof typeof FEATURES;
 const keys = <T extends string>(map: Record<T, unknown>) => Object.keys(map) as [T, ...T[]];
 
 const previewOptionsSchema = z.object({
+  /** A style from «Стили превью»; empty or hidden — the first one on. */
+  styleId: z.string().trim().max(100).default(""),
   scene: z.enum(keys<SceneKey>(SCENES)).default("auto"),
   theme: z.enum(keys<ThemeKey>(THEMES)).default("auto"),
   /** with_text — headline, badge and benefit icons; no_text — just the product in the scene. */
@@ -111,11 +115,17 @@ const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1
 /** Owner's words go inside quotes in the prompt: no quotes or line breaks of their own. */
 const clean = (text: string) => text.replace(/["«»“”\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 
-/** The prompt for the image model. Image 1 is always the owner's photo of the product. */
-export function buildPreviewPrompt(options: PreviewOptions) {
-  const scene: Scene | null = SCENES[options.scene];
-  const theme: Theme | null = THEMES[options.theme];
-  const withText = options.text === "with_text";
+/**
+ * The prompt for the image model. Image 1 is always the owner's photo of the
+ * product. The style (previewStyleService) says how the cover looks and where
+ * its text goes; keeping the product as on the photo, the owner's words and
+ * no living beings are added here, whatever the style.
+ */
+export function buildPreviewPrompt(options: PreviewOptions, style: PreviewStyleLook = DEFAULT_PREVIEW_STYLE) {
+  const scene: Scene | null = style.usesScene ? SCENES[options.scene] : null;
+  const theme: Theme | null = style.usesTheme ? THEMES[options.theme] : null;
+  const textLayout = clean(style.textLayout);
+  const withText = Boolean(textLayout) && options.text === "with_text";
   const autos: string[] = [];
   const title = clean(options.title);
   const category = clean(options.category);
@@ -128,43 +138,43 @@ export function buildPreviewPrompt(options: PreviewOptions) {
   ];
 
   const name = title ? ` ("${title}"${category ? `, ${category}` : ""})` : "";
-  lines.push(
-    `Product: the exact product from Image 1${name}` +
-      (showColors ? `, shown as ${QUANTITY[colors.length]} color variants side by side: ${colors.join(", ")}` : ", centered, front view") +
-      ", studio-quality product photography, realistic texture, sharp details."
-  );
+  lines.push(`Product: the exact product from Image 1${name}${showColors ? `, shown as ${QUANTITY[colors.length]} color variants side by side: ${colors.join(", ")}` : ""}.`);
+  lines.push(`Style: ${style.look.replace(/\s+/g, " ").trim()}`);
 
   if (scene) lines.push(`Background: ${scene.bg}, ${scene.light}${scene.fg ? `, ${scene.fg}` : ""}.`);
-  else autos.push("background scene and lighting");
+  else if (style.usesScene) autos.push("background scene and lighting");
 
   if (withText) {
     const headline = clean(options.headline);
     lines.push(
       headline
-        ? `Headline text "${headline}" exactly as written, a short Russian subtitle and one key benefit badge in Russian, all fitting the product.`
-        : "Write a short catchy headline in Russian, a short Russian subtitle and one key benefit badge in Russian, all fitting the product."
+        ? `Headline text "${headline}" exactly as written. Any other labels short, in Russian, fitting the product.`
+        : "Write a short catchy headline in Russian fitting the product. Any other labels short and in Russian."
     );
-    lines.push(
-      `Headline: bold 3D text${theme ? ` in ${theme.head}` : ""}, white outline, drop shadow, top-left corner. ` +
-        `Subtitle on a${theme ? ` ${theme.sub}` : ""} rounded label. Badge in the top-right corner${theme ? `, ${theme.accent}` : ""}.`
-    );
-
-    const iconStyle = theme ? `, ${theme.icon}` : "";
-    if (!theme) autos.push("color palette and icon style");
-    const features = options.features.map((key) => FEATURES[key]);
-    lines.push(
-      features.length
-        ? `${capitalize(NUMBERS[features.length])} round icons on the left side${iconStyle}: ${features.map(([icon, caption]) => `${icon} icon with caption "${caption}"`).join(", ")}.`
-        : `3–4 round icons on the left side${iconStyle}, each showing one of the product's most relevant benefits with a short Russian caption.`
-    );
+    lines.push(`Text layout: ${textLayout}`);
+    if (style.usesFeatures) {
+      const features = options.features.map((key) => FEATURES[key]);
+      lines.push(
+        features.length
+          ? `${capitalize(NUMBERS[features.length])} benefit icons: ${features.map(([icon, caption]) => `${icon} icon with caption "${caption}"`).join(", ")}.`
+          : "3–4 benefit icons, each showing one of the product's most relevant benefits with a short Russian caption."
+      );
+    }
     lines.push("Keep all text and icons well inside the frame, away from the edges, and spell the Russian words correctly.");
     if (swatchCodes(options).length) lines.push("Keep the bottom-right corner free of text, icons and badges.");
   } else {
     lines.push("No text, letters, numbers, icons or badges anywhere in the image: only the product in the scene.");
-    if (!theme) autos.push("color mood");
   }
 
-  lines.push(`Commercial advertising style${theme ? `, ${theme.mood} color mood` : ""}, high contrast, saturated colors, clean layout, hyperrealistic.`);
+  if (theme) {
+    lines.push(
+      withText
+        ? `Colors: headline in ${theme.head}, labels in ${theme.sub}, badge and accents in ${theme.accent}, icons as ${theme.icon}; ${theme.mood} color mood.`
+        : `Colors: ${theme.mood} color mood with ${theme.head} and ${theme.accent} accents.`
+    );
+  } else if (style.usesTheme) {
+    autos.push(withText ? "color palette and icon style" : "color mood");
+  }
   if (autos.length) lines.push(`Choose automatically whatever fits the product best: ${autos.join(", ")}.`);
 
   const avoid = ["brand logos", "watermarks", "distorted text", "misspelled letters", "blurry product", "low quality", "changes to the product's design, color or proportions", "unrelated extra objects"];
@@ -216,7 +226,7 @@ export async function drawColorSwatches(picture: Buffer, codes: string[]) {
  * (the form sends this list with the photo). If the check fails, the list is
  * empty and the photo is checked again on upload.
  */
-export async function createProductPreview(options: PreviewOptions, photo: UploadedImage) {
+export async function createProductPreview(options: PreviewOptions, photo: UploadedImage, style: PreviewStyleLook) {
   let reference: Buffer;
   try {
     // Big enough for the model to keep the details, small enough to send fast.
@@ -229,7 +239,7 @@ export async function createProductPreview(options: PreviewOptions, photo: Uploa
     throw new HttpError(400, "Не удалось прочитать фото товара. Попробуйте другое фото");
   }
   const { base64, mimetype } = await editImage({
-    prompt: buildPreviewPrompt(options),
+    prompt: buildPreviewPrompt(options, style),
     images: [{ buffer: reference, mimetype: "image/jpeg", filename: "product.jpg" }]
   });
   const codes = swatchCodes(options);

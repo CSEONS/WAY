@@ -11,6 +11,8 @@ import {
   paymentSchema,
   planOrderSchema,
   planSchema,
+  previewStyleSchema,
+  previewStyleSortSchema,
   receiptSchema,
   settingsSchema,
   storeCreateSchema,
@@ -28,6 +30,8 @@ import * as overviewService from "../services/overviewService.js";
 import * as packageService from "../services/packageService.js";
 import * as paymentService from "../services/paymentService.js";
 import * as planService from "../services/planService.js";
+import { createProductPreview, parsePreviewOptions } from "../services/previewImageService.js";
+import * as previewStyleService from "../services/previewStyleService.js";
 import * as reportService from "../services/reportService.js";
 import * as settingsService from "../services/settingsService.js";
 import * as userService from "../services/userService.js";
@@ -366,6 +370,55 @@ export const deletePackage = asyncHandler(async (req, res) => {
 
 export const reorderPackages = asyncHandler(async (req, res) => {
   res.json(await packageService.reorderPackages(parseBody(packageSortSchema, req.body).ids));
+});
+
+/** «Стили превью»: every style, hidden ones too. */
+export const listPreviewStyles = asyncHandler(async (_req, res) => {
+  res.json(await previewStyleService.listStyles());
+});
+
+export const createPreviewStyle = asyncHandler(async (req, res) => {
+  const style = await previewStyleService.saveStyle(null, parseBody(previewStyleSchema, req.body));
+  await auditService.logAction(req.user!.userId, "PREVIEW_STYLE_SAVED", undefined, `Новый стиль превью «${style.name}»`);
+  res.status(201).json(style);
+});
+
+export const updatePreviewStyle = asyncHandler(async (req, res) => {
+  const style = await previewStyleService.saveStyle(String(req.params.id), parseBody(previewStyleSchema, req.body));
+  await auditService.logAction(req.user!.userId, "PREVIEW_STYLE_SAVED", undefined, `Стиль превью «${style.name}»`);
+  res.json(style);
+});
+
+export const deletePreviewStyle = asyncHandler(async (req, res) => {
+  const style = await previewStyleService.deleteStyle(String(req.params.id));
+  await auditService.logAction(req.user!.userId, "PREVIEW_STYLE_DELETED", undefined, `Стиль превью «${style.name}»`);
+  res.status(204).send();
+});
+
+export const reorderPreviewStyles = asyncHandler(async (req, res) => {
+  res.json(await previewStyleService.reorderStyles(parseBody(previewStyleSortSchema, req.body).ids));
+});
+
+/** The sample picture: an image file sets it, none removes it. */
+export const setPreviewStyleSample = asyncHandler(async (req, res) => {
+  res.json(await previewStyleService.setSample(String(req.params.id), req.file ?? null));
+});
+
+/**
+ * «Пробная генерация»: a cover in the style as it is in the form, saved or
+ * not, on the admin's own photo. Paid by the service, not by any store.
+ */
+export const testPreviewStyle = asyncHandler(async (req, res) => {
+  if (!req.file) throw new HttpError(400, "Добавьте фото товара — по нему ИИ нарисует превью");
+  let draft: unknown = {};
+  try {
+    draft = JSON.parse(typeof req.body.style === "string" ? req.body.style : "{}");
+  } catch {
+    throw new HttpError(400, "Стиль: неверный формат");
+  }
+  const style = parseBody(previewStyleSchema, draft);
+  const options = parsePreviewOptions(req.body.options);
+  res.json(await createProductPreview(options, req.file, style));
 });
 
 /** «Расходы на ИИ»: the last 6 months and this month by store. */

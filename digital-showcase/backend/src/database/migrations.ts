@@ -1,4 +1,5 @@
 import type { Database } from "better-sqlite3";
+import { PREVIEW_STYLE_PRESETS } from "../services/previewStylePresets.js";
 
 /**
  * Schema changes, applied once each and recorded in schema_migrations.
@@ -660,6 +661,39 @@ export const migrations: Migration[] = [
     // The last reminder sent for a paid date (see subscriptionReminderService), so each goes once.
     up(db) {
       addColumn(db, "stores", "subscriptionReminder", "TEXT");
+    }
+  },
+  {
+    version: 23,
+    name: "preview styles",
+    // Styles of «Превью с ИИ» the admin keeps (see previewStyleService): the
+    // look the previews always had and a few more, hidden until tried.
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS preview_styles (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          sample TEXT,
+          look TEXT NOT NULL,
+          textLayout TEXT NOT NULL DEFAULT '',
+          usesScene INTEGER NOT NULL DEFAULT 0,
+          usesTheme INTEGER NOT NULL DEFAULT 0,
+          usesFeatures INTEGER NOT NULL DEFAULT 0,
+          isActive INTEGER NOT NULL DEFAULT 1,
+          sortOrder INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        );
+      `);
+      const now = new Date().toISOString();
+      const insert = db.prepare(
+        `INSERT OR IGNORE INTO preview_styles (id, name, description, look, textLayout, usesScene, usesTheme, usesFeatures, isActive, sortOrder, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      for (const [index, style] of PREVIEW_STYLE_PRESETS.entries()) {
+        insert.run(style.id, style.name, style.description, style.look, style.textLayout, style.usesScene, style.usesTheme, style.usesFeatures, style.isActive, index, now, now);
+      }
     }
   }
 ];

@@ -6,6 +6,7 @@ import { aiDraftUpload, bulkAiDraftUpload, previewUpload, upload } from "../midd
 export const ownerRoutes = Router();
 ownerRoutes.use(authMiddleware, ownerOnly, logActionsAsOwner);
 ownerRoutes.get("/support", controller.getSupport);
+ownerRoutes.get("/preview-styles", controller.listPreviewStyles);
 ownerRoutes.get("/stores", controller.listStores);
 ownerRoutes.get("/stores/:storeId", controller.getStore);
 ownerRoutes.patch("/stores/:storeId", controller.updateStore);

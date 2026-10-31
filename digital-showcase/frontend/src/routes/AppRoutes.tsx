@@ -32,6 +32,8 @@ const AdminPackageEditPage = lazy(() => import("../pages/AdminPackageEditPage").
 const AdminPlansPage = lazy(() => import("../pages/AdminPlansPage").then((m) => ({ default: m.AdminPlansPage })));
 const AdminNotificationsPage = lazy(() => import("../pages/AdminNotificationsPage").then((m) => ({ default: m.AdminNotificationsPage })));
 const AdminModerationPage = lazy(() => import("../pages/AdminModerationPage").then((m) => ({ default: m.AdminModerationPage })));
+const AdminPreviewStylesPage = lazy(() => import("../pages/AdminPreviewStylesPage").then((m) => ({ default: m.AdminPreviewStylesPage })));
+const AdminPreviewStyleEditPage = lazy(() => import("../pages/AdminPreviewStyleEditPage").then((m) => ({ default: m.AdminPreviewStyleEditPage })));
 const AdminSettingsPage = lazy(() => import("../pages/AdminSettingsPage").then((m) => ({ default: m.AdminSettingsPage })));
 const PrivacyPage = lazy(() => import("../pages/legal/PrivacyPage").then((m) => ({ default: m.PrivacyPage })));
 const OfferPage = lazy(() => import("../pages/legal/OfferPage").then((m) => ({ default: m.OfferPage })));
@@ -93,6 +95,9 @@ export function AppRoutes({ user, isAuthLoading, onLogin, onLogout }: Props) {
             <Route path="/admin/plans/:id/edit" element={<AdminPlanEditPage />} />
             <Route path="/admin/packages/new" element={<AdminPackageEditPage />} />
             <Route path="/admin/packages/:id/edit" element={<AdminPackageEditPage />} />
+            <Route path="/admin/preview-styles" element={<AdminPreviewStylesPage />} />
+            <Route path="/admin/preview-styles/new" element={<AdminPreviewStyleEditPage />} />
+            <Route path="/admin/preview-styles/:id/edit" element={<AdminPreviewStyleEditPage />} />
             <Route path="/admin/contacts" element={<AdminSettingsPage part="contacts" />} />
             <Route path="/admin/videos" element={<AdminSettingsPage part="videos" />} />
             <Route path="/admin/legal" element={<AdminSettingsPage part="legal" />} />

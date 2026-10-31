@@ -78,6 +78,8 @@ const LABELS: Record<string, string> = {
   isService: "Услуга",
   contents: "Что в пакете",
   packageId: "Пакет",
+  look: "Как выглядит",
+  textLayout: "Надписи",
   ids: "Товары",
   action: "Действие"
 };
@@ -318,6 +320,21 @@ export const packageSchema = z
   });
 
 export const packageSortSchema = sortOrder;
+
+// «Стили превью»
+
+export const previewStyleSchema = z.object({
+  name: requiredText(40),
+  description: text(160),
+  look: requiredText(1500),
+  textLayout: text(1000),
+  usesScene: flag,
+  usesTheme: flag,
+  usesFeatures: flag,
+  isActive: flag
+});
+
+export const previewStyleSortSchema = sortOrder;
 
 /** A package sold to a store: from the list (packageId) or the owner's request (orderId). */
 export const packageSaleSchema = z

@@ -76,6 +76,7 @@ const sections: { to: string; label: string; icon: IconSvgElement }[] = [
   { to: "/admin/videos", label: "Видеоинструкции", icon: PlayCircleIcon },
   { to: "/admin/legal", label: "Реквизиты", icon: LegalDocument01Icon },
   { to: "/admin/settings", label: "Настройки ИИ", icon: Settings02Icon },
+  { to: "/admin/preview-styles", label: "Стили ИИ-превью", icon: AiMagicIcon },
   { to: "/account", label: "Аккаунт: логин и пароль", icon: UserCircleIcon }
 ];
 

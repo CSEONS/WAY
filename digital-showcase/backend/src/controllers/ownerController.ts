@@ -10,6 +10,7 @@ import * as packageService from "../services/packageService.js";
 import { checkImage, cleanFindings, flagImage } from "../services/imageModerationService.js";
 import { readStoredImage } from "../services/imageService.js";
 import { createProductPreview, parsePreviewOptions } from "../services/previewImageService.js";
+import * as previewStyleService from "../services/previewStyleService.js";
 import * as onlinePaymentService from "../services/onlinePaymentService.js";
 import * as paymentService from "../services/paymentService.js";
 import * as productService from "../services/productService.js";
@@ -119,6 +120,11 @@ function planSummary(store: Store) {
 /** «Помощь» in the owner's app: who to write or call. */
 export const getSupport = asyncHandler(async (_req, res) => {
   res.json(supportContacts());
+});
+
+/** Styles to pick from in «Превью с ИИ». */
+export const listPreviewStyles = asyncHandler(async (_req, res) => {
+  res.json(await previewStyleService.ownerStyles());
 });
 
 /** «Подписка и итоги»: paid date, tariff, AI left this month, payments and month results. */
@@ -298,7 +304,8 @@ export const createPreview = asyncHandler(async (req, res) => {
   if (!photo) throw new HttpError(400, "Добавьте фото товара — по нему ИИ нарисует превью");
   await aiUsageService.assertWithinLimit(store, "PREVIEW");
 
-  const { result, usage } = await aiUsageService.measureTokens(() => createProductPreview(options, photo));
+  const style = await previewStyleService.styleForPreview(options.styleId);
+  const { result, usage } = await aiUsageService.measureTokens(() => createProductPreview(options, photo, style));
   await aiUsageService.recordUsage(store.id, "PREVIEW", aiUsageService.previewUnits(), usage);
   res.json(result);
 });

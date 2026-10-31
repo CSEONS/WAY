@@ -20,6 +20,8 @@ export type PreviewTheme =
 export type PreviewFeature = "warm" | "water" | "wind" | "light" | "breath" | "strong" | "eco" | "hypo" | "size" | "fast";
 
 export interface PreviewOptions {
+  /** A style from «Стили превью»; empty or since hidden — the server takes the first one on. */
+  styleId: string;
   scene: PreviewScene;
   theme: PreviewTheme;
   text: "with_text" | "no_text";
@@ -74,7 +76,7 @@ export const FEATURES: { value: PreviewFeature; label: string }[] = [
 export const MAX_FEATURES = 4;
 export const MAX_HEADLINE = 40;
 
-const DEFAULT_OPTIONS: PreviewOptions = { scene: "auto", theme: "auto", text: "with_text", headline: "", features: [], showColors: false, colorDots: true };
+const DEFAULT_OPTIONS: PreviewOptions = { styleId: "", scene: "auto", theme: "auto", text: "with_text", headline: "", features: [], showColors: false, colorDots: true };
 
 // The look carries over to the next product, so the storefront stays in one style.
 // The headline doesn't: it belongs to one product.
@@ -86,6 +88,7 @@ export function readPreviewOptions(): PreviewOptions {
     if (!saved) return DEFAULT_OPTIONS;
     return {
       ...DEFAULT_OPTIONS,
+      styleId: typeof saved.styleId === "string" ? saved.styleId : "",
       scene: SCENES.some((scene) => scene.value === saved.scene) ? saved.scene! : "auto",
       theme: THEMES.some((theme) => theme.value === saved.theme) ? saved.theme! : "auto",
       text: saved.text === "no_text" ? "no_text" : "with_text",

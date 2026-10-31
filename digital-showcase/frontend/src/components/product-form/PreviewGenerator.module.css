@@ -121,3 +121,59 @@
 .dots > * + * {
   margin-left: calc(-1 * var(--space-1));
 }
+
+/* Style cards: a sample cover (4:5, as on the storefront), the name and a line about it. */
+.styles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--space-2);
+}
+
+.style {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.styleActive {
+  border-color: var(--color-accent);
+}
+
+.style:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.styleSample {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--color-surface-muted);
+}
+
+.styleEmpty {
+  display: grid;
+  place-items: center;
+  color: var(--color-ink-subtle);
+}
+
+.styleName {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.styleDescription {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.3;
+}

@@ -32,7 +32,9 @@ const actions: Record<string, { label: string; tone: Tone }> = {
   PACKAGE_DELETED: { label: "Удалён пакет", tone: "warning" },
   PACKAGE_SOLD: { label: "Продан пакет", tone: "success" },
   PACKAGE_DONE: { label: "Услуга выполнена", tone: "success" },
-  PACKAGE_DECLINED: { label: "Отклонён запрос пакета", tone: "warning" }
+  PACKAGE_DECLINED: { label: "Отклонён запрос пакета", tone: "warning" },
+  PREVIEW_STYLE_SAVED: { label: "Сохранён стиль превью", tone: "accent" },
+  PREVIEW_STYLE_DELETED: { label: "Удалён стиль превью", tone: "warning" }
 };
 
 const timeFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });

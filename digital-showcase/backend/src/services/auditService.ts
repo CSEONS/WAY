@@ -28,7 +28,9 @@ export type AuditAction =
   | "PACKAGE_DELETED"
   | "PACKAGE_SOLD"
   | "PACKAGE_DONE"
-  | "PACKAGE_DECLINED";
+  | "PACKAGE_DECLINED"
+  | "PREVIEW_STYLE_SAVED"
+  | "PREVIEW_STYLE_DELETED";
 
 export interface AuditTarget {
   type: "store" | "owner" | "payment";

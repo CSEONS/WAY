@@ -1,4 +1,5 @@
-import type { ComponentProps } from "react";
+import { ViewIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
+import { useState, type ComponentProps } from "react";
 import { cx } from "./cx";
 import { useFieldControl } from "./Field";
 import { Icon, type IconSvgElement } from "./Icon";
@@ -20,6 +21,32 @@ export function Input({ id, invalid, icon, className, "aria-describedby": descri
     <span className={cx(styles.iconWrap, className)}>
       <Icon icon={icon} size="sm" className={styles.leadingIcon} />
       {input}
+    </span>
+  );
+}
+
+export type PasswordInputProps = Omit<InputProps, "type" | "icon">;
+
+/** Password field with an eye button that shows or hides what was typed. */
+export function PasswordInput({ id, invalid, className, "aria-describedby": describedBy, ...rest }: PasswordInputProps) {
+  const control = useFieldControl({ id, invalid, "aria-describedby": describedBy });
+  const [isVisible, setIsVisible] = useState(false);
+  const label = isVisible ? "Скрыть пароль" : "Показать пароль";
+
+  return (
+    <span className={cx(styles.iconWrap, className)}>
+      <input className={cx(styles.control, styles.withTrailing)} {...control} {...rest} type={isVisible ? "text" : "password"} />
+      <button
+        type="button"
+        className={styles.trailingButton}
+        onClick={() => setIsVisible((value) => !value)}
+        aria-label={label}
+        aria-pressed={isVisible}
+        title={label}
+        disabled={rest.disabled}
+      >
+        <Icon icon={isVisible ? ViewOffSlashIcon : ViewIcon} size="sm" />
+      </button>
     </span>
   );
 }

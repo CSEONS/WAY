@@ -3,7 +3,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { User } from "../types/models";
-import { Button, Field, Icon, Input, Notice } from "../ui";
+import { Button, Field, Icon, Input, Notice, PasswordInput } from "../ui";
 import styles from "./LoginPage.module.css";
 
 export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
@@ -44,7 +44,7 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
             <Input value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" placeholder="Логин" />
           </Field>
           <Field label="Пароль">
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Пароль" />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Пароль" />
           </Field>
           {error && <Notice tone="danger">{error}</Notice>}
           <Button type="submit" variant="primary" size="lg" block loading={isSubmitting}>

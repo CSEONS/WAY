@@ -68,3 +68,41 @@
 .withIcon {
   padding-left: var(--space-10);
 }
+
+.withTrailing {
+  padding-right: var(--space-10);
+}
+
+.trailingButton {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  color: var(--color-ink-subtle);
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.trailingButton:hover:not(:disabled) {
+  color: var(--color-ink);
+}
+
+.trailingButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.trailingButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

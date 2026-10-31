@@ -8,7 +8,7 @@ export { Chip, ChipGroup, ColorSwatch, type ChipProps, type ColorSwatchProps } f
 export { cx } from "./cx";
 export { Field, useFieldControl, type FieldProps } from "./Field";
 export { Icon, type IconProps, type IconSize, type IconSvgElement } from "./Icon";
-export { Input, Textarea, type InputProps, type TextareaProps } from "./Input";
+export { Input, PasswordInput, Textarea, type InputProps, type PasswordInputProps, type TextareaProps } from "./Input";
 export { BackLink, Breadcrumbs, Card, CardHeader, Page, PageHeader, SectionLabel, Stat, type BreadcrumbItem, type CardProps, type PageHeaderProps } from "./Layout";
 export { Menu, type MenuItem, type MenuProps } from "./Menu";
 export { ConfirmModal, Modal, type ConfirmModalProps, type ModalProps } from "./Modal";

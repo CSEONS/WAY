@@ -1,12 +1,13 @@
 import { getDb } from "../database/db.js";
-import { notifyUser } from "./notificationService.js";
+import { isDaytime, notifyUser } from "./notificationService.js";
 import { monthKey } from "./paymentService.js";
 import { type MonthReport, monthRange, storeMonthReport } from "./reportService.js";
 
 // Month results reach every owner as a notification when the month is over:
 // «Итоги за сентябрь». Only owners on the full plan (plans.reportsAnytime) can
-// also open them in the app on any day. The check runs every hour and sends
-// each store's month once, so a server that was off catches up when it starts.
+// also open them in the app on any day. The check runs every hour in the
+// daytime (from 9:00 on the 1st) and sends each store's month once, so a
+// server that was off catches up when it starts.
 
 const HOUR_MS = 60 * 60 * 1000;
 const MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
@@ -92,6 +93,7 @@ let timer: NodeJS.Timeout | null = null;
 export function startMonthlyReports() {
   if (timer) return;
   const run = () =>
+    isDaytime() &&
     sendMonthlyReports()
       .then((count) => count && console.log(`Month results sent to ${count} owners`))
       .catch((error) => console.error("Month results failed", error));

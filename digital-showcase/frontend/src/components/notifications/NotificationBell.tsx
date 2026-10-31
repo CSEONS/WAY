@@ -16,7 +16,8 @@ const timeFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "lo
 /**
  * The bell in the header: notifications from the system (photo checks) and
  * from the admin. The number shows unread ones; opening the list reads them.
- * New ones are picked up on every page change, on return to the tab and once a minute.
+ * New ones are picked up on every page change, on return to the tab, once a
+ * minute and when one reaches the phone.
  */
 export function NotificationBell() {
   const location = useLocation();
@@ -44,6 +45,16 @@ export function NotificationBell() {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh);
     };
+  }, [load]);
+
+  // A notification reached the phone while the cabinet is open (public/sw.js says so).
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    function onMessage(event: MessageEvent) {
+      if (event.data?.type === "notification") load();
+    }
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, [load]);
 
   function open() {

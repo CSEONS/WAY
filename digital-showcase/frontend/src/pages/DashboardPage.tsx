@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { InstallHint } from "../components/dashboard/InstallHint";
+import { PushHint } from "../components/notifications/PushNotifications";
 import { LaunchChecklist } from "../components/dashboard/LaunchChecklist";
 import { OwnerProductItem } from "../components/dashboard/OwnerProductItem";
 import { PriceModal } from "../components/dashboard/PriceModal";
@@ -582,6 +583,7 @@ export function DashboardPage() {
 
       {productsState === "ready" && <LaunchChecklist store={selectedStore} productCount={products.length} publicUrl={publicStoreUrl} />}
       <InstallHint />
+      <PushHint />
 
       <section className={styles.products} aria-label="Товары и статистика">
         <SegmentedControl
@@ -626,7 +628,7 @@ export function DashboardPage() {
                 { to: `/dashboard/stores/${selectedStore.id}/settings`, label: "Реквизиты магазина", icon: Settings01Icon },
                 { to: `/dashboard/stores/${selectedStore.id}/subscription`, label: "Подписка и оплата", icon: Calendar03Icon },
                 { to: `/dashboard/stores/${selectedStore.id}/poster`, label: "Плакат с QR-кодом", icon: PrinterIcon },
-                { to: "/account", label: "Аккаунт: логин и пароль", icon: UserCircleIcon },
+                { to: "/account", label: "Аккаунт: пароль и уведомления", icon: UserCircleIcon },
                 ...(stores.length > 1 ? [{ to: "/dashboard", label: "Другой магазин", icon: Exchange01Icon, state: { showAll: true } }] : [])
               ].map((section) => (
                 <Link key={section.to} to={section.to} state={"state" in section ? section.state : undefined} className={styles.tile}>

@@ -1,6 +1,6 @@
 import { getDb } from "../database/db.js";
 import type { Store } from "../types/models.js";
-import { notifyUser } from "./notificationService.js";
+import { isDaytime, notifyUser } from "./notificationService.js";
 import { onlineOffer } from "./onlinePaymentService.js";
 import { dayMonth, GRACE_DAYS, subscriptionTopic, trialLabel, WARNING_DAYS } from "./subscriptionService.js";
 
@@ -9,8 +9,9 @@ import { dayMonth, GRACE_DAYS, subscriptionTopic, trialLabel, WARNING_DAYS } fro
 // products), on the day the storefront closes and right after it has. Each is
 // sent once per paid date — stores.subscriptionReminder remembers the last
 // one — and an unread one is replaced by the next, so the bell shows only the
-// latest. A new paid date starts them over. Checked every hour, like the month
-// results: a server that was off sends the one due now, not the missed ones.
+// latest. A new paid date starts them over. Checked every hour in the daytime,
+// like the month results (each stage lasts a day or more, so none is skipped):
+// a server that was off sends the one due now, not the missed ones.
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -132,6 +133,7 @@ let timer: NodeJS.Timeout | null = null;
 export function startSubscriptionReminders() {
   if (timer) return;
   const run = () =>
+    isDaytime() &&
     sendSubscriptionReminders()
       .then((count) => count && console.log(`Payment reminders sent: ${count}`))
       .catch((error) => console.error("Payment reminders failed", error));

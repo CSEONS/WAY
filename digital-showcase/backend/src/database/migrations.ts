@@ -695,6 +695,25 @@ export const migrations: Migration[] = [
         insert.run(style.id, style.name, style.description, style.look, style.textLayout, style.usesScene, style.usesTheme, style.usesFeatures, style.isActive, index, now, now);
       }
     }
+  },
+  {
+    version: 24,
+    name: "notifications on phones",
+    up(db) {
+      db.exec(`
+        -- Phones (browsers) an owner turned notifications on for: the push service's address and keys (see pushService).
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id TEXT PRIMARY KEY,
+          userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint TEXT NOT NULL UNIQUE,
+          p256dh TEXT NOT NULL,
+          auth TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS push_subscriptions_user ON push_subscriptions(userId, updatedAt);
+      `);
+    }
   }
 ];
 

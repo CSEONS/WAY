@@ -1,9 +1,11 @@
 import { getDb } from "../database/db.js";
+import { pushToUser } from "./pushService.js";
 
 // The bell in the owner's app. Notifications come from the system (a photo
-// with a face, the admin's decision about it) or from the admin («Уведомления»
-// in the admin panel). Each belongs to one user; a broadcast to all owners is
-// one row per owner sharing a batchId.
+// with a face, the admin's decision about it, reminders to pay, month results)
+// or from the admin («Уведомления» in the admin panel). Each belongs to one
+// user; a broadcast to all owners is one row per owner sharing a batchId.
+// Each also goes to the user's phones, if they turned that on (pushService).
 
 export type NotificationSource = "SYSTEM" | "ADMIN";
 
@@ -38,35 +40,46 @@ export interface NotifyInput {
 export async function notifyUser(input: NotifyInput) {
   const db = await getDb();
   const now = new Date().toISOString();
-  if (input.topic) {
-    const unread = await db.get<{ id: string }>("SELECT id FROM notifications WHERE userId = ? AND topic = ? AND readAt IS NULL", input.userId, input.topic);
-    if (unread) {
-      await db.run(
-        "UPDATE notifications SET source = ?, title = ?, body = ?, link = ?, storeId = ?, createdAt = ? WHERE id = ?",
-        input.source,
-        input.title,
-        input.body,
-        input.link ?? null,
-        input.storeId ?? null,
-        now,
-        unread.id
-      );
-      return;
-    }
+  const unread = input.topic
+    ? await db.get<{ id: string }>("SELECT id FROM notifications WHERE userId = ? AND topic = ? AND readAt IS NULL", input.userId, input.topic)
+    : undefined;
+  if (unread) {
+    await db.run(
+      "UPDATE notifications SET source = ?, title = ?, body = ?, link = ?, storeId = ?, createdAt = ? WHERE id = ?",
+      input.source,
+      input.title,
+      input.body,
+      input.link ?? null,
+      input.storeId ?? null,
+      now,
+      unread.id
+    );
+  } else {
+    await db.run(
+      "INSERT INTO notifications (id, userId, storeId, source, title, body, link, topic, batchId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      crypto.randomUUID(),
+      input.userId,
+      input.storeId ?? null,
+      input.source,
+      input.title,
+      input.body,
+      input.link ?? null,
+      input.topic ?? null,
+      input.batchId ?? null,
+      now
+    );
   }
-  await db.run(
-    "INSERT INTO notifications (id, userId, storeId, source, title, body, link, topic, batchId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    crypto.randomUUID(),
-    input.userId,
-    input.storeId ?? null,
-    input.source,
-    input.title,
-    input.body,
-    input.link ?? null,
-    input.topic ?? null,
-    input.batchId ?? null,
-    now
-  );
+  // Not awaited: a slow push service doesn't hold up the admin's «Продлить» or a broadcast.
+  void pushToUser(input.userId, { title: input.title, body: input.body, link: input.link, topic: input.topic });
+}
+
+/**
+ * Notifications nobody asked for at that moment — reminders to pay, month
+ * results — wait for the day: they ring on phones. 9:00–21:00 server time (TZ).
+ */
+export function isDaytime(now = new Date()) {
+  const hour = now.getHours();
+  return hour >= 9 && hour < 21;
 }
 
 /** To the owner of the store. Nothing happens if the store is gone. */

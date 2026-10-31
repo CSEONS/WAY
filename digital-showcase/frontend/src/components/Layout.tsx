@@ -4,6 +4,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Button, ConfirmModal, Icon, IconButton, cx, type IconSvgElement } from "../ui";
 import { BackgroundJobsWidget } from "./BackgroundJobsWidget";
 import { NotificationBell } from "./notifications/NotificationBell";
+import { usePushInApp } from "../hooks/usePushNotifications";
 import type { User } from "../types/models";
 import { stopImpersonation } from "../utils/impersonation";
 import styles from "./Layout.module.css";
@@ -28,6 +29,7 @@ export function Layout({ user }: { user: User | null }) {
   const storeSlug = location.pathname.match(/^\/m\/([^/]+)/)?.[1];
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  usePushInApp(user);
   function logout() {
     // An admin in an owner's account just goes back to the admin panel: nothing to confirm.
     if (user?.impersonatedBy) {

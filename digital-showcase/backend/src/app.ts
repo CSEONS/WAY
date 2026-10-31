@@ -13,6 +13,7 @@ import { authRoutes } from "./routes/authRoutes.js";
 import { ogRoutes } from "./routes/ogRoutes.js";
 import { ownerRoutes } from "./routes/ownerRoutes.js";
 import { publicRoutes } from "./routes/publicRoutes.js";
+import { pushRoutes } from "./routes/pushRoutes.js";
 import { seoRoutes } from "./routes/seoRoutes.js";
 import { yookassaRoutes } from "./routes/yookassaRoutes.js";
 import { reportProblem } from "./services/alertService.js";
@@ -56,6 +57,8 @@ app.use("/api/auth/change-password", signInLimit);
 app.use("/api/public", limiter(1, 300, "Слишком много запросов. Подождите минуту."));
 // Anyone can post a notification; each one is checked with ЮKassa, so this keeps scripts from making the server ask it all day.
 app.use("/api/yookassa", limiter(1, 60, "Слишком много запросов. Подождите минуту."));
+// «Проверить» sends to the push service each time.
+app.use("/api/push", limiter(1, 30, "Слишком много запросов. Подождите минуту."));
 
 const startedAt = Date.now();
 
@@ -82,6 +85,7 @@ app.use("/api/moderation", moderationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/owner", ownerRoutes);
 app.use("/api/public", publicRoutes);
+app.use("/api/push", pushRoutes);
 app.use("/api/yookassa", yookassaRoutes);
 app.use(seoRoutes);
 // Bot-only OG-tag preview shell for /m/:slug and /m/:slug/p/:productId —

@@ -9,6 +9,15 @@ export function startImpersonation(ownerToken: string) {
   window.location.assign("/dashboard");
 }
 
+/** The admin is in an owner's account (their own session is put aside). */
+export function isImpersonating() {
+  try {
+    return Boolean(localStorage.getItem(ADMIN_TOKEN_KEY));
+  } catch {
+    return false;
+  }
+}
+
 export function stopImpersonation() {
   const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
   localStorage.removeItem(ADMIN_TOKEN_KEY);

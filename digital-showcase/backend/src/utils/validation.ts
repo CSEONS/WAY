@@ -280,6 +280,18 @@ export const notificationSendSchema = z.object({
 
 export const notificationReadSchema = z.object({ ids: z.array(z.string()).max(200).optional() });
 
+// Notifications on the phone: what the browser's PushSubscription.toJSON() gives.
+const pushEndpoint = z.string().trim().min(1).max(1000);
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: pushEndpoint,
+  keys: z.object({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }),
+  /** Just turned on: «Уведомления включены» goes to the phone. */
+  welcome: z.boolean().optional()
+});
+
+export const pushEndpointSchema = z.object({ endpoint: pushEndpoint });
+
 // «Тарифы и цены»
 
 export const planSchema = z

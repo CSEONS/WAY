@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { api } from "../api/client";
+import { PushSettings } from "../components/notifications/PushNotifications";
 import type { User } from "../types/models";
 import { Button, Card, CardHeader, Field, Notice, Page, PageHeader, PasswordInput, useToast } from "../ui";
 import styles from "./AccountPage.module.css";
@@ -60,6 +61,8 @@ export function AccountPage({ user }: { user: User | null }) {
           </Button>
         </form>
       </Card>
+      {/* The admin has no bell; in an owner's account they'd get the owner's notifications on their own phone. */}
+      {user?.role === "OWNER" && !user.impersonatedBy && <PushSettings />}
     </Page>
   );
 }

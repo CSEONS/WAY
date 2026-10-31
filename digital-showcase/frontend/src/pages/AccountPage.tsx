@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { api } from "../api/client";
 import type { User } from "../types/models";
-import { Button, Card, CardHeader, Field, Input, Notice, Page, PageHeader, useToast } from "../ui";
+import { Button, Card, CardHeader, Field, Notice, Page, PageHeader, PasswordInput, useToast } from "../ui";
 import styles from "./AccountPage.module.css";
 
 export function AccountPage({ user }: { user: User | null }) {
@@ -46,13 +46,13 @@ export function AccountPage({ user }: { user: User | null }) {
         <CardHeader title="Сменить пароль" description="Для входа можно использовать почту или телефон в любом виде: 8 928…, +7 928…" />
         <form className={styles.form} onSubmit={submit}>
           <Field label="Текущий пароль" required>
-            <Input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" required />
+            <PasswordInput value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" required />
           </Field>
           <Field label="Новый пароль" hint="Минимум 6 символов" required>
-            <Input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" minLength={6} required />
+            <PasswordInput value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" minLength={6} required />
           </Field>
           <Field label="Новый пароль ещё раз" error={mismatch ? "Пароли не совпадают" : undefined} required>
-            <Input type="password" value={repeatPassword} onChange={(event) => setRepeatPassword(event.target.value)} autoComplete="new-password" required />
+            <PasswordInput value={repeatPassword} onChange={(event) => setRepeatPassword(event.target.value)} autoComplete="new-password" required />
           </Field>
           {error && <Notice tone="danger">{error}</Notice>}
           <Button type="submit" variant="primary" size="lg" block loading={isSaving} disabled={mismatch}>

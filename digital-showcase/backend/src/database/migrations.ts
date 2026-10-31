@@ -653,6 +653,14 @@ export const migrations: Migration[] = [
       addColumn(db, "online_payments", "fills", "INTEGER NOT NULL DEFAULT 0");
       addColumn(db, "online_payments", "isService", "INTEGER NOT NULL DEFAULT 0");
     }
+  },
+  {
+    version: 22,
+    name: "reminders to pay",
+    // The last reminder sent for a paid date (see subscriptionReminderService), so each goes once.
+    up(db) {
+      addColumn(db, "stores", "subscriptionReminder", "TEXT");
+    }
   }
 ];
 

@@ -32,7 +32,7 @@ import * as reportService from "../services/reportService.js";
 import * as settingsService from "../services/settingsService.js";
 import * as userService from "../services/userService.js";
 import * as storeService from "../services/storeService.js";
-import { withSubscription } from "../services/subscriptionService.js";
+import { dayMonth, subscriptionTopic, withSubscription } from "../services/subscriptionService.js";
 import type { Store } from "../types/models.js";
 
 export const listOwners = asyncHandler(async (_req, res) => res.json(await userService.listOwners()));
@@ -115,6 +115,14 @@ export const acceptPayment = asyncHandler(async (req, res) => {
     { type: "store", id: result.store.id, name: result.store.name },
     `${rubles(result.payment.amount)} за ${result.payment.months} мес., до ${dateLabel(result.payment.periodEnd)}`
   );
+  // The owner sees it in the bell; an unread reminder to pay is replaced.
+  await notificationService.notifyStoreOwner(result.store.id, {
+    source: "SYSTEM",
+    title: "Подписка продлена",
+    body: `«${result.store.name}»: витрина работает до ${dayMonth.format(new Date(result.payment.periodEnd!))}.`,
+    link: `/dashboard/stores/${result.store.id}/subscription`,
+    topic: subscriptionTopic(result.store.id)
+  });
   res.status(201).json({ payment: result.payment, store: withSubscription(result.store) });
 });
 

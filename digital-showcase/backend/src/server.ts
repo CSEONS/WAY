@@ -12,6 +12,7 @@ import { reportProblem } from "./services/alertService.js";
 import { startBackupSchedule } from "./services/backupService.js";
 import { ensureThumbnails } from "./services/imageService.js";
 import { startMonthlyReports } from "./services/monthlyReportService.js";
+import { startSubscriptionReminders } from "./services/subscriptionReminderService.js";
 import { loadSettings } from "./services/settingsService.js";
 
 const port = Number(process.env.PORT ?? 4000);
@@ -33,6 +34,8 @@ ensureThumbnails()
 await startBackupSchedule();
 // Last month's results go to the owners as notifications.
 startMonthlyReports();
+// Owners whose paid date is near or has passed get a reminder to pay.
+startSubscriptionReminders();
 
 process.on("unhandledRejection", (error) => void reportProblem("Необработанная ошибка на сервере", error));
 process.on("uncaughtException", (error) => {

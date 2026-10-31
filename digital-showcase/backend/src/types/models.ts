@@ -43,6 +43,8 @@ export interface Store {
   extraFills: number;
   /** The admin declined to serve it after it stopped paying («Отклонить»); null — served. */
   servingEndedAt?: string | null;
+  /** The last reminder to pay sent to the owner, "<subscriptionEndsAt>|<stage>" (subscriptionReminderService). */
+  subscriptionReminder?: string | null;
   createdAt: string;
   updatedAt: string;
 }

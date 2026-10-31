@@ -19,7 +19,7 @@ import { contentsLabel, getPackage, sellPackage } from "./packageService.js";
 import { acceptPayment } from "./paymentService.js";
 import { planOf } from "./planService.js";
 import { getStore } from "./storeService.js";
-import { subscriptionInfo } from "./subscriptionService.js";
+import { subscriptionInfo, subscriptionTopic } from "./subscriptionService.js";
 
 // The owner pays on «Подписка и оплата» through ЮKassa — the plan for some
 // months or a package: a row here for every attempt, a redirect to ЮKassa's
@@ -220,12 +220,20 @@ async function deliver(row: OnlinePayment, remoteId: string, amount: number) {
       payment,
       store,
       done: `пакет «${row.name}» (${contentsLabel(bought)}) за ${money}${row.isService ? " — услугу нужно выполнить" : ""}`,
-      body: `Пакет «${row.name}» оплачен.${added ? ` Уже у вас: ${added}.` : ""}${row.isService ? " Администратор свяжется, чтобы сделать услугу." : " Спасибо!"}`
+      body: `Пакет «${row.name}» оплачен.${added ? ` Уже у вас: ${added}.` : ""}${row.isService ? " Администратор свяжется, чтобы сделать услугу." : " Спасибо!"}`,
+      topic: null
     };
   }
   const { payment, store } = await acceptPayment(row.storeId, { ...recorded, months: row.months }, null);
   const until = new Date(payment.periodEnd!).toLocaleDateString("ru-RU");
-  return { payment, store, done: `${money} за ${row.months} мес., до ${until}`, body: `Подписка «${row.name}» продлена до ${until}. Спасибо!` };
+  return {
+    payment,
+    store,
+    done: `${money} за ${row.months} мес., до ${until}`,
+    body: `Подписка «${row.name}» продлена до ${until}. Спасибо!`,
+    // Replaces an unread reminder to pay.
+    topic: subscriptionTopic(store.id)
+  };
 }
 
 /** Paid: given once, however many times ЮKassa's answer arrives. */
@@ -239,11 +247,11 @@ async function succeed(row: OnlinePayment, remote: YookassaPayment) {
   // What ЮKassa took, which is what was asked.
   const amount = Math.round(Number(remote.amount.value));
   try {
-    const { payment, store, done, body } = await deliver(row, remote.id, amount);
+    const { payment, store, done, body, topic } = await deliver(row, remote.id, amount);
     const db = await getDb();
     await db.run("UPDATE online_payments SET paymentId = ? WHERE id = ?", payment.id, row.id);
     await logAction(row.createdBy, "PAYMENT_ONLINE", { type: "store", id: store.id, name: store.name }, done);
-    await notifyStoreOwner(store.id, { source: "SYSTEM", title: "Оплата получена", body, link: `/dashboard/stores/${store.id}/subscription` });
+    await notifyStoreOwner(store.id, { source: "SYSTEM", title: "Оплата получена", body, link: `/dashboard/stores/${store.id}/subscription`, topic });
     void sendTelegram(`Онлайн-оплата: «${store.name}» — ${done}`);
   } catch (error) {
     // Money taken but nothing given (e.g. the store was deleted meanwhile): the admin sorts it out by hand.

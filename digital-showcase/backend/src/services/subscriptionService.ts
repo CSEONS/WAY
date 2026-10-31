@@ -68,7 +68,13 @@ export function subscriptionInfo(store: Pick<Store, "isActive" | "subscriptionEn
   return { state, endsAt: new Date(endsAtMs).toISOString(), graceEndsAt: new Date(graceEndsAtMs).toISOString(), daysLeft };
 }
 
-const dayMonth = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
+/** «12 октября». */
+export const dayMonth = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
+
+/** The bell's topic for news about a store's subscription: a reminder to pay and «Подписка продлена» replace each other while unread. */
+export function subscriptionTopic(storeId: string) {
+  return `subscription:${storeId}`;
+}
 
 /**
  * Why the owner can't add products now, or null when they can. New products

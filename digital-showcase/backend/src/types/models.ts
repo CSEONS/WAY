@@ -123,7 +123,8 @@ export interface JwtPayload {
   impersonatedBy?: string;
 }
 
-export type PaymentMethod = "CASH" | "TRANSFER" | "OTHER";
+/** ONLINE — paid by the owner through ЮKassa (onlinePaymentService); the others the admin records. */
+export type PaymentMethod = "CASH" | "TRANSFER" | "OTHER" | "ONLINE";
 
 export interface Payment {
   id: string;

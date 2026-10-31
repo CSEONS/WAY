@@ -12,6 +12,8 @@ ownerRoutes.patch("/stores/:storeId", controller.updateStore);
 ownerRoutes.post("/stores/:storeId/logo", upload.single("logo"), controller.updateStoreLogo);
 ownerRoutes.get("/stores/:storeId/analytics", controller.getAnalytics);
 ownerRoutes.get("/stores/:storeId/subscription", controller.getSubscription);
+ownerRoutes.post("/stores/:storeId/online-payments", controller.startOnlinePayment);
+ownerRoutes.post("/stores/:storeId/online-payments/:paymentId/check", controller.checkOnlinePayment);
 ownerRoutes.post("/stores/:storeId/packages/:packageId/request", controller.requestPackage);
 ownerRoutes.delete("/stores/:storeId/package-orders/:orderId", controller.withdrawPackageRequest);
 ownerRoutes.get("/stores/:storeId/products", controller.listProducts);

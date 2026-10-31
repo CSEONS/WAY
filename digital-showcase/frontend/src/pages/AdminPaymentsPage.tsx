@@ -8,7 +8,7 @@ import { formatDate, formatMoney, formatMonthShort, plural } from "../utils/form
 import { Badge, Button, Card, CardHeader, ConfirmModal, EmptyState, ErrorState, Field, Input, LoadingState, Modal, Page, PageHeader, Select, useToast } from "../ui";
 import styles from "./AdminPaymentsPage.module.css";
 
-const methodLabels: Record<PaymentMethod, string> = { CASH: "наличные", TRANSFER: "перевод", OTHER: "другое" };
+const methodLabels: Record<PaymentMethod, string> = { CASH: "наличные", TRANSFER: "перевод", OTHER: "другое", ONLINE: "онлайн, ЮKassa" };
 
 /** Money received: by month and every payment, with «Продлить» and cancelling a mistake. */
 export function AdminPaymentsPage() {
@@ -200,7 +200,7 @@ export function AdminPaymentsPage() {
       {toCancel && (
         <ConfirmModal
           title="Отменить оплату?"
-          description={`${toCancel.amount ? formatMoney(toCancel.amount) : "Бесплатное продление"} от ${formatDate(toCancel.createdAt)}, ${toCancel.storeName}. ${toCancel.packageName ? `Пакет «${toCancel.packageName}» отменится: магазин потеряет то, что из него не успел потратить.` : `Если это последнее продление магазина, подписка вернётся к ${toCancel.periodStart ? formatDate(toCancel.periodStart) : "прежней дате"}.`}`}
+          description={`${toCancel.amount ? formatMoney(toCancel.amount) : "Бесплатное продление"} от ${formatDate(toCancel.createdAt)}, ${toCancel.storeName}. ${toCancel.packageName ? `Пакет «${toCancel.packageName}» отменится: магазин потеряет то, что из него не успел потратить.` : `Если это последнее продление магазина, подписка вернётся к ${toCancel.periodStart ? formatDate(toCancel.periodStart) : "прежней дате"}.`}${toCancel.method === "ONLINE" ? " Деньги владельцу это не вернёт — возврат делается в личном кабинете ЮKassa." : ""}`}
           confirmLabel="Отменить оплату"
           cancelLabel="Не отменять"
           danger

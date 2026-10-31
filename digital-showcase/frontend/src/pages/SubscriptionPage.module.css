@@ -54,6 +54,44 @@
   gap: var(--space-2);
 }
 
+/* Paying online: period, total, the button and what happens next. */
+.online {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+}
+
+/* The four periods in one row, even on a phone. */
+.online .period {
+  justify-self: stretch;
+  flex-wrap: nowrap;
+}
+
+.online .period > button {
+  flex: 1;
+  padding-inline: var(--space-1);
+  white-space: nowrap;
+}
+
+.onlineTotal {
+  display: grid;
+}
+
+.onlineTotal strong {
+  color: var(--color-ink);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.onlineTotal small,
+.online > small {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
 .aiText {
   display: flex;
   align-items: flex-start;

@@ -35,13 +35,13 @@ export function subscriptionNotice(info: SubscriptionInfo | undefined): { tone: 
   if (!info) return null;
   if (info.state === "expiring") {
     const when = info.daysLeft && info.daysLeft > 0 ? `через ${days(info.daysLeft)}, ${formatDate(info.endsAt)}` : "сегодня";
-    return { tone: "warning", title: `Подписка заканчивается ${when}`, text: "Чтобы витрина работала без перерыва, продлите подписку у администратора." };
+    return { tone: "warning", title: `Подписка заканчивается ${when}`, text: "Чтобы витрина работала без перерыва, продлите подписку." };
   }
   if (info.state === "grace") {
     return {
       tone: "danger",
       title: "Подписка закончилась",
-      text: `Витрина пока работает, но ${formatDate(info.graceEndsAt)} покупатели увидят «Магазин недоступен». Новые товары можно добавлять после продления — продлите подписку у администратора.`
+      text: `Витрина пока работает, но ${formatDate(info.graceEndsAt)} покупатели увидят «Магазин недоступен». Новые товары можно добавлять после продления.`
     };
   }
   if (info.state === "expired") {

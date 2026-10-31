@@ -4,6 +4,7 @@ import type { AuditEntry } from "../types/models.js";
 export type AuditAction =
   | "STORE_CONNECTED"
   | "PAYMENT_ACCEPTED"
+  | "PAYMENT_ONLINE"
   | "PAYMENT_CANCELLED"
   | "SUBSCRIPTION_CHANGED"
   | "PLAN_CHANGED"

@@ -14,6 +14,7 @@ import { ogRoutes } from "./routes/ogRoutes.js";
 import { ownerRoutes } from "./routes/ownerRoutes.js";
 import { publicRoutes } from "./routes/publicRoutes.js";
 import { seoRoutes } from "./routes/seoRoutes.js";
+import { yookassaRoutes } from "./routes/yookassaRoutes.js";
 import { reportProblem } from "./services/alertService.js";
 import { lastSuccessfulBackup } from "./services/backupService.js";
 import { HttpError } from "./utils/http.js";
@@ -53,6 +54,8 @@ app.use("/api/auth/login", signInLimit);
 app.use("/api/auth/change-password", signInLimit);
 // Storefronts: far above what a person clicks, stops scripts hammering the server.
 app.use("/api/public", limiter(1, 300, "Слишком много запросов. Подождите минуту."));
+// Anyone can post a notification; each one is checked with ЮKassa, so this keeps scripts from making the server ask it all day.
+app.use("/api/yookassa", limiter(1, 60, "Слишком много запросов. Подождите минуту."));
 
 const startedAt = Date.now();
 
@@ -79,6 +82,7 @@ app.use("/api/moderation", moderationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/owner", ownerRoutes);
 app.use("/api/public", publicRoutes);
+app.use("/api/yookassa", yookassaRoutes);
 app.use(seoRoutes);
 // Bot-only OG-tag preview shell for /m/:slug and /m/:slug/p/:productId —
 // nginx only routes known crawler user agents here (see nginx.conf); real

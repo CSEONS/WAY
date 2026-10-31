@@ -194,7 +194,8 @@ export interface Lead {
   createdAt: string;
 }
 
-export type PaymentMethod = "CASH" | "TRANSFER" | "OTHER";
+/** ONLINE — the owner paid through ЮKassa; the others the admin records. */
+export type PaymentMethod = "CASH" | "TRANSFER" | "OTHER" | "ONLINE";
 
 export interface Payment {
   id: string;
@@ -254,6 +255,8 @@ export interface OwnerSubscription {
   /** The store's plan; null if it has none. */
   plan: { name: string; price: number | null; aiEnabled: boolean; aiMonthlyLimit: number | null; reportsAnytime: boolean } | null;
   graceDays: number;
+  /** Paying the plan through ЮKassa: its month price and the periods to pick; null — only through the admin. */
+  online: { planName: string; price: number; months: number[] } | null;
   ai: AiStatus;
   payments: Pick<Payment, "id" | "amount" | "months" | "method" | "periodEnd" | "receipt" | "packageName" | "createdAt">[];
   /** Empty unless the plan has «Итоги в любой день»: the others get month results in a notification. */
@@ -264,6 +267,14 @@ export interface OwnerSubscription {
   packages: PublicPackage[];
   /** The store's requests and purchases, newest first. */
   orders: Omit<PackageOrder, "storeId" | "paymentId">[];
+}
+
+/** POST /owner/stores/:id/online-payments/:paymentId/check — back from ЮKassa. */
+export interface OnlinePaymentCheck {
+  status: "PENDING" | "SUCCEEDED" | "CANCELED";
+  months: number;
+  amount: number;
+  subscription: SubscriptionInfo;
 }
 
 /** One store in the admin overview. */

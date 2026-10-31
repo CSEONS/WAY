@@ -1,13 +1,29 @@
-import { AiMagicIcon, Call02Icon, Calendar03Icon, TelegramIcon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, Call02Icon, Calendar03Icon, CreditCardIcon, TelegramIcon, WhatsappIcon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { PackageCard } from "../components/landing/PackageCard";
-import type { OwnerSubscription, PackageOrder, PackageOrderStatus, Store } from "../types/models";
+import type { OnlinePaymentCheck, OwnerSubscription, PackageOrder, PackageOrderStatus, Store } from "../types/models";
 import { phoneUrl, telegramUrl, whatsappUrl } from "../utils/contact";
 import { formatDate, formatMoney, formatMonth, plural } from "../utils/format";
 import { subscriptionNotice } from "../utils/subscription";
-import { Badge, Button, ButtonLink, Card, CardHeader, ErrorState, Icon, LoadingState, Notice, Page, PageHeader, ProgressBar, useToast, type Tone } from "../ui";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHeader,
+  ErrorState,
+  Icon,
+  LoadingState,
+  Notice,
+  Page,
+  PageHeader,
+  ProgressBar,
+  SegmentedControl,
+  useToast,
+  type Tone
+} from "../ui";
 import { ReceiptLink } from "../components/ReceiptLink";
 import styles from "./SubscriptionPage.module.css";
 
@@ -21,13 +37,24 @@ const orderStatuses: Record<PackageOrderStatus, { label: string; tone: Tone }> =
   CANCELLED: { label: "Отменён", tone: "neutral" }
 };
 
+/** Asks again while ЮKassa hasn't answered yet: right after the redirect back it can take a few seconds. */
+const CHECK_ATTEMPTS = 5;
+const CHECK_PAUSE_MS = 2000;
+
 /**
- * «Оплачено до 12 октября», the AI left this month and from packages,
- * packages to ask for, results of the last months and payments — for the owner.
+ * «Оплачено до 12 октября», paying online or the admin's contacts, the AI
+ * left this month and from packages, packages to ask for, results of the
+ * last months and payments — for the owner.
  */
 export function SubscriptionPage() {
   const { storeId = "" } = useParams();
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // ЮKassa sends the owner back here with ?payment=<id>; read once, then the address is cleaned.
+  const [returnedPayment] = useState(() => searchParams.get("payment"));
+  const [checking, setChecking] = useState<"checking" | "waiting" | null>(returnedPayment ? "checking" : null);
+  const [months, setMonths] = useState(1);
+  const [paying, setPaying] = useState(false);
   // The package being asked for or withdrawn right now.
   const [busyId, setBusyId] = useState<string | null>(null);
   const [store, setStore] = useState<Store>();
@@ -46,6 +73,52 @@ export function SubscriptionPage() {
   }
 
   useEffect(load, [storeId]);
+
+  // Back from ЮKassa: paid — the date is new; cancelled — nothing was taken; no answer yet — it comes later.
+  useEffect(() => {
+    if (!returnedPayment) return;
+    setSearchParams({}, { replace: true });
+    let cancelled = false;
+    void (async () => {
+      for (let attempt = 0; attempt < CHECK_ATTEMPTS; attempt++) {
+        try {
+          const { data: result } = await api.post<OnlinePaymentCheck>(`/owner/stores/${storeId}/online-payments/${returnedPayment}/check`);
+          if (cancelled) return;
+          if (result.status === "SUCCEEDED") {
+            setChecking(null);
+            toast.show(`Оплата прошла — подписка продлена до ${formatDate(result.subscription.endsAt)}`, { tone: "success" });
+            load();
+            return;
+          }
+          if (result.status === "CANCELED") {
+            setChecking(null);
+            toast.show("Оплата не прошла, деньги не списаны. Можно попробовать ещё раз", { tone: "danger" });
+            return;
+          }
+        } catch {
+          // Asked again below.
+        }
+        await new Promise((resolve) => setTimeout(resolve, CHECK_PAUSE_MS));
+        if (cancelled) return;
+      }
+      setChecking("waiting");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [returnedPayment, storeId]);
+
+  /** «Оплатить»: to ЮKassa's page; it sends the owner back here. */
+  async function payOnline() {
+    setPaying(true);
+    try {
+      const { data: started } = await api.post<{ id: string; confirmationUrl: string }>(`/owner/stores/${storeId}/online-payments`, { months });
+      window.location.assign(started.confirmationUrl);
+    } catch (err: any) {
+      toast.show(err?.response?.data?.message ?? "Не удалось перейти к оплате", { tone: "danger" });
+      setPaying(false);
+    }
+  }
 
   function setOrders(update: (orders: OwnerOrder[]) => OwnerOrder[]) {
     setData((current) => current && { ...current, orders: update(current.orders) });
@@ -96,7 +169,7 @@ export function SubscriptionPage() {
     );
   }
 
-  const { subscription, ai, payments, reports, support, packages, orders } = data;
+  const { subscription, online, ai, payments, reports, support, packages, orders } = data;
   const extra = [
     ai.extraFills ? `${ai.extraFills} ${plural(ai.extraFills, ["карточка", "карточки", "карточек"])}` : "",
     ai.extraPreviews ? `${ai.extraPreviews} превью` : ""
@@ -108,10 +181,25 @@ export function SubscriptionPage() {
   const isTrial = payments.length === 0 && Boolean(subscription.endsAt);
   const renewText = `Здравствуйте! Хочу продлить подписку витрины «${store.name}».`;
   const hasSupport = Boolean(support.whatsapp || support.phone || support.telegram);
+  // A new period goes on top of the old one while the storefront still works (grace days included), otherwise from today.
+  const paidOnTop = Boolean(subscription.endsAt) && ["active", "expiring", "grace"].includes(subscription.state);
+  const onlineTotal = online ? Math.round(online.price * months) : 0;
 
   return (
     <Page width="narrow">
       <PageHeader title="Подписка и оплата" description={store.name} back={back} />
+
+      {checking === "checking" && (
+        <Notice tone="accent" title="Проверяем оплату…">
+          Это займёт несколько секунд.
+        </Notice>
+      )}
+      {checking === "waiting" && (
+        <Notice tone="warning" title="Ждём подтверждения от ЮKassa">
+          Если деньги списались, подписка продлится сама, обычно в течение нескольких минут — обновите страницу позже. Если этого не случилось, напишите
+          администратору.
+        </Notice>
+      )}
 
       {notice && (
         <Notice tone={notice.tone} title={notice.title}>
@@ -141,13 +229,43 @@ export function SubscriptionPage() {
           )}
         </div>
         <p className={styles.muted}>
-          После окончания витрина работает ещё {data.graceDays} дня, чтобы вы успели продлить, но новые товары в эти дни добавить нельзя. Продление — у
-          администратора, оплата наличными или переводом.
+          После окончания витрина работает ещё {data.graceDays} дня, чтобы вы успели продлить, но новые товары в эти дни добавить нельзя.{" "}
+          {online ? "Продлить можно онлайн или у администратора." : "Продление — у администратора, оплата наличными или переводом."}
         </p>
+        {online && (
+          <div className={styles.online}>
+            <SegmentedControl
+              className={styles.period}
+              label="Срок оплаты"
+              value={String(months)}
+              onChange={(value) => setMonths(Number(value))}
+              options={online.months.map((count) => ({ value: String(count), label: `${count} мес.` }))}
+            />
+            <div className={styles.onlineTotal}>
+              <strong>{formatMoney(onlineTotal)}</strong>
+              <small>
+                {formatMoney(online.price)} в месяц · тариф «{online.planName}»
+              </small>
+            </div>
+            <Button variant="primary" icon={CreditCardIcon} loading={paying} disabled={checking === "checking"} onClick={() => void payOnline()}>
+              Оплатить {formatMoney(onlineTotal)}
+            </Button>
+            <small>
+              {paidOnTop ? `Срок добавится к ${formatDate(subscription.endsAt)}. ` : "Срок начнётся сегодня. "}
+              Оплата картой или через СБП на странице ЮKassa. Подписка продлится сразу после оплаты.
+            </small>
+          </div>
+        )}
         {hasSupport ? (
           <div className={styles.actions}>
             {support.whatsapp && (
-              <ButtonLink variant="primary" icon={WhatsappIcon} href={whatsappUrl(support.whatsapp, renewText)} target="_blank" rel="noreferrer">
+              <ButtonLink
+                variant={online ? "outline" : "primary"}
+                icon={WhatsappIcon}
+                href={whatsappUrl(support.whatsapp, renewText)}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Написать администратору
               </ButtonLink>
             )}
@@ -163,7 +281,7 @@ export function SubscriptionPage() {
             )}
           </div>
         ) : (
-          <p className={styles.muted}>Чтобы продлить, свяжитесь с администратором, который подключал вам витрину.</p>
+          !online && <p className={styles.muted}>Чтобы продлить, свяжитесь с администратором, который подключал вам витрину.</p>
         )}
       </Card>
 

@@ -593,6 +593,53 @@ export const migrations: Migration[] = [
     // A product priced «one price for everything» is now sizes and colors without combinations,
     // so buyers have nothing to pick. Older ones kept the full color × size grid at that price.
     up: dropOnePriceCombinations
+  },
+  {
+    version: 20,
+    name: "online payments through yookassa",
+    // The owner pays the plan on ЮKassa's page (see onlinePaymentService): an
+    // attempt waits here until ЮKassa says paid or cancelled, a paid one becomes
+    // a payment with method ONLINE (the table is rebuilt, SQLite can't change a CHECK).
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS online_payments (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+          externalId TEXT,
+          planName TEXT NOT NULL,
+          months INTEGER NOT NULL,
+          amount INTEGER NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('PENDING', 'SUCCEEDED', 'CANCELED')),
+          paymentId TEXT,
+          createdBy TEXT,
+          createdAt TEXT NOT NULL,
+          finishedAt TEXT
+        );
+        CREATE INDEX IF NOT EXISTS online_payments_store ON online_payments(storeId, status, createdAt);
+        CREATE UNIQUE INDEX IF NOT EXISTS online_payments_external ON online_payments(externalId);
+
+        CREATE TABLE payments_new (
+          id TEXT PRIMARY KEY,
+          storeId TEXT NOT NULL,
+          storeName TEXT NOT NULL,
+          amount INTEGER NOT NULL,
+          months INTEGER NOT NULL,
+          method TEXT NOT NULL CHECK(method IN ('CASH', 'TRANSFER', 'OTHER', 'ONLINE')),
+          comment TEXT,
+          periodStart TEXT,
+          periodEnd TEXT,
+          createdBy TEXT,
+          createdAt TEXT NOT NULL,
+          receipt TEXT,
+          packageName TEXT
+        );
+        INSERT INTO payments_new (id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, createdAt, receipt, packageName)
+          SELECT id, storeId, storeName, amount, months, method, comment, periodStart, periodEnd, createdBy, createdAt, receipt, packageName FROM payments;
+        DROP TABLE payments;
+        ALTER TABLE payments_new RENAME TO payments;
+        CREATE INDEX IF NOT EXISTS payments_store ON payments(storeId, createdAt);
+      `);
+    }
   }
 ];
 

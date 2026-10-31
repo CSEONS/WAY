@@ -240,6 +240,9 @@ export const paymentSchema = z.object({
 
 export const receiptSchema = z.object({ receipt: optionalText(500) });
 
+/** «Оплатить онлайн»: how many months; which are offered is checked by onlinePaymentService. */
+export const onlinePaymentSchema = z.object({ months: z.coerce.number().int().min(1).max(12) });
+
 export const connectSchema = z.object({
   ownerName: requiredText(100),
   phone: requiredText(40),

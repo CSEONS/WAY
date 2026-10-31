@@ -4,7 +4,7 @@ import { HttpError } from "../utils/http.js";
 import { getStore, updateStore } from "./storeService.js";
 import { addMonths, extensionBase } from "./subscriptionService.js";
 
-export const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "TRANSFER", "OTHER"];
+export const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "TRANSFER", "OTHER", "ONLINE"];
 export const MAX_MONTHS = 12;
 
 export interface PaymentInput {

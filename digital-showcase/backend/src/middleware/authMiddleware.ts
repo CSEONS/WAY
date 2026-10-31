@@ -68,6 +68,8 @@ export function notWhileImpersonating(req: Request, _res: Response, next: NextFu
 }
 
 const OWNER_ACTIONS: [method: string, path: RegExp, label: string][] = [
+  ["POST", /\/online-payments\/[^/]+\/check$/, "Проверил онлайн-оплату"],
+  ["POST", /\/online-payments$/, "Перешёл к онлайн-оплате"],
   ["POST", /\/products\/bulk-ai-draft$/, "ИИ-черновики нескольких товаров"],
   ["POST", /\/products\/bulk$/, "Изменил несколько товаров сразу"],
   ["POST", /\/products\/ai-draft$/, "ИИ-черновик товара"],

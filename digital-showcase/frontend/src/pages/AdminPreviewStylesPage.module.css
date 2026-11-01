@@ -1,12 +1,14 @@
+/* 300px: «Редактировать» and both arrows fit in one row inside the card. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: var(--space-4);
 }
 
+/* Cards in a row are as tall as the tallest; the buttons stay at the bottom, level with the neighbours'. */
 .card {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
 }
 
@@ -42,9 +44,12 @@
   gap: var(--space-1);
 }
 
+/* Narrower than planned (a large font, a zoom): the arrows go to the next line instead of out of the card. */
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  margin-top: auto;
 }
 
 .edit {

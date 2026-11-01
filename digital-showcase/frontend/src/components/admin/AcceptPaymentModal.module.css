@@ -1,9 +1,7 @@
-.row {
-  display: grid;
-  gap: var(--space-4);
-}
+/* «Продлить» and «Пакет»: one column, top to bottom — what, how much, how paid, what happens. */
 
-.period {
+/* A label and a control that isn't a form field (period, method). */
+.group {
   display: grid;
   gap: var(--space-2);
 }
@@ -16,6 +14,18 @@
   line-height: var(--line-height-snug);
 }
 
+/* All options in one row across the dialog, even on a phone. */
+.fill {
+  justify-self: stretch;
+  flex-wrap: nowrap;
+}
+
+.fill > button {
+  flex: 1;
+  padding-inline: var(--space-1);
+  white-space: nowrap;
+}
+
 .preview {
   margin: 0;
   border-radius: var(--radius-md);
@@ -25,9 +35,67 @@
   font-size: var(--font-size-md);
 }
 
-@media (min-width: 560px) {
-  .row {
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-    align-items: end;
-  }
+/* Packages to pick from: name and price, the picked one outlined. */
+.packages {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.package {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
+}
+
+.package:hover {
+  border-color: var(--color-border-strong);
+}
+
+.package:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.package:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.package input {
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.packageName {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink);
+  font-weight: var(--font-weight-semibold);
+}
+
+.packageName small {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+}
+
+.packagePrice {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
 }

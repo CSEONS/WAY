@@ -1,21 +1,16 @@
 import { type FormEvent, useState } from "react";
 import { api } from "../../api/client";
 import { useAdminPlans } from "../../state/adminPlans";
-import type { PaymentMethod, Store, SubscriptionInfo } from "../../types/models";
+import type { Store, SubscriptionInfo } from "../../types/models";
 import { formatDate, formatMoney } from "../../utils/format";
-import { Button, Field, Input, Modal, SegmentedControl, Select, Textarea, useToast } from "../../ui";
+import { Button, Field, Input, Modal, SegmentedControl, useToast } from "../../ui";
 import styles from "./AcceptPaymentModal.module.css";
+import { emptyPaymentDetails, PaymentDetails } from "./PaymentDetails";
 
 const GRACE_DAYS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const periods = ["1", "3", "6", "12"] as const;
 type Period = (typeof periods)[number];
-
-const methodOptions: { value: PaymentMethod; label: string }[] = [
-  { value: "CASH", label: "Наличные" },
-  { value: "TRANSFER", label: "Перевод" },
-  { value: "OTHER", label: "Другое" }
-];
 
 /** Same rule as the server: from the old date while the store still runs (grace included), otherwise from today. */
 function previewEnd(endsAt: string | null | undefined, months: number) {
@@ -35,23 +30,25 @@ interface AcceptPaymentModalProps {
   onPaid: (store: Store) => void;
 }
 
-/** «Продлить»: extends the subscription and records the payment in one step (0 ₽ — a free extension). */
+/**
+ * «Продлить»: extends the subscription and records the payment in one step
+ * (0 ₽ — a free extension). The period first: the sum follows it from the
+ * plan's price until the admin types another.
+ */
 export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModalProps) {
   const toast = useToast();
   const [amount, setAmount] = useState("");
   const [amountTouched, setAmountTouched] = useState(false);
   const [period, setPeriod] = useState<Period>("1");
-  const [method, setMethod] = useState<PaymentMethod>("CASH");
-  const [comment, setComment] = useState("");
-  const [receipt, setReceipt] = useState("");
+  const [details, setDetails] = useState(emptyPaymentDetails);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const months = Number(period);
   const endsAt = previewEnd(store.subscriptionEndsAt, months);
-  // The store's plan price × the period, until the admin types another sum.
   const { plans } = useAdminPlans();
   const plan = plans?.find((item) => item.id === store.planId) ?? null;
   const shownAmount = !amountTouched && plan?.price != null ? String(plan.price * months) : amount;
+  const isRunning = Boolean(store.subscriptionEndsAt && Date.parse(store.subscriptionEndsAt) > Date.now());
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -62,7 +59,7 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
     }
     setIsSaving(true);
     try {
-      const { data } = await api.post<{ store: Store }>(`/admin/stores/${store.id}/payments`, { amount: rubles, months, method, comment, receipt });
+      const { data } = await api.post<{ store: Store }>(`/admin/stores/${store.id}/payments`, { amount: rubles, months, ...details });
       toast.show(`Продлено до ${formatDate(data.store.subscriptionEndsAt)} · ${formatMoney(rubles)}`, { tone: "success" });
       onPaid(data.store);
     } catch (err: any) {
@@ -90,9 +87,23 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
         </>
       }
     >
+      <div className={styles.group}>
+        <span className={styles.label}>На сколько</span>
+        <SegmentedControl
+          label="На сколько продлить"
+          value={period}
+          onChange={setPeriod}
+          options={periods.map((value) => ({ value, label: `${value} мес.` }))}
+          className={styles.fill}
+        />
+      </div>
       <Field
         label="Сумма, ₽"
-        hint={plan?.price != null ? `Тариф «${plan.name}» — ${formatMoney(plan.price)} в месяц` : undefined}
+        hint={
+          plan?.price != null
+            ? `${formatMoney(plan.price)} × ${months} мес. по тарифу «${plan.name}». 0 — продлить бесплатно.`
+            : "0 — продлить бесплатно."
+        }
         error={error}
         required
       >
@@ -107,29 +118,10 @@ export function AcceptPaymentModal({ store, onClose, onPaid }: AcceptPaymentModa
           }}
         />
       </Field>
-      <div className={styles.row}>
-        <div className={styles.period}>
-          <span className={styles.label}>Период</span>
-          <SegmentedControl
-            label="Период оплаты"
-            value={period}
-            onChange={setPeriod}
-            options={periods.map((value) => ({ value, label: `${value} мес.` }))}
-          />
-        </div>
-        <Field label="Способ">
-          <Select value={method} onChange={(value) => setMethod(value as PaymentMethod)} options={methodOptions} />
-        </Field>
-      </div>
-      <Field label="Чек" hint="Ссылка на чек из «Мой налог» или номер чека. Можно добавить позже в «Оплатах». Владелец увидит его в своей истории оплат.">
-        <Input value={receipt} onChange={(e) => setReceipt(e.target.value)} placeholder="https://lknpd.nalog.ru/…" />
-      </Field>
-      <Field label="Комментарий" hint="Видно только в админке">
-        <Textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
-      </Field>
+      <PaymentDetails value={details} onChange={setDetails} />
       <p className={styles.preview}>
-        Подписка будет оплачена до <strong>{formatDate(endsAt)}</strong>
-        {store.subscriptionEndsAt && Date.parse(store.subscriptionEndsAt) > Date.now() && ` (сейчас до ${formatDate(store.subscriptionEndsAt)})`}
+        Будет оплачено до <strong>{formatDate(endsAt)}</strong>
+        {isRunning && ` — сейчас до ${formatDate(store.subscriptionEndsAt)}`}
       </p>
     </Modal>
   );

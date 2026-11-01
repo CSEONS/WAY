@@ -1,30 +1,28 @@
-import { ArchiveArrowDownIcon, ArchiveArrowUpIcon, Delete02Icon, Edit02Icon, Money03Icon, PlusSignIcon, ShoppingBasketAdd01Icon, Store01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArchiveArrowDownIcon,
+  ArchiveArrowUpIcon,
+  Delete02Icon,
+  Edit02Icon,
+  Money03Icon,
+  PlusSignIcon,
+  Search01Icon,
+  ShoppingBasketAdd01Icon,
+  Store01Icon,
+  StoreAdd01Icon
+} from "@hugeicons/core-free-icons";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { AcceptPaymentModal } from "../components/admin/AcceptPaymentModal";
+import { AddStoreModal } from "../components/admin/AddStoreModal";
 import { SellPackageModal } from "../components/admin/SellPackageModal";
 import { planLabel, useAdminPlans } from "../state/adminPlans";
 import type { Store, User } from "../types/models";
 import { subscriptionBadge } from "../utils/subscription";
-import {
-  Badge,
-  Button,
-  ButtonLink,
-  Card,
-  CardHeader,
-  ConfirmModal,
-  EmptyState,
-  Field,
-  Icon,
-  Input,
-  Modal,
-  Page,
-  PageHeader,
-  Select,
-  Textarea,
-  useToast
-} from "../ui";
-import styles from "./Admin.module.css";
+import { Badge, Button, ButtonLink, Card, CardHeader, ConfirmModal, EmptyState, Field, Icon, Input, Menu, Modal, Page, PageHeader, Select, Textarea, useToast } from "../ui";
+import styles from "./AdminStoresPage.module.css";
+
+/** A search box once the list is longer than this. */
+const SEARCH_FROM = 6;
 
 interface StoreFormState {
   ownerId: string;
@@ -103,9 +101,9 @@ export function AdminStoresPage() {
   const toast = useToast();
   const { plans } = useAdminPlans();
   const [owners, setOwners] = useState<User[]>([]);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [storeForm, setStoreForm] = useState<StoreFormState>(emptyStoreForm);
-  const [isCreating, setIsCreating] = useState(false);
+  const [stores, setStores] = useState<Store[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
   const [storeToEdit, setStoreToEdit] = useState<Store | null>(null);
   const [storeEditForm, setStoreEditForm] = useState<StoreFormState>(emptyStoreForm);
   const editPlan = plans?.find((plan) => plan.id === storeEditForm.planId);
@@ -114,6 +112,8 @@ export function AdminStoresPage() {
   const [storeToPay, setStoreToPay] = useState<Store | null>(null);
   const [storeToSell, setStoreToSell] = useState<Store | null>(null);
   const ownerOptions = owners.map((owner) => ({ value: owner.id, label: owner.name }));
+  const query = search.trim().toLowerCase();
+  const shown = (stores ?? []).filter((store) => !query || [store.name, store.slug, store.ownerName].some((text) => text?.toLowerCase().includes(query)));
 
   async function load() {
     const [ownersRes, storesRes] = await Promise.all([api.get("/admin/owners"), api.get("/admin/stores")]);
@@ -133,21 +133,6 @@ export function AdminStoresPage() {
     } catch (err) {
       toast.show(errorMessage(err, fallback), { tone: "danger" });
       return false;
-    }
-  }
-
-  async function createStore(event: FormEvent) {
-    event.preventDefault();
-    if (!storeForm.ownerId) {
-      toast.show("Выберите владельца", { tone: "danger" });
-      return;
-    }
-    setIsCreating(true);
-    const isCreated = await run(() => api.post("/admin/stores", { ...storePayload(storeForm), isActive: 1 }), "Не удалось создать магазин");
-    setIsCreating(false);
-    if (isCreated) {
-      setStoreForm(emptyStoreForm);
-      toast.show("Магазин создан", { tone: "success" });
     }
   }
 
@@ -210,91 +195,95 @@ export function AdminStoresPage() {
     <Page>
       <PageHeader
         title="Управление магазинами"
-        description="Новому клиенту удобнее «Подключить магазин»: владелец, магазин и пробный период одной формой."
+        description="Новому клиенту — «Подключить магазин»: владелец, магазин и пробный период одной формой. Тому, у кого уже есть кабинет, — «Ещё магазин»."
         back={{ to: "/admin", label: "Назад в админку" }}
         actions={
-          <ButtonLink variant="primary" icon={PlusSignIcon} to="/admin/connect">
-            Подключить магазин
-          </ButtonLink>
+          <>
+            <Button variant="secondary" icon={StoreAdd01Icon} onClick={() => setIsAdding(true)}>
+              Ещё магазин
+            </Button>
+            <ButtonLink variant="primary" icon={PlusSignIcon} to="/admin/connect">
+              Подключить магазин
+            </ButtonLink>
+          </>
         }
       />
-      <div className={styles.columns}>
-        <Card as="section" padding="lg">
-          <CardHeader title="Ещё один магазин владельцу" />
-          <form className={styles.form} onSubmit={createStore}>
-            <Field label="Владелец" required>
-              <Select placeholder="Выберите" value={storeForm.ownerId} onChange={(value) => setStoreForm({ ...storeForm, ownerId: value })} options={ownerOptions} />
-            </Field>
-            <Field label="Название" required>
-              <Input value={storeForm.name} onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} required />
-            </Field>
-            <Field label="Slug" hint="Адрес витрины: /m/slug" required>
-              <Input value={storeForm.slug} onChange={(e) => setStoreForm({ ...storeForm, slug: e.target.value })} required />
-            </Field>
-            <Field label="Подписка до" hint="Пусто — пробный период">
-              <Input type="datetime-local" value={storeForm.subscriptionEndsAt} onChange={(e) => setStoreForm({ ...storeForm, subscriptionEndsAt: e.target.value })} />
-            </Field>
-            <Button type="submit" variant="primary" loading={isCreating}>
-              Создать
-            </Button>
-          </form>
-        </Card>
-        <Card as="section" padding="lg">
-          <CardHeader title="Список магазинов" />
-          {stores.length ? (
+      <Card as="section" padding="lg">
+        <CardHeader title={stores?.length ? `Магазины · ${stores.length}` : "Магазины"} />
+        {stores && stores.length >= SEARCH_FROM && (
+          <Input icon={Search01Icon} aria-label="Поиск магазина" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Магазин, адрес или владелец" />
+        )}
+        {stores?.length ? (
+          shown.length ? (
             <div className={styles.list}>
-              {stores.map((store) => (
-                <div className={styles.row} key={store.id}>
-                  <div className={styles.rowMain}>
-                    <span className={styles.rowIcon}>
-                      <Icon icon={Store01Icon} size="md" strokeWidth={1.6} />
-                    </span>
-                    <div className={styles.rowText}>
-                      <strong>{store.name}</strong>
-                      <small>/m/{store.slug}</small>
+              {shown.map((store) => {
+                const status = store.isActive
+                  ? subscriptionBadge(store.subscription)
+                  : store.servingEndedAt
+                    ? { tone: "danger" as const, label: "Не обслуживается" }
+                    : { tone: "neutral" as const, label: "В архиве" };
+                return (
+                  <div className={styles.store} key={store.id}>
+                    <div className={styles.main}>
+                      <span className={styles.icon}>
+                        <Icon icon={Store01Icon} size="md" strokeWidth={1.6} />
+                      </span>
+                      <div className={styles.text}>
+                        <strong>{store.name}</strong>
+                        <small>
+                          <a href={`/m/${store.slug}`} target="_blank" rel="noreferrer">
+                            /m/{store.slug}
+                          </a>
+                          {store.ownerName && ` · ${store.ownerName}`}
+                        </small>
+                      </div>
+                    </div>
+                    <div className={styles.badges}>
+                      <Badge tone={status.tone}>{status.label}</Badge>
+                      <Badge tone={store.aiFormEnabled ? "accent" : "neutral"}>{plans?.find((plan) => plan.id === store.planId)?.name ?? "Без тарифа"}</Badge>
+                    </div>
+                    <div className={styles.actions}>
+                      <Button variant="primary" size="sm" icon={Money03Icon} onClick={() => setStoreToPay(store)}>
+                        Продлить
+                      </Button>
+                      <Button variant="secondary" size="sm" icon={ShoppingBasketAdd01Icon} onClick={() => setStoreToSell(store)}>
+                        Пакет
+                      </Button>
+                      <Menu
+                        label={`Ещё действия с магазином ${store.name}`}
+                        items={[
+                          { label: "Редактировать", icon: Edit02Icon, onSelect: () => openEditStore(store) },
+                          store.isActive
+                            ? { label: "Архивировать", icon: ArchiveArrowDownIcon, onSelect: () => setStoreToArchive(store) }
+                            : { label: "Восстановить", icon: ArchiveArrowUpIcon, onSelect: () => toggle(store) },
+                          { label: "Удалить", icon: Delete02Icon, danger: true, onSelect: () => setStoreToDelete(store) }
+                        ]}
+                      />
                     </div>
                   </div>
-                  <div className={styles.rowMeta}>
-                    {store.isActive ? (
-                      <Badge tone={subscriptionBadge(store.subscription).tone}>{subscriptionBadge(store.subscription).label}</Badge>
-                    ) : store.servingEndedAt ? (
-                      <Badge tone="danger">Не обслуживается</Badge>
-                    ) : (
-                      <Badge tone="neutral">В архиве</Badge>
-                    )}
-                    <Badge tone={store.aiFormEnabled ? "accent" : "neutral"}>{plans?.find((plan) => plan.id === store.planId)?.name ?? "Без тарифа"}</Badge>
-                    <span>{store.ownerName}</span>
-                  </div>
-                  <div className={styles.rowActions}>
-                    <Button variant="primary" size="sm" icon={Money03Icon} onClick={() => setStoreToPay(store)}>
-                      Продлить
-                    </Button>
-                    <Button variant="secondary" size="sm" icon={ShoppingBasketAdd01Icon} onClick={() => setStoreToSell(store)}>
-                      Пакет
-                    </Button>
-                    <Button variant="secondary" size="sm" icon={Edit02Icon} onClick={() => openEditStore(store)}>
-                      Редактировать
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon={store.isActive ? ArchiveArrowDownIcon : ArchiveArrowUpIcon}
-                      onClick={() => (store.isActive ? setStoreToArchive(store) : toggle(store))}
-                    >
-                      {store.isActive ? "Архивировать" : "Восстановить"}
-                    </Button>
-                    <Button variant="danger" size="sm" icon={Delete02Icon} className={styles.pushRight} onClick={() => setStoreToDelete(store)}>
-                      Удалить
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <EmptyState icon={Store01Icon} title="Магазинов пока нет" description="Создайте первый магазин в форме слева." />
-          )}
-        </Card>
-      </div>
+            <EmptyState icon={Search01Icon} title="Ничего не нашлось" description="Проверьте название или имя владельца." />
+          )
+        ) : (
+          stores && <EmptyState icon={Store01Icon} title="Магазинов пока нет" description="Нажмите «Подключить магазин» — владелец, магазин и пробный период одной формой." />
+        )}
+      </Card>
+
+      {isAdding && (
+        <AddStoreModal
+          owners={owners}
+          stores={stores ?? []}
+          onClose={() => setIsAdding(false)}
+          onCreated={() => {
+            setIsAdding(false);
+            toast.show("Магазин создан", { tone: "success" });
+            load();
+          }}
+        />
+      )}
 
       {storeToEdit && (
         <Modal
@@ -320,7 +309,7 @@ export function AdminStoresPage() {
           <Field label="Название" required>
             <Input {...field("name")} required />
           </Field>
-          <Field label="Slug" required>
+          <Field label="Адрес витрины" hint={`${window.location.host}/m/${storeEditForm.slug}`} required>
             <Input {...field("slug")} required />
           </Field>
           <Field label="Описание">

@@ -1,18 +1,13 @@
 import { type FormEvent, useState } from "react";
 import { api } from "../../api/client";
 import { useAdminPackages } from "../../state/adminPackages";
-import type { PackageOrder, PaymentMethod } from "../../types/models";
+import type { PackageOrder } from "../../types/models";
 import { formatMoney } from "../../utils/format";
-import { Button, Field, Input, Modal, Select, Textarea, useToast } from "../../ui";
+import { Button, Field, Input, Modal, useToast } from "../../ui";
 import { packageSummary } from "../landing/PackageCard";
-// The same form as «Продлить»: sum, method, receipt, comment.
+// The same form as «Продлить»: what, sum, how paid, what happens.
 import styles from "./AcceptPaymentModal.module.css";
-
-const methodOptions: { value: PaymentMethod; label: string }[] = [
-  { value: "CASH", label: "Наличные" },
-  { value: "TRANSFER", label: "Перевод" },
-  { value: "OTHER", label: "Другое" }
-];
+import { emptyPaymentDetails, PaymentDetails } from "./PaymentDetails";
 
 interface SellPackageModalProps {
   /** extraPreviews/extraFills: what the store has left, shown for reference. */
@@ -27,15 +22,15 @@ interface SellPackageModalProps {
 export function SellPackageModal({ store, order, onClose, onSold }: SellPackageModalProps) {
   const toast = useToast();
   const { packages } = useAdminPackages();
-  const [packageId, setPackageId] = useState("");
+  const [chosenId, setChosenId] = useState("");
   const [amount, setAmount] = useState("");
   const [amountTouched, setAmountTouched] = useState(false);
-  const [method, setMethod] = useState<PaymentMethod>("CASH");
-  const [comment, setComment] = useState("");
-  const [receipt, setReceipt] = useState("");
+  const [details, setDetails] = useState(emptyPaymentDetails);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // The only package is picked already.
+  const packageId = chosenId || (packages?.length === 1 ? packages[0].id : "");
   const picked = order ?? packages?.find((item) => item.id === packageId) ?? null;
   // The package's price until the admin types another sum.
   const shownAmount = !amountTouched && picked ? String(picked.price) : amount;
@@ -54,7 +49,7 @@ export function SellPackageModal({ store, order, onClose, onSold }: SellPackageM
     }
     setIsSaving(true);
     try {
-      await api.post(`/admin/stores/${store.id}/packages`, { ...(order ? { orderId: order.id } : { packageId }), amount: rubles, method, comment, receipt });
+      await api.post(`/admin/stores/${store.id}/packages`, { ...(order ? { orderId: order.id } : { packageId }), amount: rubles, ...details });
       toast.show(`«${picked.name}» — ${store.name} · ${formatMoney(rubles)}`, { tone: "success" });
       onSold();
     } catch (err: any) {
@@ -83,44 +78,52 @@ export function SellPackageModal({ store, order, onClose, onSold }: SellPackageM
       }
     >
       {!order && (
-        <Field label="Пакет" required>
-          <Select
-            value={packageId}
-            placeholder={packages === undefined ? "Загружаем…" : packages?.length ? "Выберите пакет" : "Пакетов нет — добавьте в «Тарифах и ценах»"}
-            onChange={(value) => {
-              setPackageId(value);
-              setError("");
-            }}
-            options={(packages ?? []).map((item) => ({
-              value: item.id,
-              label: `${item.name} · ${formatMoney(item.price)}${item.isPublic ? "" : " · скрыт"}`
-            }))}
-          />
-        </Field>
+        <div className={styles.group}>
+          <span className={styles.label}>Пакет</span>
+          {packages === undefined ? (
+            <p className={styles.label}>Загружаем…</p>
+          ) : packages?.length ? (
+            <fieldset className={styles.packages} aria-label="Пакет">
+              {packages.map((item) => (
+                <label key={item.id} className={styles.package}>
+                  <input
+                    type="radio"
+                    name="package"
+                    value={item.id}
+                    checked={item.id === packageId}
+                    onChange={() => {
+                      setChosenId(item.id);
+                      setAmountTouched(false);
+                      setError("");
+                    }}
+                  />
+                  <span className={styles.packageName}>
+                    {item.name}
+                    {/* Owners don't see it in «Подписка», but it can still be sold. */}
+                    {!item.isPublic && <small>скрыт от владельцев</small>}
+                  </span>
+                  <span className={styles.packagePrice}>{item.price ? formatMoney(item.price) : "бесплатно"}</span>
+                </label>
+              ))}
+            </fieldset>
+          ) : (
+            <p className={styles.label}>Пакетов нет — добавьте их в «Тарифах и ценах».</p>
+          )}
+        </div>
       )}
-      <div className={styles.row}>
-        <Field label="Сумма, ₽" hint={picked ? `Цена пакета — ${formatMoney(picked.price)}` : undefined} error={error} required>
-          <Input
-            inputMode="numeric"
-            placeholder="200"
-            value={shownAmount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              setAmountTouched(true);
-              setError("");
-            }}
-          />
-        </Field>
-        <Field label="Способ">
-          <Select value={method} onChange={(value) => setMethod(value as PaymentMethod)} options={methodOptions} />
-        </Field>
-      </div>
-      <Field label="Чек" hint="Ссылка на чек из «Мой налог» или номер чека. Можно добавить позже в «Оплатах».">
-        <Input value={receipt} onChange={(e) => setReceipt(e.target.value)} placeholder="https://lknpd.nalog.ru/…" />
+      <Field label="Сумма, ₽" hint={picked ? `Цена пакета — ${formatMoney(picked.price)}. 0 — в подарок.` : undefined} error={error} required>
+        <Input
+          inputMode="numeric"
+          placeholder="200"
+          value={shownAmount}
+          onChange={(e) => {
+            setAmount(e.target.value);
+            setAmountTouched(true);
+            setError("");
+          }}
+        />
       </Field>
-      <Field label="Комментарий" hint="Видно только в админке">
-        <Textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
-      </Field>
+      <PaymentDetails value={details} onChange={setDetails} />
       {picked && (
         <p className={styles.preview}>
           {picked.previews || picked.fills ? (

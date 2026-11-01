@@ -1,0 +1,90 @@
+.list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/*
+ * A store: name, address and owner; status and plan; «Продлить», «Пакет» and
+ * «⋮» with the rest. On a wide screen one line, on a phone three.
+ */
+.store {
+  display: grid;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-muted);
+  background: var(--color-surface-muted);
+}
+
+.text {
+  display: grid;
+  min-width: 0;
+}
+
+.text strong,
+.text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text strong {
+  color: var(--color-ink);
+  font-weight: var(--font-weight-semibold);
+}
+
+.text small {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-sm);
+}
+
+.text a {
+  color: inherit;
+}
+
+.text a:hover {
+  color: var(--color-accent);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (min-width: 900px) {
+  .store {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .badges {
+    justify-content: flex-end;
+  }
+}

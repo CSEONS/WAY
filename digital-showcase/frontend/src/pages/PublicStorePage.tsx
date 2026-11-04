@@ -35,7 +35,8 @@ type Sort = (typeof SORTS)[number];
 /** Everything that picks which products are shown. Lives in the URL, so a filtered link can be shared. */
 interface Query {
   q: string;
-  category: string;
+  /** Products of any of these; none — all. */
+  category: string[];
   size: string;
   color: string;
   sort: Sort;
@@ -46,7 +47,7 @@ function readQuery(params: URLSearchParams): Query {
   const sort = params.get("sort");
   return {
     q: params.get("q") ?? "",
-    category: params.get("category") ?? "",
+    category: params.getAll("category").filter(Boolean),
     size: params.get("size") ?? "",
     color: params.get("color") ?? "",
     sort: SORTS.find((value) => value === sort) ?? "new",
@@ -120,14 +121,16 @@ export function PublicStorePage() {
         const res = await api.get<Product[]>(`/public/stores/${storeSlug}/products`, {
           params: {
             q: query.q || undefined,
-            category: query.category || undefined,
+            category: query.category.length ? query.category : undefined,
             size: query.size || undefined,
             color: query.color || undefined,
             sort: query.sort,
             ids: query.favorites ? favoriteIds : undefined,
             limit: PAGE_SIZE,
             offset
-          }
+          },
+          // ?category=Платья&category=Обувь, not category[]=…
+          paramsSerializer: { indexes: null }
         });
         if (id !== requestId.current) return;
         const total = Number(res.headers["x-total-count"] ?? res.data.length);
@@ -160,8 +163,9 @@ export function PublicStorePage() {
           const next = new URLSearchParams(current);
           for (const [field, value] of Object.entries(patch)) {
             const name = field === "favorites" ? "fav" : field;
-            if (!value || (field === "sort" && value === "new")) next.delete(name);
-            else next.set(name, value === true ? "1" : String(value));
+            next.delete(name);
+            if (Array.isArray(value)) value.forEach((item) => next.append(name, item));
+            else if (value && !(field === "sort" && value === "new")) next.set(name, value === true ? "1" : String(value));
           }
           return next;
         },
@@ -208,12 +212,12 @@ export function PublicStorePage() {
   const sizes = sortSizes(facets?.sizes ?? []);
   const colors = facets?.colors ?? [];
   const filterCount = [query.size, query.color].filter(Boolean).length;
-  const isFiltered = Boolean(query.q || query.category || filterCount);
+  const isFiltered = Boolean(query.q || query.category.length || filterCount);
   const favoriteCount = favorites.ids.length;
 
   function resetAll() {
     setSearch("");
-    updateQuery({ q: "", category: "", size: "", color: "", favorites: false });
+    updateQuery({ q: "", category: [], size: "", color: "", favorites: false });
   }
 
   return (
@@ -244,7 +248,7 @@ export function PublicStorePage() {
                 Фильтры
               </Chip>
             )}
-            <Chip selected={!query.category && !query.favorites} onClick={() => updateQuery({ category: "", favorites: false })}>
+            <Chip selected={!query.category.length && !query.favorites} onClick={() => updateQuery({ category: [], favorites: false })}>
               Все
             </Chip>
             {(favoriteCount > 0 || query.favorites) && (
@@ -253,7 +257,7 @@ export function PublicStorePage() {
                 count={favoriteCount}
                 selected={query.favorites}
                 className={styles.favoritesChip}
-                onClick={() => updateQuery({ favorites: !query.favorites, category: "" })}
+                onClick={() => updateQuery({ favorites: !query.favorites, category: [] })}
               >
                 Избранное
               </Chip>
@@ -261,8 +265,13 @@ export function PublicStorePage() {
             {categories.map((category) => (
               <Chip
                 key={category}
-                selected={query.category === category}
-                onClick={() => updateQuery({ category: query.category === category ? "" : category, favorites: false })}
+                selected={query.category.includes(category)}
+                onClick={() =>
+                  updateQuery({
+                    category: query.category.includes(category) ? query.category.filter((chosen) => chosen !== category) : [...query.category, category],
+                    favorites: false
+                  })
+                }
               >
                 {category}
               </Chip>

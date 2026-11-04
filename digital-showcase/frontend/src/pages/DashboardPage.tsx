@@ -56,6 +56,7 @@ import {
   LoadingState,
   Menu,
   Modal,
+  MultiSelect,
   Notice,
   Page,
   PageHeader,
@@ -238,7 +239,8 @@ export function DashboardPage() {
   const [productsState, setProductsState] = useState<"loading" | "ready" | "error">("loading");
   const [search, setSearch] = useState("");
   const [listFilter, setListFilter] = useState<ListFilter>("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  // Products of any of the chosen categories; none chosen — all.
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sort, setSort] = useState("new");
   const [view, setView] = useState<SectionView>("products");
   const [isStatsHelpOpen, setIsStatsHelpOpen] = useState(false);
@@ -263,7 +265,7 @@ export function DashboardPage() {
   const addingAllowed = canAddProducts(subscription);
 
   const categories = useMemo(
-    () => [...new Set(products.map((product) => product.category).filter((category): category is string => Boolean(category)))],
+    () => [...new Set(products.flatMap((product) => product.categories).filter(Boolean))],
     [products]
   );
 
@@ -273,7 +275,7 @@ export function DashboardPage() {
       (product) =>
         (!query || product.title.toLowerCase().includes(query)) &&
         filterMatchers[listFilter](product) &&
-        (categoryFilter === "all" || product.category === categoryFilter)
+        (!categoryFilter.length || product.categories.some((category) => categoryFilter.includes(category)))
     );
 
     const updatedAt = (product: Product) => new Date(product.updatedAt ?? product.createdAt).getTime();
@@ -676,12 +678,14 @@ export function DashboardPage() {
                 ]}
               />
               {categories.length > 0 && (
-                <Select
-                  ariaLabel="Категория"
+                <MultiSelect
+                  ariaLabel="Категории"
                   value={categoryFilter}
                   onChange={setCategoryFilter}
                   className={styles.category}
-                  options={[{ value: "all", label: "Все категории" }, ...categories.map((category) => ({ value: category, label: category }))]}
+                  allLabel="Все категории"
+                  countLabel={(count) => `Категории: ${count}`}
+                  options={categories.map((category) => ({ value: category, label: category }))}
                 />
               )}
             </div>

@@ -44,7 +44,12 @@ export function readSavedDraft(draftKey?: string): SavedProductFormDraft | null 
   if (!draftKey) return null;
   try {
     const value = localStorage.getItem(draftKey);
-    return value ? (JSON.parse(value) as SavedProductFormDraft) : null;
+    if (!value) return null;
+    const draft = JSON.parse(value) as SavedProductFormDraft;
+    // Drafts saved before several categories kept one, as `category`.
+    const old = draft.form as SavedProductFormDraft["form"] & { category?: string };
+    if (!Array.isArray(old.categories)) draft.form = { ...old, categories: old.category?.trim() ? [old.category.trim()] : [] };
+    return draft;
   } catch {
     return null;
   }
@@ -54,7 +59,7 @@ export function hasDraftContent(draft: SavedProductFormDraft) {
   return (
     draft.form.title.trim() ||
     draft.form.description.trim() ||
-    draft.form.category.trim() ||
+    draft.form.categories.length ||
     draft.simple?.price.trim() ||
     draft.simple?.sizes.length ||
     draft.simple?.colors.length ||

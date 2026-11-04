@@ -4,7 +4,8 @@ import type { PriceRow, SimpleDetails, VariantPrices } from "./simple";
 export interface ProductFormState {
   title: string;
   description: string;
-  category: string;
+  /** Several may be chosen; the first one goes to the AI and the preview. */
+  categories: string[];
   status: ProductStatus;
   isVisible: number;
 }
@@ -28,6 +29,8 @@ export interface ProductPayload {
   price: number | null;
   priceText: string | null;
   category: string | null;
+  /** Sent by the form; the AI answers with `category` alone. */
+  categories?: string[];
   status: ProductStatus;
   isVisible: number;
   sizes: string[];

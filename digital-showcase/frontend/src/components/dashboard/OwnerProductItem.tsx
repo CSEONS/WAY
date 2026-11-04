@@ -68,7 +68,7 @@ export function OwnerProductItem({ product, storeId, storeSlug, onUpdated, onEdi
     <div className={styles.body}>
       {title}
       <span className={styles.price}>{productPrice(product)}</span>
-      {product.category && <span className={styles.category}>{product.category}</span>}
+      {product.categories.length > 0 && <span className={styles.category}>{product.categories.join(", ")}</span>}
       {badges}
     </div>
   );

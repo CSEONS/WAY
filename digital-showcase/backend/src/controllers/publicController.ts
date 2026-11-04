@@ -42,11 +42,17 @@ const MAX_PAGE_SIZE = 60;
  * `ids` (comma-separated, for favorites) and `limit`/`offset` paging.
  * The total for the same filters is in the X-Total-Count header.
  */
+function queryList(value: unknown) {
+  const list = (Array.isArray(value) ? value : value === undefined ? [] : [value]).map(String).filter(Boolean).slice(0, 50);
+  return list.length ? list : undefined;
+}
+
 export const listProducts = asyncHandler(async (req, res) => {
   const store = await publicStore(String(req.params.slug));
   const filters: productService.ProductFilters = {
     q: req.query.q?.toString() || undefined,
-    category: req.query.category?.toString() || undefined,
+    // ?category=Платья&category=Обувь — products of any of them.
+    category: queryList(req.query.category),
     size: req.query.size?.toString() || undefined,
     color: req.query.color?.toString() || undefined,
     ids: req.query.ids !== undefined ? String(req.query.ids).split(",").filter(Boolean).slice(0, 200) : undefined

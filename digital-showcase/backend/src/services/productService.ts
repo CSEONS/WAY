@@ -30,25 +30,28 @@ async function enrichMany(products: Product[], publicOnly = false): Promise<Prod
   const db = await getDb();
   const ids = products.map((product) => product.id);
   const inList = ids.map(() => "?").join(", ");
-  const [images, sizes, colors, variants] = await Promise.all([
+  const [images, sizes, colors, variants, categories] = await Promise.all([
     db.all<ProductImage>(
       `SELECT * FROM product_images WHERE productId IN (${inList}) ${publicOnly ? `AND ${visibleToBuyers("product_images.url")}` : ""} ORDER BY sortOrder, createdAt`,
       ids
     ),
     db.all<ProductSize>(`SELECT * FROM product_sizes WHERE productId IN (${inList}) ORDER BY value`, ids),
     db.all<ProductColor>(`SELECT * FROM product_colors WHERE productId IN (${inList}) ORDER BY name`, ids),
-    db.all<ProductVariant>(`SELECT * FROM product_variants WHERE productId IN (${inList}) ORDER BY colorName, size`, ids)
+    db.all<ProductVariant>(`SELECT * FROM product_variants WHERE productId IN (${inList}) ORDER BY colorName, size`, ids),
+    db.all<{ productId: string; name: string }>(`SELECT productId, name FROM product_categories WHERE productId IN (${inList}) ORDER BY sortOrder`, ids)
   ]);
   const imagesBy = groupByProduct(images);
   const sizesBy = groupByProduct(sizes);
   const colorsBy = groupByProduct(colors);
   const variantsBy = groupByProduct(variants);
+  const categoriesBy = groupByProduct(categories);
   if (!publicOnly) {
     const moderation = await moderationOf(images.map((image) => image.url));
     for (const image of images) image.moderation = moderation.get(image.url) ?? null;
   }
   return products.map((product) => ({
     ...product,
+    categories: categoriesBy.get(product.id)?.map((row) => row.name) ?? (product.category ? [product.category] : []),
     images: imagesBy.get(product.id) ?? [],
     sizes: sizesBy.get(product.id) ?? [],
     colors: colorsBy.get(product.id) ?? [],
@@ -65,7 +68,8 @@ export type ProductSort = "new" | "price-asc" | "price-desc";
 
 export interface ProductFilters {
   q?: string;
-  category?: string;
+  /** Products in any of these categories. */
+  category?: string[];
   size?: string;
   color?: string;
   /** Only these products (the buyer's favorites). */
@@ -87,7 +91,7 @@ function productWhere(storeId: string, publicOnly: boolean, filters: ProductFilt
   if (publicOnly) where.push("p.isVisible = 1 AND p.blockedAt IS NULL");
   if (filters.q) {
     // ulower(): Unicode-aware lower(); SQLite's own LOWER() ignores Cyrillic.
-    where.push("(ulower(p.title) LIKE ? OR ulower(p.category) LIKE ?)");
+    where.push("(ulower(p.title) LIKE ? OR EXISTS (SELECT 1 FROM product_categories pc WHERE pc.productId = p.id AND ulower(pc.name) LIKE ?))");
     const pattern = `%${filters.q.toLowerCase()}%`;
     params.push(pattern, pattern);
   }
@@ -98,9 +102,9 @@ function productWhere(storeId: string, publicOnly: boolean, filters: ProductFilt
       params.push(...filters.ids);
     }
   }
-  if (filters.category) {
-    where.push("p.category = ?");
-    params.push(filters.category);
+  if (filters.category?.length) {
+    where.push(`EXISTS (SELECT 1 FROM product_categories pc WHERE pc.productId = p.id AND pc.name IN (${filters.category.map(() => "?").join(", ")}))`);
+    params.push(...filters.category);
   }
   if (filters.size) {
     where.push("(EXISTS (SELECT 1 FROM product_sizes s WHERE s.productId = p.id AND s.value = ?) OR EXISTS (SELECT 1 FROM product_variants v WHERE v.productId = p.id AND v.size = ?))");
@@ -136,19 +140,19 @@ export async function countProducts(storeId: string, publicOnly = false, filters
 /** Categories the store has given its products, hidden ones too — the most used first: the form offers them as buttons. */
 export async function listStoreCategories(storeId: string) {
   const db = await getDb();
-  const rows = await db.all<{ category: string }>(
-    "SELECT category FROM products WHERE storeId = ? AND category IS NOT NULL AND TRIM(category) != '' GROUP BY category ORDER BY COUNT(*) DESC, category",
+  const rows = await db.all<{ name: string }>(
+    "SELECT pc.name FROM product_categories pc JOIN products p ON p.id = pc.productId WHERE p.storeId = ? AND TRIM(pc.name) != '' GROUP BY pc.name ORDER BY COUNT(*) DESC, pc.name",
     storeId
   );
-  return rows.map((row) => row.category);
+  return rows.map((row) => row.name);
 }
 
 /** Filter options of a storefront: categories, sizes and colors of its visible products. */
 export async function listFacets(storeId: string) {
   const db = await getDb();
   const [categories, sizes, colors] = await Promise.all([
-    db.all<{ category: string }>(
-      "SELECT DISTINCT category FROM products WHERE storeId = ? AND isVisible = 1 AND blockedAt IS NULL AND category IS NOT NULL AND category != '' ORDER BY category",
+    db.all<{ name: string }>(
+      "SELECT DISTINCT pc.name FROM product_categories pc JOIN products p ON p.id = pc.productId WHERE p.storeId = ? AND p.isVisible = 1 AND p.blockedAt IS NULL AND pc.name != '' ORDER BY pc.name",
       storeId
     ),
     db.all<{ value: string }>(
@@ -161,7 +165,7 @@ export async function listFacets(storeId: string) {
     )
   ]);
   return {
-    categories: categories.map((row) => row.category),
+    categories: categories.map((row) => row.name),
     sizes: sizes.map((row) => row.value),
     colors: colors.map((row) => ({ name: row.name, hex: row.hex }))
   };
@@ -191,6 +195,35 @@ async function replaceDetails(productId: string, sizes?: string[], colors?: { na
     }
   }
 }
+
+/**
+ * The categories asked for: `categories` when given, else `category` alone;
+ * undefined — neither was given, the product keeps its own. Trimmed, without
+ * empty ones and repeats («Сумки» and «сумки» are one).
+ */
+function categoriesOf(input: { category?: string | null; categories?: string[] }) {
+  const asked = input.categories ?? (Object.prototype.hasOwnProperty.call(input, "category") ? [input.category ?? ""] : undefined);
+  if (!asked) return undefined;
+  const seen = new Set<string>();
+  return asked
+    .map((name) => name.trim().replace(/\s+/g, " "))
+    .filter((name) => {
+      const key = name.toLowerCase().replace(/ё/g, "е");
+      if (!name || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+async function replaceCategories(productId: string, categories: string[]) {
+  const db = await getDb();
+  await db.run("DELETE FROM product_categories WHERE productId = ?", productId);
+  for (const [index, name] of categories.entries()) {
+    await db.run("INSERT INTO product_categories (id, productId, name, sortOrder) VALUES (?, ?, ?, ?)", crypto.randomUUID(), productId, name, index);
+  }
+}
+
+type CategoriesInput = { categories?: string[] };
 
 function normalizeVariants(variants?: ProductVariantInput[]) {
   return variants
@@ -233,7 +266,8 @@ async function replaceVariants(productId: string, variants?: ProductVariantInput
 }
 
 export async function createProduct(
-  input: Partial<Product> & {
+  input: Partial<Product> &
+    CategoriesInput & {
     storeId: string;
     title: string;
     sizes?: string[];
@@ -244,6 +278,7 @@ export async function createProduct(
   const db = await getDb();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
+  const categories = categoriesOf(input) ?? [];
   await db.run(
     `INSERT INTO products (id, storeId, title, description, price, priceText, category, status, isVisible, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -253,12 +288,13 @@ export async function createProduct(
     input.description ?? null,
     input.price ?? null,
     input.priceText ?? null,
-    input.category ?? null,
+    categories[0] ?? null,
     input.status ?? "AVAILABLE",
     input.isVisible ?? 1,
     now,
     now
   );
+  await replaceCategories(id, categories);
   if (input.variants) await replaceVariants(id, input.variants, input.sizes, input.colors);
   else await replaceDetails(id, input.sizes, input.colors);
   return getProduct(id);
@@ -267,24 +303,26 @@ export async function createProduct(
 export async function updateProduct(
   id: string,
   storeId: string,
-  input: Partial<Product> & { sizes?: string[]; colors?: { name: string; hex?: string | null }[]; variants?: ProductVariantInput[] }
+  input: Partial<Product> & CategoriesInput & { sizes?: string[]; colors?: { name: string; hex?: string | null }[]; variants?: ProductVariantInput[] }
 ) {
   const current = await getProduct(id, storeId);
   if (!current) return null;
   const db = await getDb();
+  const categories = categoriesOf(input);
   await db.run(
     `UPDATE products SET title = ?, description = ?, price = ?, priceText = ?, category = ?, status = ?, isVisible = ?, updatedAt = ? WHERE id = ? AND storeId = ?`,
     input.title ?? current.title,
     productField(input, "description", current.description),
     productField(input, "price", current.price),
     productField(input, "priceText", current.priceText),
-    productField(input, "category", current.category),
+    categories ? categories[0] ?? null : current.category,
     input.status ?? current.status,
     input.isVisible ?? current.isVisible,
     new Date().toISOString(),
     id,
     storeId
   );
+  if (categories) await replaceCategories(id, categories);
   if (input.variants) await replaceVariants(id, input.variants, input.sizes, input.colors);
   else await replaceDetails(id, input.sizes, input.colors);
   return getProduct(id, storeId);

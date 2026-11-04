@@ -15,7 +15,7 @@ export { ConfirmModal, Modal, type ConfirmModalProps, type ModalProps } from "./
 export { Notice, type NoticeProps, type NoticeTone } from "./Notice";
 export { ProgressBar } from "./ProgressBar";
 export { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
-export { Select, type SelectOption, type SelectProps } from "./Select";
+export { MultiSelect, Select, type MultiSelectProps, type SelectOption, type SelectProps } from "./Select";
 export { Spinner } from "./Spinner";
 export { EmptyState, ErrorState, LoadingState, type EmptyStateProps, type ErrorStateProps } from "./States";
 export { Switch, type SwitchProps } from "./Switch";

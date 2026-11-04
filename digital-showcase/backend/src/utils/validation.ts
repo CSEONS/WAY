@@ -161,6 +161,8 @@ const productFields = {
   price,
   priceText: optionalText(100),
   category: optionalText(100),
+  /** Several categories; when given, `category` is ignored and becomes the first of them. */
+  categories: z.array(text(100)).max(20).optional(),
   status: z.enum(["AVAILABLE", "NOT_AVAILABLE", "CHECK_IN_STORE"]).optional(),
   isVisible: flag.optional(),
   // Empty sizes and color names are skipped by the service, so they are allowed here.

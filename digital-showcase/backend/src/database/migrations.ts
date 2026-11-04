@@ -714,6 +714,27 @@ export const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS push_subscriptions_user ON push_subscriptions(userId, updatedAt);
       `);
     }
+  },
+  {
+    version: 25,
+    name: "several categories per product",
+    // A product may be in several categories now («Платья» and «Новинки»). products.category
+    // stays and keeps the first of them: the AI and the previews read one category.
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS product_categories (
+          id TEXT PRIMARY KEY,
+          productId TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          sortOrder INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS product_categories_product ON product_categories(productId, sortOrder);
+        CREATE INDEX IF NOT EXISTS product_categories_name ON product_categories(name);
+      `);
+      const rows = db.prepare("SELECT id, category FROM products WHERE category IS NOT NULL AND TRIM(category) != ''").all() as { id: string; category: string }[];
+      const insert = db.prepare("INSERT INTO product_categories (id, productId, name, sortOrder) VALUES (?, ?, ?, 0)");
+      for (const row of rows) insert.run(crypto.randomUUID(), row.id, row.category.trim());
+    }
   }
 ];
 

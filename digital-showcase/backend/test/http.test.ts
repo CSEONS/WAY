@@ -99,6 +99,36 @@ test("свои категории магазина — для кнопок в ф
   assert.equal((await call("GET", `/api/owner/stores/${storeB.id}/categories`, { token })).status, 404);
 });
 
+test("у товара несколько категорий: сохраняются по порядку, фильтр витрины по любой из выбранных", async () => {
+  const token = await login("+79280000011", "password-a");
+  const created = await call("POST", `/api/owner/stores/${storeA.id}/products`, {
+    token,
+    body: { title: "Сарафан", categories: [" Платья ", "Новинки", "платья", ""] }
+  });
+  assert.equal(created.status, 201);
+  assert.deepEqual(created.data.categories, ["Платья", "Новинки"]);
+  assert.equal(created.data.category, "Платья");
+  await createProduct({ storeId: storeA.id, title: "Кеды", category: "Обувь" });
+  await createProduct({ storeId: storeA.id, title: "Шапка", categories: ["Аксессуары"] });
+
+  const titles = async (query: string) =>
+    (await call("GET", `/api/public/stores/shop-a/products?${query}`)).data.map((product: { title: string }) => product.title).sort();
+  assert.deepEqual(await titles("category=Новинки"), ["Сарафан"]);
+  assert.deepEqual(await titles(`category=${encodeURIComponent("Новинки")}&category=${encodeURIComponent("Обувь")}`), ["Кеды", "Сарафан"]);
+  const filters = await call("GET", "/api/public/stores/shop-a/filters");
+  assert.ok(["Аксессуары", "Новинки", "Обувь", "Платья"].every((name) => filters.data.categories.includes(name)));
+
+  // Only `category` — the old way: one category instead of all.
+  const updated = await call("PATCH", `/api/owner/stores/${storeA.id}/products/${created.data.id}`, { token, body: { category: "Сарафаны" } });
+  assert.deepEqual(updated.data.categories, ["Сарафаны"]);
+  // Neither given — categories stay.
+  const kept = await call("PATCH", `/api/owner/stores/${storeA.id}/products/${created.data.id}`, { token, body: { title: "Сарафан льняной" } });
+  assert.deepEqual(kept.data.categories, ["Сарафаны"]);
+  const cleared = await call("PATCH", `/api/owner/stores/${storeA.id}/products/${created.data.id}`, { token, body: { categories: [] } });
+  assert.deepEqual(cleared.data.categories, []);
+  assert.equal(cleared.data.category, null);
+});
+
 test("владелец не попадает в админку", async () => {
   const token = await login("+79280000011", "password-a");
   assert.equal((await call("GET", "/api/admin/stores", { token })).status, 403);

@@ -159,7 +159,10 @@ export interface Product {
   description: string | null;
   price: number | null;
   priceText: string | null;
+  /** The first of `categories`. */
   category: string | null;
+  /** Every category of the product, in the owner's order. */
+  categories: string[];
   status: ProductStatus;
   isVisible: number;
   /** Taken off the storefront by the admin after a photo check; buyers don't see it. */

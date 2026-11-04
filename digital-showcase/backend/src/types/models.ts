@@ -99,6 +99,8 @@ export interface ProductVariant {
 }
 
 export interface ProductFull extends Product {
+  /** Every category of the product in the owner's order; `category` is the first of them. */
+  categories: string[];
   images: ProductImage[];
   sizes: ProductSize[];
   colors: ProductColor[];

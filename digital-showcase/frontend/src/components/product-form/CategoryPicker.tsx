@@ -4,8 +4,9 @@ import { Button, Chip, ChipGroup, Field, Input, Modal } from "../../ui";
 import { CATEGORY_PRESETS } from "./simple";
 
 interface CategoryPickerProps {
-  value: string;
-  onChange: (category: string) => void;
+  /** The chosen categories, in the order they were tapped. */
+  value: string[];
+  onChange: (categories: string[]) => void;
   /** Categories the store already gave its products, the most used first. */
   storeCategories: string[];
   /** The label with its «ИИ» mark. */
@@ -17,7 +18,7 @@ interface CategoryPickerProps {
 const categoryKey = (category: string) => category.trim().toLowerCase().replace(/ё/g, "е");
 
 /**
- * «Категория»: tap one — the usual ones, the store's own, the one the AI
+ * «Категории»: tap any number — the usual ones, the store's own, the one the AI
  * suggested — or «Своя категория», like «Свой размер». A category given once
  * comes back as a button for the store's next products.
  */
@@ -25,7 +26,7 @@ export function CategoryPicker({ value, onChange, storeCategories, label, action
   const [isAdding, setIsAdding] = useState(false);
   const [name, setName] = useState("");
   const seen = new Set<string>();
-  const chips = [...CATEGORY_PRESETS, ...storeCategories, value].filter((category) => {
+  const chips = [...CATEGORY_PRESETS, ...storeCategories, ...value].filter((category) => {
     const key = categoryKey(category);
     if (!key || seen.has(key)) return false;
     seen.add(key);
@@ -36,16 +37,25 @@ export function CategoryPicker({ value, onChange, storeCategories, label, action
     event.preventDefault();
     const typed = name.trim().replace(/\s+/g, " ");
     // «сумки» when «Сумки» is there already: the existing one.
-    if (typed) onChange(chips.find((category) => categoryKey(category) === categoryKey(typed)) ?? typed);
+    const category = typed && (chips.find((chip) => categoryKey(chip) === categoryKey(typed)) ?? typed);
+    if (category && !isChosen(category)) onChange([...value, category]);
     setName("");
     setIsAdding(false);
   }
 
+  function isChosen(category: string) {
+    return value.some((chosen) => categoryKey(chosen) === categoryKey(category));
+  }
+
+  function toggle(category: string) {
+    onChange(isChosen(category) ? value.filter((chosen) => categoryKey(chosen) !== categoryKey(category)) : [...value, category]);
+  }
+
   return (
-    <Field label={label} action={action}>
-      <ChipGroup label="Категория">
+    <Field label={label} action={action} hint="Можно выбрать несколько — товар найдут в каждой">
+      <ChipGroup label="Категории">
         {chips.map((category) => (
-          <Chip key={category} selected={value === category} onClick={() => onChange(value === category ? "" : category)}>
+          <Chip key={category} selected={isChosen(category)} onClick={() => toggle(category)}>
             {category}
           </Chip>
         ))}

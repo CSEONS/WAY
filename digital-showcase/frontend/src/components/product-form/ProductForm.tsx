@@ -106,7 +106,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
     savedDraft?.form ?? {
       title: initial?.title ?? "",
       description: initial?.description ?? "",
-      category: initial?.category ?? "",
+      categories: initial?.categories ?? (initial?.category ? [initial.category] : []),
       status: initial?.status ?? "AVAILABLE",
       isVisible: initial?.isVisible ?? 1
     }
@@ -176,7 +176,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       ...current,
       title: draft.title ?? current.title,
       description: draft.description ?? current.description,
-      category: draft.category ?? current.category,
+      categories: draft.category?.trim() ? [draft.category.trim()] : current.categories,
       status: draft.status ?? current.status,
       isVisible: draft.isVisible ?? current.isVisible
     }));
@@ -215,7 +215,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   function drawAutoPreview(draft: ProductDraft, colors: SimpleDetailsValue["colors"]) {
     const photo = imageManager.previewImage;
     if (!aiPreviewPath || !photo || previewDrawing.isDrawing || previewDrawing.results.length) return false;
-    const product = { title: draft.title ?? form.title, category: draft.category ?? form.category, colors };
+    const product = { title: draft.title ?? form.title, category: draft.category ?? form.categories[0] ?? "", colors };
     void previewDrawing.draw(previewRequest(photo, readPreviewOptions(), product), photo.id);
     return true;
   }
@@ -224,7 +224,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   const hasOwnerDetails = Boolean(
     form.title.trim() ||
       form.description.trim() ||
-      form.category.trim() ||
+      form.categories.length ||
       simple.sizes.length ||
       simple.colors.length
   );
@@ -256,7 +256,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
 
   /** «Вручную + ИИ»: one field from the photos and what the owner already typed. */
   async function fillField(field: AiDraftField) {
-    const known = { title: form.title, description: form.description, category: form.category };
+    const known = { title: form.title, description: form.description, category: form.categories.join(", ") };
     const hasOtherText = (Object.keys(known) as (keyof typeof known)[]).some((key) => key !== field && known[key].trim());
     if (!imageManager.images.length && !hasOtherText) {
       toast.show("Сначала добавьте фото товара — по нему ИИ заполнит поле");
@@ -279,6 +279,15 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       const { colors } = detailsFromDraft({ ...draft, variants: [] }).simple;
       if (!colors.length) return false;
       setSimple((current) => ({ ...current, colors }));
+    } else if (field === "category") {
+      const value = draft.category?.trim();
+      if (!value) return false;
+      // Added to the chosen ones, not instead of them.
+      setForm((current) => {
+        const key = value.toLowerCase().replace(/ё/g, "е");
+        const has = current.categories.some((category) => category.toLowerCase().replace(/ё/g, "е") === key);
+        return has ? current : { ...current, categories: [...current.categories, value] };
+      });
     } else {
       const value = draft[field]?.trim();
       if (!value) return false;
@@ -334,7 +343,8 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
       {
         title: form.title,
         description: form.description || null,
-        category: form.category || null,
+        category: form.categories[0] ?? null,
+        categories: form.categories,
         status: form.status as ProductStatus,
         isVisible: Number(form.isVisible),
         ...(mode === "simple" ? simplePayload(simple) : variantPayload(simple, variantPrices))
@@ -443,12 +453,15 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
               <Textarea value={form.description} onChange={(e) => updateForm({ description: e.target.value })} placeholder="Ткань, посадка, уход" />
             </Field>
             <CategoryPicker
-              value={form.category}
-              onChange={(category) => updateForm({ category })}
+              value={form.categories}
+              onChange={(categories) => {
+                setForm((current) => ({ ...current, categories }));
+                editedByOwner("category");
+              }}
               storeCategories={storeCategories}
               label={
                 <>
-                  Категория <AiBadge show={aiFilled.has("category")} />
+                  Категории <AiBadge show={aiFilled.has("category")} />
                 </>
               }
               action={aiAction("category")}
@@ -491,7 +504,7 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
           coverId={imageManager.previewImageId}
           product={{
             title: form.title,
-            category: form.category,
+            category: form.categories[0] ?? "",
             colors: simple.colors
           }}
           onClose={() => setIsPreviewOpen(false)}

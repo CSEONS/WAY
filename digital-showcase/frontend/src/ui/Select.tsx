@@ -24,14 +24,70 @@ export interface SelectProps {
   className?: string;
 }
 
-export function Select({ value, onChange, options, ariaLabel, placeholder, disabled, id, menuAlign = "start", className }: SelectProps) {
+export function Select({ value, onChange, options, ...rest }: SelectProps) {
+  const selected = options.find((option) => option.value === value);
+  return (
+    <SelectBase
+      {...rest}
+      options={options}
+      isSelected={(option) => option.value === value}
+      onPick={(option) => {
+        onChange(option.value);
+        return true;
+      }}
+      triggerLabel={selected?.label}
+    />
+  );
+}
+
+export interface MultiSelectProps extends Omit<SelectProps, "value" | "onChange" | "placeholder"> {
+  value: string[];
+  onChange: (value: string[]) => void;
+  /** The first option, it clears the choice: «Все категории». Also the trigger's text while nothing is chosen. */
+  allLabel: string;
+  /** The trigger's text for several chosen: «Категории: 2». */
+  countLabel: (count: number) => string;
+}
+
+const ALL = "\u0000all";
+
+/** Like Select, but options are ticked on and off and the list stays open. */
+export function MultiSelect({ value, onChange, options, allLabel, countLabel, ...rest }: MultiSelectProps) {
+  const chosen = options.filter((option) => value.includes(option.value));
+  return (
+    <SelectBase
+      {...rest}
+      multiple
+      options={[{ value: ALL, label: allLabel }, ...options]}
+      isSelected={(option) => (option.value === ALL ? chosen.length === 0 : value.includes(option.value))}
+      onPick={(option) => {
+        if (option.value === ALL) {
+          onChange([]);
+          return true;
+        }
+        onChange(value.includes(option.value) ? value.filter((item) => item !== option.value) : [...value, option.value]);
+        return false;
+      }}
+      triggerLabel={chosen.length === 0 ? allLabel : chosen.length === 1 ? chosen[0].label : countLabel(chosen.length)}
+    />
+  );
+}
+
+interface SelectBaseProps extends Omit<SelectProps, "value" | "onChange"> {
+  multiple?: boolean;
+  isSelected: (option: SelectOption) => boolean;
+  /** True — the list closes. */
+  onPick: (option: SelectOption) => boolean;
+  triggerLabel?: string;
+}
+
+function SelectBase({ options, ariaLabel, placeholder, disabled, id, menuAlign = "start", className, multiple, isSelected, onPick, triggerLabel }: SelectBaseProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const control = useFieldControl({ id });
-  const selected = options.find((option) => option.value === value);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,7 +102,7 @@ export function Select({ value, onChange, options, ariaLabel, placeholder, disab
   }, [isOpen]);
 
   function openList() {
-    setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
+    setActiveIndex(Math.max(0, options.findIndex(isSelected)));
     setIsOpen(true);
   }
 
@@ -56,8 +112,7 @@ export function Select({ value, onChange, options, ariaLabel, placeholder, disab
   }
 
   function selectOption(option: SelectOption) {
-    onChange(option.value);
-    closeList();
+    if (onPick(option)) closeList();
   }
 
   function onTriggerKeyDown(event: KeyboardEvent) {
@@ -100,24 +155,32 @@ export function Select({ value, onChange, options, ariaLabel, placeholder, disab
         onClick={() => (isOpen ? setIsOpen(false) : openList())}
         onKeyDown={onTriggerKeyDown}
       >
-        <span className={cx(styles.value, !selected && styles.placeholder)}>{selected?.label ?? placeholder ?? ""}</span>
+        <span className={cx(styles.value, !triggerLabel && styles.placeholder)}>{triggerLabel ?? placeholder ?? ""}</span>
         <Icon icon={ArrowDown01Icon} size="sm" className={styles.chevron} />
       </button>
       {isOpen && (
-        <ul className={styles.popup} role="listbox" aria-label={ariaLabel} tabIndex={-1} ref={listRef} onKeyDown={onListKeyDown}>
+        <ul
+          className={styles.popup}
+          role="listbox"
+          aria-label={ariaLabel}
+          aria-multiselectable={multiple || undefined}
+          tabIndex={-1}
+          ref={listRef}
+          onKeyDown={onListKeyDown}
+        >
           {options.map((option, index) => {
-            const isSelected = option.value === value;
+            const selected = isSelected(option);
             return (
               <li
                 key={option.value}
                 role="option"
-                aria-selected={isSelected}
-                className={cx(styles.option, index === activeIndex && styles.active, isSelected && styles.selected)}
+                aria-selected={selected}
+                className={cx(styles.option, index === activeIndex && styles.active, selected && styles.selected)}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => selectOption(option)}
               >
                 <span>{option.label}</span>
-                {isSelected && <Icon icon={Tick02Icon} size="sm" />}
+                {selected && <Icon icon={Tick02Icon} size="sm" />}
               </li>
             );
           })}

@@ -60,7 +60,7 @@ export function ProductCard({ product, slug, favorite = false, onToggleFavorite 
         <div className={styles.body}>
           <h3 className={styles.title}>{product.title}</h3>
           <p className={styles.price}>{priceText}</p>
-          <small className={styles.category}>{product.category || "Без категории"}</small>
+          <small className={styles.category}>{product.categories.join(", ") || "Без категории"}</small>
           <div className={styles.meta}>
             {sortSizes(product.sizes.map((size) => size.value)).map((size) => (
               <Badge key={size}>{size}</Badge>

@@ -1,9 +1,10 @@
 import { LockKeyIcon } from "@hugeicons/core-free-icons";
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { User } from "../types/models";
 import { Button, Field, Icon, Input, Notice, PasswordInput } from "../ui";
+import { pathAfterLogin } from "../utils/loginRedirect";
 import styles from "./LoginPage.module.css";
 
 export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
@@ -12,6 +13,7 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -21,7 +23,7 @@ export function LoginPage({ onLogin }: { onLogin: (user: User) => void }) {
       const { data } = await api.post("/auth/login", { login, password });
       localStorage.setItem("token", data.token);
       onLogin(data.user);
-      navigate(data.user.role === "ADMIN" ? "/admin" : "/dashboard");
+      navigate(pathAfterLogin(location.search, data.user.role), { replace: true });
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Не удалось войти");
     } finally {

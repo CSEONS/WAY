@@ -21,6 +21,11 @@ ownerRoutes.get("/stores/:storeId/products", controller.listProducts);
 ownerRoutes.get("/stores/:storeId/categories", controller.listCategories);
 ownerRoutes.post("/stores/:storeId/products/ai-draft", aiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 8 }]), controller.createProductDraft);
 ownerRoutes.post("/stores/:storeId/products/bulk-ai-draft", bulkAiDraftUpload.fields([{ name: "voice", maxCount: 1 }, { name: "images", maxCount: 40 }]), controller.createBulkProductDraft);
+// Before /products/:id, which would take «bulk-ai-draft» for a product id.
+ownerRoutes.get("/stores/:storeId/products/bulk-ai-draft", controller.listBulkDrafts);
+ownerRoutes.get("/stores/:storeId/products/bulk-ai-draft/:draftId", controller.getBulkDraft);
+ownerRoutes.get("/stores/:storeId/products/bulk-ai-draft/:draftId/photos/:index", controller.getBulkDraftPhoto);
+ownerRoutes.delete("/stores/:storeId/products/bulk-ai-draft/:draftId", controller.deleteBulkDraft);
 ownerRoutes.post("/stores/:storeId/products/ai-preview", previewUpload.single("image"), controller.createPreview);
 ownerRoutes.post("/stores/:storeId/products", controller.createProduct);
 ownerRoutes.post("/stores/:storeId/products/bulk", controller.bulkProducts);

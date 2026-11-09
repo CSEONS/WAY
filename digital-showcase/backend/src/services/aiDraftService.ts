@@ -490,8 +490,9 @@ function findSizes(prompt: string) {
 }
 
 function buildVariants(prompt: string, colors: { name: string; hex: string | null }[], sizes: string[], fallbackPrice: number | null) {
-  const safeColors = colors.length ? colors : [{ name: "Уточнить", hex: null }];
-  const safeSizes = sizes.length ? sizes : ["Уточнить"];
+  // An unknown color or size is «Уточнить у продавца»: the form knows that phrase and leaves it out of the chips.
+  const safeColors = colors.length ? colors : [{ name: "Уточнить у продавца", hex: null }];
+  const safeSizes = sizes.length ? sizes : ["Уточнить у продавца"];
   return safeColors.flatMap((color) =>
     safeSizes.map((size) => ({
       colorName: color.name,

@@ -27,6 +27,8 @@ test("группирует сценарий из TODO в три товара и 
     assert.deepEqual(draft.sizes, ["Уточнить у продавца"]);
     assert.equal(draft.status, "AVAILABLE");
   }
+  // Variants built from colors alone: the unknown size is the phrase the form leaves out of the size chips.
+  assert.deepEqual(drafts[0].variants.map((variant) => variant.size), ["Уточнить у продавца", "Уточнить у продавца"]);
 });
 
 test("каждое изображение назначается только один раз", () => {

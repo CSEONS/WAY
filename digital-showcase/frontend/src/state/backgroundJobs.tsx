@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
+import { type BulkSorting, sortingsPath } from "../components/bulk/grouping";
 import type { ProductImageSelection, ProductPayload } from "../components/product-form";
 import type { Product } from "../types/models";
 
@@ -41,6 +42,30 @@ interface SaveProgress {
 
 const PREVIEW = "ai-preview-after-save";
 
+/**
+ * «Добавить много товаров» left while the AI sorts the photos on the server:
+ * the dock shows how it's going and «Продолжить» once it's done.
+ */
+export interface BulkSortingJob {
+  draftId: string;
+  storeId: string;
+  photoCount: number;
+  status: BulkSorting["status"];
+  productCount: number;
+  error: string | null;
+}
+
+export interface WatchBulkSortingArgs {
+  storeId: string;
+  draftId: string;
+  photoCount: number;
+  /** Kept for the page that continues the sorting, so it doesn't download them again. */
+  photos: File[];
+}
+
+/** How often the dock asks the server about a sorting. */
+const SORTING_POLL_MS = 4000;
+
 interface BackgroundJobsContextValue {
   jobs: BackgroundJob[];
   queueProductSave: (args: QueueProductSaveArgs) => string;
@@ -49,6 +74,12 @@ interface BackgroundJobsContextValue {
   /** Runs a failed job again from where it stopped. */
   retryJob: (id: string) => void;
   dismissJob: (id: string) => void;
+  sortings: BulkSortingJob[];
+  /** The owner left «Добавить много товаров» while the AI sorts: the dock follows the sorting. */
+  watchBulkSorting: (args: WatchBulkSortingArgs) => void;
+  /** The page opened the sorting again: the dock lets go of it and hands over its photos, if they're still here. */
+  takeBulkSorting: (draftId: string) => File[] | null;
+  dismissBulkSorting: (draftId: string) => void;
 }
 
 const BackgroundJobsContext = createContext<BackgroundJobsContextValue | null>(null);
@@ -128,6 +159,62 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
 
   const retryJob = useCallback((id: string) => void run(id), [run]);
 
+  const [sortings, setSortings] = useState<BulkSortingJob[]>([]);
+  // Files aren't for rendering: kept beside the state until the page takes them back.
+  const sortingPhotosRef = useRef(new Map<string, File[]>());
+
+  const dismissBulkSorting = useCallback((draftId: string) => {
+    sortingPhotosRef.current.delete(draftId);
+    setSortings((current) => current.filter((sorting) => sorting.draftId !== draftId));
+  }, []);
+
+  const watchBulkSorting = useCallback(({ storeId, draftId, photoCount, photos }: WatchBulkSortingArgs) => {
+    sortingPhotosRef.current.set(draftId, photos);
+    setSortings((current) => [
+      ...current.filter((sorting) => sorting.draftId !== draftId),
+      { draftId, storeId, photoCount, status: "RUNNING", productCount: 0, error: null }
+    ]);
+  }, []);
+
+  const takeBulkSorting = useCallback(
+    (draftId: string) => {
+      const photos = sortingPhotosRef.current.get(draftId) ?? null;
+      dismissBulkSorting(draftId);
+      return photos;
+    },
+    [dismissBulkSorting]
+  );
+
+  // The sortings the AI is still on: asked about every few seconds, without
+  // «watching» — the owner isn't on the page, so the server also notifies them.
+  const runningKey = sortings
+    .filter((sorting) => sorting.status === "RUNNING")
+    .map((sorting) => `${sorting.storeId}/${sorting.draftId}`)
+    .join(",");
+  useEffect(() => {
+    if (!runningKey) return;
+    const timer = window.setInterval(() => {
+      for (const key of runningKey.split(",")) {
+        const [storeId, draftId] = key.split("/");
+        api
+          .get<Pick<BulkSorting, "status" | "drafts" | "error">>(`${sortingsPath(storeId)}/${draftId}`)
+          .then(({ data }) => {
+            if (data.status === "RUNNING") return;
+            setSortings((current) =>
+              current.map((sorting) =>
+                sorting.draftId === draftId ? { ...sorting, status: data.status, productCount: data.drafts?.length ?? 0, error: data.error } : sorting
+              )
+            );
+          })
+          .catch((err) => {
+            // Thrown away in another tab: nothing to follow.
+            if (err?.response?.status === 404) dismissBulkSorting(draftId);
+          });
+      }
+    }, SORTING_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [runningKey, dismissBulkSorting]);
+
   const hasUnfinishedJobs = jobs.some((job) => job.status === "running" || job.status === "waiting");
   useEffect(() => {
     if (!hasUnfinishedJobs) return;
@@ -141,8 +228,8 @@ export function BackgroundJobsProvider({ children }: { children: ReactNode }) {
   }, [hasUnfinishedJobs]);
 
   const value = useMemo(
-    () => ({ jobs, queueProductSave, queueProductBatch, retryJob, dismissJob }),
-    [jobs, queueProductSave, queueProductBatch, retryJob, dismissJob]
+    () => ({ jobs, queueProductSave, queueProductBatch, retryJob, dismissJob, sortings, watchBulkSorting, takeBulkSorting, dismissBulkSorting }),
+    [jobs, queueProductSave, queueProductBatch, retryJob, dismissJob, sortings, watchBulkSorting, takeBulkSorting, dismissBulkSorting]
   );
 
   return <BackgroundJobsContext.Provider value={value}>{children}</BackgroundJobsContext.Provider>;

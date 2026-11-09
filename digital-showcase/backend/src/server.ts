@@ -10,6 +10,7 @@ import { assertProductionConfig } from "./config.js";
 import { closeDb, initDatabase } from "./database/db.js";
 import { reportProblem } from "./services/alertService.js";
 import { startBackupSchedule } from "./services/backupService.js";
+import { startBulkDrafts } from "./services/bulkDraftService.js";
 import { ensureThumbnails } from "./services/imageService.js";
 import { startMonthlyReports } from "./services/monthlyReportService.js";
 import { startSubscriptionReminders } from "./services/subscriptionReminderService.js";
@@ -32,6 +33,8 @@ ensureThumbnails()
   .catch((error) => console.error("Thumbnail backfill failed", error));
 
 await startBackupSchedule();
+// «Добавить много товаров»: sortings a restart interrupted are failed, old ones removed.
+await startBulkDrafts().catch((error) => console.error("Bulk drafts start failed", error));
 // Last month's results go to the owners as notifications.
 startMonthlyReports();
 // Owners whose paid date is near or has passed get a reminder to pay.

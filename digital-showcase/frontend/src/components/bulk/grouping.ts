@@ -39,6 +39,35 @@ export interface Layout {
 /** What the server returns for one product (see aiDraftService: BulkProductAiDraft). */
 export type AiBulkDraft = ProductDraft & { imageIndexes: number[] };
 
+/**
+ * The AI sorts the photos in the background (bulkDraftService): the photos and
+ * its answer wait on the server for a few days, so the owner may leave the page.
+ */
+export interface BulkSorting {
+  id: string;
+  storeId: string;
+  status: "RUNNING" | "DONE" | "ERROR";
+  photoCount: number;
+  /** What the owner wrote for the AI, back with the photos. */
+  prompt: string;
+  expectedCount: number | null;
+  createdAt: string;
+  finishedAt: string | null;
+  /** The AI's answer, once DONE. */
+  drafts: AiBulkDraft[] | null;
+  error: string | null;
+}
+
+/** A sorting in the store's list, without the AI's answer. */
+export type BulkSortingSummary = Pick<BulkSorting, "id" | "status" | "photoCount" | "createdAt" | "finishedAt" | "error"> & { productCount: number };
+
+/** Days the server keeps a sorting (bulkDraftService.KEEP_DAYS). */
+export const SORTING_KEEP_DAYS = 3;
+
+export function sortingsPath(storeId: string) {
+  return `/owner/stores/${storeId}/products/bulk-ai-draft`;
+}
+
 /** A new product is in stock until the owner says otherwise. */
 const DEFAULT_STATUS: ProductStatus = "AVAILABLE";
 

@@ -1,8 +1,9 @@
 import type { Request } from "express";
 import type { Store } from "../types/models.js";
-import { DRAFT_FIELDS, type DraftField, type KnownProductFields, createBulkProductAiDraft, createProductAiDraft } from "../services/aiDraftService.js";
+import { DRAFT_FIELDS, type DraftField, type KnownProductFields, createProductAiDraft } from "../services/aiDraftService.js";
 import * as aiUsageService from "../services/aiUsageService.js";
-import { previewSettings } from "../services/aiProvider.js";
+import { isAiConfigured, previewSettings } from "../services/aiProvider.js";
+import * as bulkDraftService from "../services/bulkDraftService.js";
 import { planOf } from "../services/planService.js";
 import { settings } from "../services/settingsService.js";
 import * as analyticsService from "../services/analyticsService.js";
@@ -310,24 +311,59 @@ export const createPreview = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+/**
+ * «Добавить много товаров»: the photos are saved and the AI sorts them in the
+ * background (bulkDraftService). The answer is the sorting to ask about.
+ */
 export const createBulkProductDraft = asyncHandler(async (req, res) => {
   const store = await storeForNewProducts(req);
   if (!aiUsageService.aiAllowed(store, "BULK")) throw new HttpError(403, "ИИ-заполнение формы не подключено");
   const { voice, images } = uploadedAiDraftFiles(req);
   if (images.length < 2) throw new HttpError(400, "Для массовой группировки добавьте минимум два изображения");
+  if (!isAiConfigured()) throw new HttpError(503, "Для массовой группировки товаров настройте AI_API_KEY на сервере");
   const prompt = typeof req.body.prompt === "string" ? req.body.prompt : "";
   const expectedCount = Number(req.body.expectedCount);
   await aiUsageService.assertWithinLimit(store, "BULK");
-  const { result, usage } = await aiUsageService.measureTokens(() =>
-    createBulkProductAiDraft({
-      prompt,
-      voice,
-      images,
-      expectedCount: Number.isInteger(expectedCount) && expectedCount > 0 && expectedCount <= images.length ? expectedCount : undefined
-    })
-  );
-  await aiUsageService.recordUsage(store.id, "BULK", result.length, usage);
-  res.json(result);
+  const draft = await bulkDraftService.startBulkDraft(store.id, {
+    prompt,
+    voice,
+    images,
+    expectedCount: Number.isInteger(expectedCount) && expectedCount > 0 && expectedCount <= images.length ? expectedCount : undefined
+  });
+  res.status(202).json(draft);
+});
+
+/** The store's sortings: the page offers to go on with one the owner left. */
+export const listBulkDrafts = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  res.json(bulkDraftService.listBulkDrafts(store.id));
+});
+
+/**
+ * How a sorting is going. `?watch=1` — the page is open and shows it, so the
+ * owner needs no notification when it's done; `?watch=0` — the page was left.
+ * A GET, so asking every few seconds doesn't fill the journal.
+ */
+export const getBulkDraft = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  const watch = req.query.watch === "1" ? true : req.query.watch === "0" ? false : undefined;
+  res.json(bulkDraftService.getBulkDraft(store.id, String(req.params.draftId), watch));
+});
+
+export const getBulkDraftPhoto = asyncHandler(async (req, res, next) => {
+  const store = await scopedStore(req);
+  const photo = bulkDraftService.bulkDraftPhoto(store.id, String(req.params.draftId), Number(req.params.index));
+  res.setHeader("Cache-Control", "private, no-store");
+  res.type(photo.type).sendFile(photo.file, (error) => {
+    // Removed a moment ago (published or cleaned up).
+    if (error && !res.headersSent) next(new HttpError(404, "Фото не найдено"));
+  });
+});
+
+export const deleteBulkDraft = asyncHandler(async (req, res) => {
+  const store = await scopedStore(req);
+  await bulkDraftService.deleteBulkDraft(store.id, String(req.params.draftId));
+  res.status(204).end();
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {

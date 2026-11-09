@@ -1,4 +1,5 @@
 import { getDb } from "../database/db.js";
+import { plural } from "../utils/plural.js";
 import { isDaytime, notifyUser } from "./notificationService.js";
 import { monthKey } from "./paymentService.js";
 import { type MonthReport, monthRange, storeMonthReport } from "./reportService.js";
@@ -18,14 +19,6 @@ const CHANNELS: [keyof MonthReport["contactsByChannel"], string][] = [
   ["vk", "ВКонтакте"],
   ["phone", "звонок"]
 ];
-
-function plural(count: number, [one, few, many]: [string, string, string]) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
-}
 
 const times = (count: number) => `${count.toLocaleString("ru-RU")} ${plural(count, ["раз", "раза", "раз"])}`;
 

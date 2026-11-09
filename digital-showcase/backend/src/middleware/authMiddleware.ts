@@ -71,6 +71,7 @@ const OWNER_ACTIONS: [method: string, path: RegExp, label: string][] = [
   ["POST", /\/online-payments\/[^/]+\/check$/, "Проверил онлайн-оплату"],
   ["POST", /\/online-payments$/, "Перешёл к онлайн-оплате"],
   ["POST", /\/products\/bulk-ai-draft$/, "ИИ-черновики нескольких товаров"],
+  ["DELETE", /\/products\/bulk-ai-draft\/[^/]+$/, "Убрал раскладку фото ИИ"],
   ["POST", /\/products\/bulk$/, "Изменил несколько товаров сразу"],
   ["POST", /\/products\/ai-draft$/, "ИИ-черновик товара"],
   ["POST", /\/products\/ai-preview$/, "ИИ-превью товара"],

@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ProductStatus } from "../../types/models";
 import { PRICE_ERROR, isValidPrice } from "../../utils/price";
 import { Button, Card, Field, Input, Select, Textarea, cx } from "../../ui";
+import { ColorPicker, SizePicker } from "../product-form/DetailPickers";
 import { ASK_SELLER } from "../product-form/helpers";
-import { type BulkDraft, type BulkPhoto, type Layout, withPrice, withPriceForAll } from "./grouping";
+import { type BulkDraft, type BulkPhoto, type Layout, withPriceForAll } from "./grouping";
 import styles from "./Bulk.module.css";
 
 const statusOptions = [
@@ -21,7 +22,10 @@ interface PricesStepProps {
   errorsShown: number;
 }
 
-/** Step 3: a name and a price per product. Everything else the AI filled in stays under «Ещё». */
+/**
+ * Step 3: a name and a price per product. Everything else the AI filled in
+ * stays under «Ещё»; sizes and colors are picked as in the product form.
+ */
 export function PricesStep({ photos, layout, onChange, errorsShown }: PricesStepProps) {
   const [priceForAll, setPriceForAll] = useState("");
   const [openIds, setOpenIds] = useState<string[]>([]);
@@ -66,7 +70,7 @@ export function PricesStep({ photos, layout, onChange, errorsShown }: PricesStep
                     <Input value={draft.title} onChange={(event) => update(draft.id, (current) => ({ ...current, title: event.target.value }))} placeholder="Название товара" />
                   </Field>
                   <Field label="Цена, ₽" error={isValidPrice(draft.price) ? undefined : PRICE_ERROR} hint={draft.price.trim() ? undefined : `Без цены покупатель увидит «${ASK_SELLER}».`}>
-                    <Input inputMode="decimal" value={draft.price} onChange={(event) => update(draft.id, (current) => withPrice(current, event.target.value))} placeholder="Например, 2500" />
+                    <Input inputMode="decimal" value={draft.price} onChange={(event) => update(draft.id, (current) => ({ ...current, price: event.target.value }))} placeholder="Например, 2500" />
                   </Field>
                 </div>
                 <div className={styles.itemMore}>
@@ -85,12 +89,17 @@ export function PricesStep({ photos, layout, onChange, errorsShown }: PricesStep
                       <Field label="Описание" className={styles.wide}>
                         <Textarea value={draft.description} onChange={(event) => update(draft.id, (current) => ({ ...current, description: event.target.value }))} />
                       </Field>
-                      <Field label="Размеры" hint="Через запятую: S, M, L">
-                        <Input value={draft.sizes} onChange={(event) => update(draft.id, (current) => ({ ...current, sizes: event.target.value }))} placeholder={ASK_SELLER} />
-                      </Field>
-                      <Field label="Цвета" hint="Через запятую: синий, белый">
-                        <Input value={draft.colors} onChange={(event) => update(draft.id, (current) => ({ ...current, colors: event.target.value }))} />
-                      </Field>
+                      <SizePicker
+                        className={styles.wide}
+                        value={draft.sizes}
+                        onChange={(change) => update(draft.id, (current) => ({ ...current, sizes: change(current.sizes) }))}
+                      />
+                      <ColorPicker
+                        className={styles.wide}
+                        value={draft.colors}
+                        onChange={(change) => update(draft.id, (current) => ({ ...current, colors: change(current.colors) }))}
+                        coverUrl={photos[draft.photos[0]]?.url}
+                      />
                       <Field label="Категория">
                         <Input value={draft.category} onChange={(event) => update(draft.id, (current) => ({ ...current, category: event.target.value }))} placeholder="Например, платья" />
                       </Field>

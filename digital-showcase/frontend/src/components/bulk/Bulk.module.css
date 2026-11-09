@@ -295,8 +295,12 @@
   gap: var(--space-3);
 }
 
+/* «Название» and «Цена» side by side: labels on one line and inputs on the next,
+   the same height. A field isn't stretched to its neighbour's hint (a stretched
+   Field spreads the extra height between its label and input). */
 .itemFields {
   display: grid;
+  align-items: start;
   gap: var(--space-3);
   min-width: 0;
 }
@@ -309,7 +313,8 @@
 
 .itemMoreFields {
   display: grid;
-  gap: var(--space-3);
+  align-items: start;
+  gap: var(--space-4) var(--space-3);
 }
 
 @media (min-width: 720px) {

@@ -172,12 +172,12 @@ export function ProductForm({ initial, aiDraftPath, aiPreviewPath, aiFormEnabled
   }
 
   function applyDraft(draft: ProductDraft) {
+    // Availability stays the owner's: «В наличии» for a new product, whatever they picked otherwise.
     setForm((current) => ({
       ...current,
       title: draft.title ?? current.title,
       description: draft.description ?? current.description,
       categories: draft.category?.trim() ? [draft.category.trim()] : current.categories,
-      status: draft.status ?? current.status,
       isVisible: draft.isVisible ?? current.isVisible
     }));
     const { simple: draftSimple, variantPrices: draftPrices, isOnePrice } = detailsFromDraft(draft);

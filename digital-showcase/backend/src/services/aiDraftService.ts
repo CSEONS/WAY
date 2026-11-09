@@ -66,7 +66,6 @@ const productDraftInstructions = `
   "price": 4500 или null,
   "priceText": "Уточнить у продавца" или null,
   "category": "Платья" или null,
-  "status": "AVAILABLE" | "NOT_AVAILABLE" | "CHECK_IN_STORE",
   "isVisible": 1 или 0,
   "sizes": ["S", "M"],
   "colors": [{"name":"тёмно-синий","hex":"#1f2a44"}],
@@ -160,7 +159,6 @@ description,
 price,
 priceText,
 category,
-status,
 isVisible,
 sizes,
 colors,
@@ -235,9 +233,8 @@ export function normalizeBulkProductDrafts(rawText: string, imageCount: number, 
     const raw = item as Record<string, unknown>;
     const normalized = normalizeAiDraft(JSON.stringify(raw), fallbackPrompt);
     const sizes = normalized.sizes.length ? normalized.sizes : ["Уточнить у продавца"];
-    const draft = normalized.price == null
-      ? { ...normalized, sizes, priceText: "Уточнить у продавца", status: "CHECK_IN_STORE" as ProductStatus }
-      : { ...normalized, sizes };
+    // Without a price the buyer sees «Уточнить у продавца»; the product is still in stock.
+    const draft = normalized.price == null ? { ...normalized, sizes, priceText: "Уточнить у продавца" } : { ...normalized, sizes };
     const imageIndexes = normalizeImageIndexes(raw.imageIndexes, imageCount).filter((index) => !claimed.has(index));
     imageIndexes.forEach((index) => claimed.add(index));
     return imageIndexes.length ? [{ ...draft, imageIndexes }] : [];
@@ -361,7 +358,8 @@ function normalizeAiDraft(rawText: string, fallbackPrompt: string): ProductAiDra
     price,
     priceText: stringOrNull(parsed.priceText) ?? (price == null ? "Уточнить у продавца" : null),
     category: stringOrNull(parsed.category),
-    status: normalizeStatus(parsed.status),
+    // A new product is in stock until the owner says otherwise: the AI doesn't decide it.
+    status: "AVAILABLE",
     isVisible: Number(parsed.isVisible) === 0 ? 0 : 1,
     sizes,
     colors,
@@ -437,10 +435,6 @@ function numberOrNull(value: unknown) {
   if (value === "" || value === null || value === undefined) return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
-}
-
-function normalizeStatus(value: unknown): ProductStatus {
-  return value === "NOT_AVAILABLE" || value === "CHECK_IN_STORE" || value === "AVAILABLE" ? value : "AVAILABLE";
 }
 
 function createLocalProductAiDraft(prompt: string): ProductAiDraft {

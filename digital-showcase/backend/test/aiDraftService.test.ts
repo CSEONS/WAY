@@ -7,8 +7,9 @@ test("группирует сценарий из TODO в три товара и 
   const response = JSON.stringify({
     products: [
       { title: "Джинсы", colors: ["синий", "черный"], imageIndexes: [0, 1, 2] },
-      { title: "Свитер", imageIndexes: [3] },
-      { title: "Пиджак", imageIndexes: [4, 5] }
+      // Availability isn't the AI's to decide: a new product is in stock.
+      { title: "Свитер", status: "CHECK_IN_STORE", imageIndexes: [3] },
+      { title: "Пиджак", status: "NOT_AVAILABLE", imageIndexes: [4, 5] }
     ]
   });
 
@@ -24,7 +25,7 @@ test("группирует сценарий из TODO в три товара и 
     assert.equal(draft.price, null);
     assert.equal(draft.priceText, "Уточнить у продавца");
     assert.deepEqual(draft.sizes, ["Уточнить у продавца"]);
-    assert.equal(draft.status, "CHECK_IN_STORE");
+    assert.equal(draft.status, "AVAILABLE");
   }
 });
 

@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import type { AiRequest, AiSpend, AiSpendReport } from "../../types/models";
 import { ButtonLink, Card, CardHeader, ErrorState, LoadingState, Notice, Stat } from "../../ui";
 import { formatMoney, formatMonth, plural } from "../../utils/format";
+import { AiSpendDays } from "./AiSpendDays";
 import styles from "./AiSpendTab.module.css";
 
 function rubles(value: number | null) {
@@ -22,9 +23,10 @@ const requestNames: Record<AiRequest, string> = {
 };
 
 /**
- * «Расходы на ИИ» in the admin panel: this month at a glance (from the
- * overview), the last six months, this month by store — to compare with
- * what the AI plan brings in — and how many tokens each kind of request takes.
+ * «Расходы на ИИ» in the admin panel: tokens and money by day (from OpenAI with
+ * an Admin key), this month at a glance (from the overview), the last six
+ * months, this month by store — to compare with what the AI plan brings in —
+ * and how many tokens each kind of request takes.
  */
 export function AiSpendTab({ summary }: { summary: AiSpend }) {
   const [report, setReport] = useState<AiSpendReport>();
@@ -45,6 +47,8 @@ export function AiSpendTab({ summary }: { summary: AiSpend }) {
 
   return (
     <>
+      <AiSpendDays />
+
       {summary.rubPerUsd == null && (
         <Notice
           title="Сколько стоит ИИ в рублях"

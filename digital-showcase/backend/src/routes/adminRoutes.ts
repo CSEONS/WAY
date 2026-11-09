@@ -23,6 +23,7 @@ adminRoutes.post("/backups", controller.startBackup);
 adminRoutes.get("/ai", controller.aiStatus);
 adminRoutes.post("/ai/check", controller.checkAi);
 adminRoutes.get("/ai/spend", controller.aiSpend);
+adminRoutes.get("/ai/spend/days", controller.aiSpendByDay);
 adminRoutes.get("/plans", controller.listPlans);
 adminRoutes.post("/plans", controller.createPlan);
 adminRoutes.post("/plans/order", controller.reorderPlans);

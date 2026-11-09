@@ -501,6 +501,35 @@ export interface AiRequestStats {
   maxRub: number | null;
 }
 
+/** One day of AI spending. `rub` is null until the rate is set on «Настройки ИИ». */
+export interface AiSpendDay {
+  /** "2026-11-09": a UTC day for OpenAI's figures, a server day for the site's. */
+  date: string;
+  inputTokens: number;
+  outputTokens: number;
+  requests: number;
+  usd: number;
+  rub: number | null;
+}
+
+/**
+ * «Траты по дням» (GET /admin/ai/spend/days): what OpenAI billed (with
+ * OPENAI_ADMIN_KEY on the server) or the site's own estimate.
+ */
+export interface AiSpendByDay {
+  source: "openai" | "site";
+  /** OPENAI_ADMIN_KEY is set on the server. */
+  adminKey: boolean;
+  /** Why OpenAI's figures couldn't be read although the key is set. */
+  error: string | null;
+  rubPerUsd: number | null;
+  /** Oldest first; today so far is the last one. */
+  days: AiSpendDay[];
+  total: Omit<AiSpendDay, "date">;
+  /** The site's records only: models without a known price, left out of the sums. */
+  unpricedModels: string[];
+}
+
 /** This month's AI, in cards and rubles. Ruble sums are null until the rate is set on «Настройки». */
 export interface AiSpend {
   /** Cards used by all stores; previews are part of them too. */

@@ -3,6 +3,7 @@ import { getDb, rawDb } from "../database/db.js";
 import type { Store } from "../types/models.js";
 import { HttpError } from "../utils/http.js";
 import { requestCostUsd, rublesPerDollar } from "./aiPrices.js";
+import { openAiAdminKey, openAiUsageByDay } from "./openaiUsageService.js";
 import { planOf } from "./planService.js";
 import { settings } from "./settingsService.js";
 
@@ -328,5 +329,95 @@ export async function spendReport(current: CurrentModels, now = new Date(), mont
     stores: [...byStore.values()].sort((a, b) => b.usd - a.usd || b.used - a.used).map(({ usd, ...store }) => ({ ...store, costRub: toRubles(usd) })),
     requests: requestStats(requests),
     unpricedModels: [...unpriced]
+  };
+}
+
+/** One day of AI spending: tokens, requests and dollars. */
+export interface SpendDay {
+  /** "2026-11-09". */
+  date: string;
+  inputTokens: number;
+  outputTokens: number;
+  requests: number;
+  usd: number;
+}
+
+/** A local calendar day, "2026-11-09". */
+function dayKey(date: Date) {
+  return `${monthKey(date)}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/** The site's own records by day: every owner request at its model's price. Photo checks and voice aren't among them. */
+async function siteSpendByDay(current: CurrentModels, days: number, now: Date) {
+  const db = await getDb();
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+  const rows = await db.all<UsageRow & { createdAt: string }>(
+    "SELECT kind, units, planUnits, inputTokens, outputTokens, model, createdAt FROM ai_usage WHERE createdAt >= ?",
+    from.toISOString()
+  );
+  const byDate = new Map<string, SpendDay>();
+  for (let index = 0; index < days; index += 1) {
+    const date = dayKey(new Date(from.getFullYear(), from.getMonth(), from.getDate() + index));
+    byDate.set(date, { date, inputTokens: 0, outputTokens: 0, requests: 0, usd: 0 });
+  }
+  const unpriced = new Set<string>();
+  for (const row of rows) {
+    const day = byDate.get(dayKey(new Date(row.createdAt)));
+    if (!day) continue;
+    const { usd, unpriced: model } = rowCost(row, current);
+    if (model) unpriced.add(model);
+    day.inputTokens += row.inputTokens;
+    day.outputTokens += row.outputTokens;
+    day.requests += 1;
+    day.usd += usd ?? 0;
+  }
+  return { days: [...byDate.values()], unpricedModels: [...unpriced] };
+}
+
+/** Dollars to the millionth: a cheap day stays above zero, float dust goes. */
+const roundUsd = (usd: number) => Math.round(usd * 1_000_000) / 1_000_000;
+
+/**
+ * «Траты по дням» in the admin panel: tokens and money over the last `days`
+ * days. With OPENAI_ADMIN_KEY — what OpenAI itself counted and billed (UTC
+ * days, the whole organization); without it, or when OpenAI can't be read
+ * (`error` says why), the site's own records: an estimate that misses the
+ * photo checks and voice. Rubles at the rate from «Настройки ИИ».
+ */
+export async function spendByDay(current: CurrentModels, days: number, { refresh = false, now = new Date() } = {}) {
+  let source: "openai" | "site" = "site";
+  let error: string | null = null;
+  let list: SpendDay[] | null = null;
+  let unpricedModels: string[] = [];
+  if (openAiAdminKey()) {
+    try {
+      list = await openAiUsageByDay(days, { refresh, now });
+      source = "openai";
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Не удалось прочитать расходы OpenAI";
+    }
+  }
+  if (!list) {
+    const site = await siteSpendByDay(current, days, now);
+    list = site.days;
+    unpricedModels = site.unpricedModels;
+  }
+  const total = list.reduce(
+    (sum, day) => ({
+      inputTokens: sum.inputTokens + day.inputTokens,
+      outputTokens: sum.outputTokens + day.outputTokens,
+      requests: sum.requests + day.requests,
+      usd: sum.usd + day.usd
+    }),
+    { inputTokens: 0, outputTokens: 0, requests: 0, usd: 0 }
+  );
+  return {
+    source,
+    adminKey: Boolean(openAiAdminKey()),
+    error,
+    rubPerUsd: rublesPerDollar(),
+    days: list.map((day) => ({ ...day, usd: roundUsd(day.usd), rub: toRubles(day.usd) })),
+    total: { ...total, usd: roundUsd(total.usd), rub: toRubles(total.usd) },
+    unpricedModels
   };
 }

@@ -421,9 +421,18 @@ export const testPreviewStyle = asyncHandler(async (req, res) => {
   res.json(await createProductPreview(options, req.file, style));
 });
 
+/** Models in use now: they price the site's records saved before the model was. */
+const currentModels = () => ({ text: aiProvider.aiSettings().model, preview: aiProvider.previewSettings()?.model ?? null });
+
 /** «Расходы на ИИ»: the last 6 months and this month by store. */
 export const aiSpend = asyncHandler(async (_req, res) => {
-  res.json(await aiUsageService.spendReport({ text: aiProvider.aiSettings().model, preview: aiProvider.previewSettings()?.model ?? null }));
+  res.json(await aiUsageService.spendReport(currentModels()));
+});
+
+/** «Траты по дням»: tokens and money over the last 7, 30 or 90 days — from OpenAI with an Admin key. `?refresh=1` skips the cache. */
+export const aiSpendByDay = asyncHandler(async (req, res) => {
+  const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+  res.json(await aiUsageService.spendByDay(currentModels(), days, { refresh: req.query.refresh === "1" }));
 });
 
 /** «Настройки»: plans, contacts, requisites, the trial and AI — plus priced model names to pick from. */

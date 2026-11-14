@@ -1,7 +1,7 @@
-import { ArrowDown01Icon, Cancel01Icon, ImageAdd01Icon, Mic01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Cancel01Icon, ImageAdd01Icon, Mic01Icon, TextIcon } from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import type { useVoiceRecorder } from "../../hooks/useVoiceRecorder";
-import { Button, Card, Field, FileButton, Icon, Input, Spinner, Textarea, cx } from "../../ui";
+import { Button, Card, Field, FileButton, Icon, Input, SegmentedControl, Spinner, Textarea, cx } from "../../ui";
 import { VoiceStatus, voiceButtonLabel } from "../VoiceRecorder";
 import type { BulkPhoto } from "./grouping";
 import styles from "./Bulk.module.css";
@@ -24,11 +24,22 @@ interface PhotosStepProps {
   onExpectedCount: (value: string) => void;
 }
 
-/** Step 1: only photos are needed. Voice and the rest are optional help for the AI. */
+type DescribeMode = "voice" | "text";
+
+/** Step 1: only photos are needed. A description by voice or text and the rest are optional help for the AI. */
 export function PhotosStep({ photos, isPreparing, disabled, onAdd, onRemove, recorder, prompt, onPrompt, expectedCount, onExpectedCount }: PhotosStepProps) {
-  // Opened from the start when the owner comes back to something they typed.
-  const [isMoreOpen, setIsMoreOpen] = useState(() => Boolean(prompt.trim() || expectedCount.trim()));
+  // Opened from the start when the owner comes back to something they entered.
+  const [isMoreOpen, setIsMoreOpen] = useState(() => Boolean(expectedCount.trim()));
+  // Text when the owner comes back to a typed description without a recording.
+  const [describeMode, setDescribeMode] = useState<DescribeMode>(() => (prompt.trim() && !recorder.blob ? "text" : "voice"));
   const isFull = photos.length >= MAX_PHOTOS;
+  // What the other mode already holds still goes to the AI: say so, so it isn't a surprise.
+  const otherNote =
+    describeMode === "text" && recorder.blob
+      ? "Голосовая запись тоже уйдёт ИИ."
+      : describeMode === "voice" && prompt.trim()
+        ? "Написанный текст тоже уйдёт ИИ."
+        : null;
 
   return (
     <>
@@ -75,17 +86,39 @@ export function PhotosStep({ photos, isPreparing, disabled, onAdd, onRemove, rec
       </Card>
 
       <Card as="section">
-        <div className={styles.voiceText}>
+        <div className={styles.describeHead}>
           <span className={styles.voiceTitle}>
-            Расскажите о товарах голосом
+            Расскажите о товарах
             <span className={styles.optional}>необязательно</span>
           </span>
-          <p className={styles.lead}>Назовите товары, цены и размеры — как удобно. Например: «Синее платье четыре с половиной тысячи, размеры S и M, юбка две тысячи».</p>
+          <SegmentedControl
+            label="Как рассказать о товарах"
+            size="sm"
+            value={describeMode}
+            onChange={setDescribeMode}
+            options={[
+              { value: "voice", label: "Голосом", icon: Mic01Icon },
+              { value: "text", label: "Текстом", icon: TextIcon }
+            ]}
+            className={cx(recorder.isRecording && styles.locked)}
+          />
         </div>
-        {(recorder.isRecording || recorder.blob) && <VoiceStatus recorder={recorder} />}
-        <Button variant="secondary" icon={Mic01Icon} disabled={disabled} onClick={recorder.toggle}>
-          {voiceButtonLabel(recorder)}
-        </Button>
+        <p className={styles.lead}>
+          Назовите товары, цены и размеры — как удобно. Например: «Синее платье четыре с половиной тысячи, размеры S и M, юбка две тысячи».
+        </p>
+        {describeMode === "voice" ? (
+          <>
+            {(recorder.isRecording || recorder.blob) && <VoiceStatus recorder={recorder} />}
+            <Button variant="secondary" icon={Mic01Icon} disabled={disabled} onClick={recorder.toggle}>
+              {voiceButtonLabel(recorder)}
+            </Button>
+          </>
+        ) : (
+          <Field label="Описание товаров">
+            <Textarea value={prompt} disabled={disabled} onChange={(event) => onPrompt(event.target.value)} placeholder="Например: джинсы по 1000, носки по 50, кепка 44 размера…" />
+          </Field>
+        )}
+        {otherNote && <p className={styles.note}>{otherNote}</p>}
       </Card>
 
       <Button
@@ -100,9 +133,6 @@ export function PhotosStep({ photos, isPreparing, disabled, onAdd, onRemove, rec
       </Button>
       {isMoreOpen && (
         <Card as="section">
-          <Field label="Описать текстом" hint="Вместо голоса или вместе с ним.">
-            <Textarea value={prompt} disabled={disabled} onChange={(event) => onPrompt(event.target.value)} placeholder="Например: джинсы по 1000, носки по 50, кепка 44 размера…" />
-          </Field>
           <Field label="Сколько примерно товаров на фото" hint="Помогает ИИ не склеить разные вещи и не разбить одну.">
             <Input
               type="number"
